@@ -1,132 +1,174 @@
-# Przygotowanie i późniejsze uruchomienie database-per-company
+# Lokalne wdrożenie database-per-company
 
-Status 2026-10-21: przygotowano kod i migracje offline. Nie utworzono nowych baz,
-nie wykonano migracji ani operacji w Vatowiec_Dev. Decyzja: [ADR-014](adr/ADR-014-database-per-company.md).
+Status 2026-10-21: wdrożono trzy bazy demonstracyjne, wykonano migracje EF Core
+i zainicjalizowano dwie fikcyjne firmy. Zaliczone 50 testów, w tym 12 na SQL,
+bez pominięć. Decyzja: [ADR-014](adr/ADR-014-database-per-company.md).
 
-## Co jest gotowe
+## Zgoda i zakres
 
-SystemDbContext mapuje `core.Companies` i `core.CompanyDatabases`.
-CompanyDbContext mapuje `core.CompanyProfile` i `core.Contractors`. Każdy ma
-własną migrację początkową i snapshot. Dotychczasowe migracje są archiwalne.
+Użytkownik potwierdził, że wszystkie bazy projektu są obecnie testowe, i zezwolił
+na ich usuwanie, ponowne tworzenie i modyfikowanie na localhost\SQLEXPRESS bez
+ponawiania pytań. Przed usunięciem sprawdzamy dokładną nazwę i przeznaczenie.
+Zgoda nie obejmuje baz innych aplikacji, baz systemowych SQL ani zdalnych instancji.
 
-Konfiguracja API używa `ConnectionStrings__VatowiecSystem`; domyślnie jest pusta.
-Stary klucz `ConnectionStrings__Vatowiec` jest ignorowany. Nie ma połączeń firm
-w appsettings ani w Desktop. CompanyDatabaseSelection jest przygotowaniem do
-serwerowego resolvera, nie działającą autoryzacją czy kontrolą fizycznego profilu.
+Dotychczasowa Vatowiec_Dev zawierała wyłącznie core.Companies, core.Contractors,
+historię 20261021092204_InitialCompaniesAndContractors i zero rekordów domenowych.
+Po sprawdzeniu została usunięta. Oryginalne pliki migracji pozostają w
+Persistence/LegacyMigrations, poza kompilacją. Nie kopiowano danych do nowych baz.
 
-## Generowanie SQL offline
+## Pozostawione bazy i dane
 
-Te polecenia nie łączą się z SQL i nie wykonują wygenerowanego SQL:
+Instancja: localhost\SQLEXPRESS, SQL Server 2025 Express 17.0.1000.7.
+Połączenie: Windows Authentication (NTLM), Encrypt=True.
+TrustServerCertificate=True jest wyjątkiem wyłącznie dla lokalnego Development.
+Użyto istniejącego konta Windows operatora; nie tworzono loginów SQL ani haseł.
+
+| Baza | Tabele | Migracja |
+|---|---|---|
+| Vatowiec_System | core.Companies, core.CompanyDatabases, dbo.__EFMigrationsHistory | 20261021102909_InitialSystem |
+| Vatowiec_Company_A_Dev | core.CompanyProfile, core.Contractors, dbo.__EFMigrationsHistory | 20261021102912_InitialCompany |
+| Vatowiec_Company_B_Dev | core.CompanyProfile, core.Contractors, dbo.__EFMigrationsHistory | 20261021102912_InitialCompany |
+
+Katalog zawiera dokładnie dwie firmy i dwie lokalizacje. Nie zawiera dokumentów
+księgowych ani kontrahentów. Każda firma ma własną historię migracji i singleton
+profilu z lokalnym FK kontrahentów do CompanyProfile.CompanyId, bez relacji SQL
+między bazami.
+
+| Firma fikcyjna | CompanyId | Baza |
+|---|---|---|
+| Firma demonstracyjna A — dane fikcyjne | aaaaaaaa-0000-4000-8000-000000000001 | Vatowiec_Company_A_Dev |
+| Firma demonstracyjna B — dane fikcyjne | bbbbbbbb-0000-4000-8000-000000000002 | Vatowiec_Company_B_Dev |
+
+Każda baza firmowa ma jeden profil i jednego fikcyjnego kontrahenta. NIP/REGON
+i identyfikator podatkowy kontrahenta są puste. Kontrahenci celowo mają ten sam
+techniczny Id cccccccc-0000-4000-8000-000000000001 i kod DEMO w obu bazach,
+ale inne nazwy i CompanyId. Nie są wspólną kartoteką.
+
+## Narzędzie administracyjne
+
+Narzędzie tools/database/Vatowiec.DatabaseTools jest osobnym programem konsolowym
+.NET, zależnym od infrastruktury. Nie jest wywoływane przez API. Z głównego katalogu:
 
 ```powershell
+dotnet restore Vatowiec.slnx
 dotnet build Vatowiec.slnx --no-restore
+dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- inspect
+dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- initialize
+dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- verify
+```
+
+Polecenia mają jawny zakres:
+
+- inspect: sprawdza lokalny serwer i wyświetla listę baz; jeśli istnieje Vatowiec_Dev,
+  sprawdza jej dokładny schemat i znaną migrację.
+- initialize: usuwa tylko potwierdzoną starą Vatowiec_Dev, tworzy trzy bazy
+  demonstracyjne, jawnie wykonuje EF MigrateAsync i seed przez encje domenowe.
+  Ponowienie zachowuje profile, dane i wpisy migracji; nie tworzy duplikatów.
+- verify: sprawdza własność, dokładne zestawy tabel, historie EF, brak oczekujących
+  migracji, zgodność CompanyId, katalog i dane firm.
+- prepare-tests / cleanup-tests: tworzy z migracjami lub usuwa wyłącznie trzy
+  oznaczone bazy *_Test.
+- test: przygotowuje bazy *_Test, uruchamia wszystkie testy, zapisuje TRX, weryfikuje
+  rollbacky i usuwa bazy *_Test w finally, także gdy testy zgłoszą błąd.
+
+Narzędzie sprawdza lokalną nazwę komputera, instancję SQLEXPRESS, wersję 17,
+edycję Express i Windows Authentication. Nazwy baz pochodzą z zamkniętej listy,
+a nie z argumentów użytkownika. Nowe bazy otrzymują rozszerzoną właściwość
+Vatowiec.LocalTestPurpose: osobno demonstrator i jednorazowe fixture integracyjne.
+Istniejąca baza bez zgodnego znacznika nie jest przejmowana, migrowana ani usuwana.
+Wyjątkiem jest wskazana przez użytkownika Vatowiec_Dev, rozpoznawana po dokładnym
+schemacie i archiwalnej migracji. Sam prefiks Vatowiec nie upoważnia do usunięcia.
+
+Kod używa Windows Authentication; poświadczenia nie są przekazywane klientowi
+Avalonia ani zapisywane w repozytorium. Administrator wykonujący narzędzie musi
+mieć istniejące uprawnienia do tworzenia baz i migracji. Nie nadawano nowych praw
+zwykłemu kontu aplikacji. Przyszły provisioning użyje osobnej tożsamości technicznej.
+
+## Konfiguracja API i granice obecnego etapu
+
+appsettings.Development.json wskazuje lokalną Vatowiec_System z Windows
+Authentication. Można nadpisać ConnectionStrings__VatowiecSystem.
+Bazowy appsettings poza Development nie ma domyślnego połączenia produkcyjnego.
+Stary klucz ConnectionStrings__Vatowiec jest ignorowany.
+
+CompanyDatabases.ConnectionProfileKey = LocalWindows jest referencją do
+serwerowego sposobu połączenia. Resolver korzystający z tego katalogu i autoryzacja
+nie zostały jeszcze zaimplementowane. Sam wpis w katalogu nie udostępnia firmy.
+CompanyDbContext wymaga jawnego CompanyDatabaseSelection zgodnego z ICompanyContext.
+Nie ma domyślnego wyboru firmy i nie ma migracji przy starcie API.
+
+To narzędzie lokalnego wdrożenia, nie pełny provisioning firmy z interfejsu.
+Logowanie, role, autoryzowany resolver z kontrolą fizycznego profilu, trwała
+operacja provisioningu z checkpointami, audyt aktorów i backup/restore pozostają
+kolejnymi zadaniami. Nie zaliczamy jeszcze ich scenariuszy ani całego M0.
+
+## Przegląd SQL offline
+
+Fabryki projektowe nadal nie mają connection stringów i nie odczytują konfiguracji
+środowiska. Poniższe polecenia jedynie generują SQL:
+
+```powershell
 dotnet ef migrations script 0 --idempotent --context SystemDbContext --project src/Modules/Core/Infrastructure --no-build --output src/Modules/Core/Infrastructure/obj/system.initial.sql
 dotnet ef migrations script 0 --idempotent --context CompanyDbContext --project src/Modules/Core/Infrastructure --no-build --output src/Modules/Core/Infrastructure/obj/company.initial.sql
 ```
 
-Fabryki projektowe nie dziedziczą konfiguracji środowiska i nie mają connection
-stringa. Powstałe pliki są artefaktami do przeglądu, nie skryptem tworzenia baz.
-System SQL nie może tworzyć tabel kontrahentów/księgowych; Company SQL nie może
-tworzyć katalogu firm ani centralnych użytkowników. Nie stosuj tych migracji
-do istniejącej Vatowiec_Dev i nie kopiuj jej historii EF do nowych baz.
+Oba skrypty przejrzano przed wdrożeniem. System tworzy tylko katalog i lokalizacje,
+Company tylko profil i kontrahentów; każdy dodaje własną historię EF. Nie zawierają
+DROP ani kopii księgowości innych firm. Migracje wykonano jawnie przez narzędzie,
+osobno dla każdej bazy. Nie stosuje się tych migracji do starego schematu.
 
-## Plan bezpiecznego utworzenia trzech baz — jeszcze niewykonany
+## Testy i wyniki
 
-1. Ustalić docelową instancję, katalogi danych/backupów i konta techniczne.
-   Dla demonstratora proponowane nazwy: `Vatowiec_System`,
-   `Vatowiec_Company_A_Dev`, `Vatowiec_Company_B_Dev` na localhost\SQLEXPRESS.
-   Sprawdzić zajętość dokładnie tych nazw i pojemność. Zastanej bazy nie
-   nadpisywać ani nie uznawać automatycznie za własną. Wyłączyć Vatowiec_Dev
-   z listy celów; nie wymaga ona odczytu ani modyfikacji do startu pustych firm.
-2. Przed wykonaniem przedstawić SQL do przeglądu i uzyskać zgodę na operacje
-   SQL. Docelowy skrypt/wykonawca musi sprawdzać nazwę serwera i katalogu przed
-   DDL, odmawiać operacji na Vatowiec_Dev i stosować osobne tożsamości
-   provisioningu/migracji, zwykłego CRUD i backupu. Sam SQL z EF nie zawiera
-   zabezpieczeń wskazujących konkretną docelową instancję i bazę.
-3. Utworzyć wyłącznie nową Vatowiec_System i wykonać InitialSystem. Sprawdzić
-   historię EF, rozłączność tabel i minimalne uprawnienia konta aplikacji.
-   Konta użytkowników i role wymagają uprzedniej implementacji logowania;
-   obecna migracja nie tworzy użytkowników ani fikcyjnych poświadczeń.
-4. Przydzielić dwa stabilne, sztuczne CompanyId. Dla każdej firmy wykonać
-   kontrolowane: utworzenie pustej bazy → InitialCompany → inicjalizację
-   dokładnie jednego CompanyProfile → weryfikację CompanyId, CHECK, FK,
-   rowversion i historii EF. Nazwy i identyfikatory nie mogą pochodzić z
-   autentycznych danych podatników. Inicjalizator profilu jest kolejnym zadaniem;
-   sam skrypt migracji nie seeduje profilu.
-5. Zapisać katalog i lokalizacje w bazie systemowej oraz serwerowe profile
-   połączeń. Po implementacji autoryzacji i resolvera dopuścić firmę do pracy
-   dopiero po weryfikacji stanu Ready, rzeczywistego profilu i wersji schematu.
-   Sama obecność rekordu CompanyDatabases nie udostępnia bazy klientowi.
-6. Wykonać oddzielny backup każdej bazy i wymaganych załączników, próbny restore
-   do nowych baz roboczych, sprawdzić dane i tożsamość oraz udokumentować wynik.
-   W późniejszym interfejsie uprawniony użytkownik zleci to bez SSMS.
-7. Po osobnej zgodzie przygotować dedykowane, puste bazy *_Test opisane niżej
-   i wykonać testy SQL. Dalej: test dwóch użytkowników tej samej firmy, IDOR,
-   błędnego routingu, awarii provisioningu, niezależnego restore i audytu po
-   usunięciu konta. Dopiero wykonanie tych scenariuszy pozwala je zaliczyć.
-
-Docelowo kroki tworzenia firmy wykona wznawialny proces uruchamiany z aplikacji,
-z trwałą operacją i checkpointami z ADR-014. Na tym etapie nie ma jeszcze
-wykonawcy, UI, tabel stanu provisioningu, backupu ani restore. Pierwsze bazy mogą
-powstać kontrolowanym narzędziem wdrożeniowym po przeglądzie; nie oznacza to,
-że końcowy użytkownik będzie potrzebował SSMS.
-
-## Późniejsze przeniesienie danych z Vatowiec_Dev
-
-To oddzielne zadanie. Przed kopiowaniem backup i weryfikacja źródła, zatrzymanie
-zapisów, mapa CompanyId → nowa baza, kopiowanie katalogu/profili i kontrahentów
-z zachowaniem identyfikatorów/dat, sprawdzenie liczności, wartości, unikatów i FK.
-Rowversion zostanie wygenerowany ponownie. Import musi być idempotentny.
-Przełączenie dopiero po weryfikacji; źródło i jego historia EF pozostają
-nienaruszone. Po zapisach w nowym systemie powrót do starego źródła wymaga
-uzgodnienia danych, nie prostego przełączenia connection stringa.
-
-## Testy
-
-Domyślne testy bez SQL sprawdzają modele, migracje/skrypty offline, DI,
-politykę połączeń i host API. Bezpieczny przebieg bez względu na stare flagi:
+Pełny przebieg z lokalnym SQL:
 
 ```powershell
-$env:VATOWIEC_DATABASE_PER_COMPANY_SQL = '0'
-dotnet test Vatowiec.slnx --no-build
+dotnet build Vatowiec.slnx --no-restore
+dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- test
+dotnet format Vatowiec.slnx --verify-no-changes --no-restore
 ```
 
-Dziewięć testów SQL pozostaje pominiętych. Nie tworzą baz ani nie migrują.
-Do ich przyszłego wykonania wymagane są trzy wcześniej zmigrowane, puste bazy:
+Runner przygotowuje puste Vatowiec_System_Test, Vatowiec_Company_A_Test i
+Vatowiec_Company_B_Test, wykonuje ich migracje i włącza
+VATOWIEC_DATABASE_PER_COMPANY_SQL=1 wyłącznie w procesie testowym.
+Wyniki trafiają do ignorowanego TestResults/database-per-company-*.trx.
+Runner odrzuca przebieg bez testów lub z pominięciami, nawet przy kodzie wyjścia 0.
+Po sprawdzeniu rollbacków usuwa tylko te trzy fixture. Bazy demonstracyjne pozostają.
 
-| Zmienna środowiskowa | Wymagany katalog |
+Przy ręcznym uruchamianiu testów po prepare-tests wymagane są zmienne:
+
+| Zmienna | Wymagany katalog |
 |---|---|
 | ConnectionStrings__VatowiecSystemTest | Vatowiec_System_Test |
 | ConnectionStrings__VatowiecCompanyATest | Vatowiec_Company_A_Test |
 | ConnectionStrings__VatowiecCompanyBTest | Vatowiec_Company_B_Test |
 
-Połączenia muszą wskazywać localhost\SQLEXPRESS i Windows Authentication,
-z Encrypt=True. TrustServerCertificate=True jest dopuszczalne tylko dla tych
-lokalnych baz Development. Nie podawaj sekretów w repozytorium ani logach.
-Gdy bazy i konfiguracja są gotowe, jawnie ustaw
-`VATOWIEC_DATABASE_PER_COMPANY_SQL=1` i uruchom testy. Brak konfiguracji jest
-wtedy błędem, nie pominięciem. Stara flaga VATOWIEC_SQL_INTEGRATION jest ignorowana.
+Każde połączenie wskazuje localhost\SQLEXPRESS, Windows Authentication,
+Encrypt=True; lokalne TrustServerCertificate=True jest dozwolone.
+Nie wskazuj baz demonstracyjnych w tych zmiennych.
+Stara flaga VATOWIEC_SQL_INTEGRATION nie włącza testów.
 
-Testy zapisują wyłącznie w transakcjach wycofywanych na końcu. Dla company testy
-oczekują braku profilu i danych przed startem. Nie należy wskazywać baz Dev.
-Test rowversion używa dwóch kontekstów i nie dowodzi jeszcze równoczesności
-dwóch zalogowanych operatorów. Provisioning/restore/audyt kont wymagają osobnych
-testów po ich implementacji.
+Zwykłe dotnet test bez flagi SQL wykonuje 38 testów i pomija 12 testów SQL.
+Można wymusić ten tryb ustawiając VATOWIEC_DATABASE_PER_COMPANY_SQL=0.
+To odrębny wynik od pełnego przebiegu opisanego poniżej.
 
-## Wynik weryfikacji kodu (2026-10-21)
+Wykonana weryfikacja (2026-10-21):
 
-- `dotnet build Vatowiec.slnx --no-restore`: wszystkie siedem projektów,
-  zero błędów i ostrzeżeń.
-- `VATOWIEC_DATABASE_PER_COMPANY_SQL=0` i `dotnet test Vatowiec.slnx --no-build`:
-  38 zaliczonych testów offline, 9 pominiętych testów SQL, 0 niepowodzeń.
-- Wygenerowano idempotentne skrypty obu kontekstów poleceniami opisanymi wyżej;
-  żadnego nie wykonano. Test potwierdza zgodność modeli ze snapshotami i rozłączność
-  tabel w generowanym SQL.
-- `dotnet format Vatowiec.slnx --verify-no-changes --no-restore`: powodzenie.
-- Porównanie git hash-object z oryginalnymi plikami HEAD potwierdza zachowanie
-  treści wszystkich trzech archiwalnych plików historii Vatowiec_Dev.
+- Build wszystkich ośmiu projektów: 0 błędów, 0 ostrzeżeń.
+- Wszystkie 50 testów zaliczone: 38 bez SQL i 12 na rzeczywistym SQL Server,
+  bez pominięć i błędów.
+- SQL: fizyczna izolacja dwóch baz, ten sam Id/kod kontrahenta w różnych firmach,
+  odmowa odczytu/zapisu przy złym/brakującym kontekście, singleton profilu,
+  FK także przy surowym SQL, unikalność kodu i lokalizacji bazy, rowversion,
+  atomowość SaveChanges, daty i rollbacky.
+- Niezależność migracji: usunięcie wpisu historii w A w wycofywanej transakcji
+  nie zmieniło historii B ani systemowej; po testach każda historia wróciła do
+  jednego wpisu i wszystkie fixture były puste.
+- Ponowiono initialize: nadal dwie firmy, dwa wskazania baz i po jednym profilu
+  oraz kontrahencie w firmach, bez powtórzenia migracji.
+- Końcowa inspekcja: tylko cztery bazy systemowe SQL i trzy bazy demonstracyjne;
+  brak Vatowiec_Dev i tymczasowych *_Test.
+- Formatowanie i git diff --check poprawne. Nie wykonano commit ani push.
 
-Nie łączono się z SQL Serverem, nie utworzono baz i nie wykonano migracji.
-Nie zmieniono Vatowiec_Dev; nie wykonano commit ani push. Wyniki nie dowodzą
-działania nowej struktury na SQL, autoryzacji, provisioningu, backupu/restore
-ani audytu po usunięciu konta. Te funkcje wymagają dalszej implementacji i prób.
+Test rowversion używa dwóch kontekstów; nie dowodzi jeszcze pracy dwóch
+zalogowanych operatorów przez API. Backup/restore, autoryzacja, provisioning
+z interfejsu i audyt po usunięciu konta wymagają dalszej implementacji i testów.

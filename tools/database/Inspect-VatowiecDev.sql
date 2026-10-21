@@ -1,4 +1,6 @@
--- Tylko odczyt katalogu i liczby rekordów w docelowej bazie developerskiej.
+-- Historyczny skrypt starej architektury. Vatowiec_Dev została usunięta za zgodą użytkownika.
+-- Aktualna inspekcja: dotnet run --project tools/database/Vatowiec.DatabaseTools -- inspect
+-- Poniżej zachowano dawny odczyt katalogu i liczby rekordów; nie dotyczy nowych baz.
 SET NOCOUNT ON;
 IF DB_NAME() <> N'Vatowiec_Dev'
     THROW 50001, 'Dozwolona jest wyłącznie baza Vatowiec_Dev.', 1;

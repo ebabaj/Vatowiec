@@ -44,6 +44,60 @@ public sealed class SqlServerPersistenceTests
     }
 
     [SqlServerFact]
+    public async Task MigrationHistories_ArePhysicallyIndependent()
+    {
+        await using var a = await Session.CompanyA();
+        await using var b = await Session.CompanyB();
+        await using var s = await Session.Open("Vatowiec_System_Test", "ConnectionStrings__VatowiecSystemTest");
+        await using var first = a.Company(null);
+        await using var second = b.Company(null);
+        await using var system = s.System();
+        using var command = new SqlCommand("DELETE FROM dbo.__EFMigrationsHistory;", a.Connection, a.Transaction);
+        Assert.Equal(1, await command.ExecuteNonQueryAsync());
+        Assert.Empty(await first.Database.GetAppliedMigrationsAsync());
+        Assert.Single(await first.Database.GetPendingMigrationsAsync());
+        Assert.EndsWith("_InitialCompany", Assert.Single(await second.Database.GetAppliedMigrationsAsync()));
+        Assert.Empty(await second.Database.GetPendingMigrationsAsync());
+        Assert.EndsWith("_InitialSystem", Assert.Single(await system.Database.GetAppliedMigrationsAsync()));
+        Assert.Empty(await system.Database.GetPendingMigrationsAsync());
+        // Usunięcie wpisu historii w A jest wycofywane przez Session.DisposeAsync.
+    }
+
+    [SqlServerFact]
+    public async Task LocalForeignKey_RejectsContractorOfAnotherCompanyThroughRawSql()
+    {
+        await using var session = await Session.CompanyA();
+        await session.Seed(Guid.NewGuid(), Guid.NewGuid());
+        using var command = new SqlCommand("""
+            INSERT core.Contractors (CompanyId, Id, Code, Name, CountryCode, IsActive, CreatedAtUtc, UpdatedAtUtc)
+            VALUES (@foreignCompany, NEWID(), N'FOREIGN', N'Fikcyjny obcy kontrahent', N'PL', 1, SYSUTCDATETIME(), SYSUTCDATETIME());
+            """, session.Connection, session.Transaction);
+        command.Parameters.AddWithValue("@foreignCompany", Guid.NewGuid());
+        var error = await Assert.ThrowsAsync<SqlException>(() => command.ExecuteNonQueryAsync());
+        Assert.Equal(547, error.Number);
+        Assert.Contains("FK_Contractors_CompanyProfile_CompanyId", error.Message);
+    }
+
+    [SqlServerFact]
+    public async Task SystemCatalog_EnforcesCompanyForeignKeyAndUniqueDatabaseLocation()
+    {
+        await using var session = await Session.Open("Vatowiec_System_Test", "ConnectionStrings__VatowiecSystemTest");
+        await using var context = session.System();
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        context.CompanyDatabases.Add(new CompanyDatabaseRegistration(a, "test-sql", "test-company", "TestWindows"));
+        var orphan = await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
+        Assert.Equal(547, Assert.IsType<SqlException>(orphan.InnerException).Number);
+        context.ChangeTracker.Clear();
+        context.Companies.AddRange(new Company(a, "Firma testowa A"), new Company(b, "Firma testowa B"));
+        context.CompanyDatabases.Add(new CompanyDatabaseRegistration(a, "test-sql", "test-company", "TestWindows"));
+        await context.SaveChangesAsync();
+        context.CompanyDatabases.Add(new CompanyDatabaseRegistration(b, "test-sql", "test-company", "TestWindows"));
+        var duplicate = await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
+        Assert.Contains(Assert.IsType<SqlException>(duplicate.InnerException).Number, new[] { 2601, 2627 });
+    }
+
+    [SqlServerFact]
     public async Task MissingContext_ReturnsNoDataAndRejectsWrites()
     {
         await using var session = await Session.CompanyA();

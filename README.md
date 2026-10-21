@@ -1,10 +1,10 @@
 # Otwarty następca VATowca
 
 Projekt wielostanowiskowej aplikacji dla polskich mikrofirm. Obecny stan to
-**przebudowa persystencji M0 na database-per-company**: szkielet API, okno
-desktopowe, osobne SystemDbContext i CompanyDbContext oraz migracje przygotowane
-offline. Nowe bazy nie zostały jeszcze utworzone ani zmigrowane. Nie jest to
-jeszcze program do prowadzenia księgowości.
+**lokalne wdrożenie persystencji M0 database-per-company**: szkielet API, okno
+desktopowe, osobne SystemDbContext i CompanyDbContext, trzy zmigrowane bazy SQL
+Server oraz dwie fikcyjne firmy. Wszystkie 50 testów przeszło, w tym 12 testów SQL.
+Nie jest to jeszcze program do prowadzenia księgowości.
 
 Wymagania produktu: [SPECYFIKACJA.md](SPECYFIKACJA.md).
 Architektura i granice modułów: [ADR-013](docs/adr/ADR-013-architektura-modularnego-monolitu.md).
@@ -23,9 +23,9 @@ Plan baz, konfiguracja i testy: [database-per-company](docs/database-per-company
 - Dostęp do nuget.org podczas pierwszego pobrania pakietów.
 - Git do pracy z repozytorium.
 
-Do późniejszych testów SQL potrzebny będzie lokalny **SQL Server 2025 Express**,
+Do pełnych testów SQL potrzebny jest lokalny **SQL Server 2025 Express**,
 instancja `localhost\SQLEXPRESS`, Windows Authentication i trzy dedykowane bazy
-`*_Test`. Obecny etap nie tworzy baz i nie wykonuje migracji. SQL nie jest potrzebny
+`*_Test`, tworzone i usuwane przez narzędzie testowe. SQL nie jest potrzebny
 do kompilacji, generowania migracji/skryptów, testów bez bazy ani startu okna.
 Nie trzeba instalować szablonów Avalonia ani dodatkowych workloadów .NET.
 Avalonia i EF Core pobierają się jako pakiety NuGet; lokalne narzędzie `dotnet-ef`
@@ -119,7 +119,7 @@ src/
   SharedContracts/    # DTO publicznego API
 tests/Vatowiec.Tests/  # testy domeny/API i jawnie włączane testy SQL
 docs/adr/             # decyzje architektoniczne
-tools/database/       # historyczny skrypt odczytu Vatowiec_Dev (nieużywany przez nowe modele)
+tools/database/       # narzędzie lokalnego wdrożenia, weryfikacji i pełnych testów SQL
 ```
 
 Application zależy od Domain; Infrastructure od Application. API składa serwer
@@ -135,7 +135,8 @@ pozostają kolejnymi zadaniami. W bazie systemowej nie ma kartoteki kontrahentó
 ani dokumentów księgowych.
 
 API czyta `ConnectionStrings__VatowiecSystem` z konfiguracji serwera.
-Oba appsettings domyślnie pozostawiają ten klucz pusty. Stary klucz
+appsettings.Development.json wskazuje lokalną Vatowiec_System przez Windows
+Authentication z Encrypt=True; poza Development połączenie jest puste. Stary klucz
 `ConnectionStrings__Vatowiec` jest ignorowany. Nie ma domyślnej bazy firmowej.
 Kontekst firmy wymaga jawnego CompanyDatabaseSelection zgodnego z ICompanyContext,
 dostarczonego w scope przez przyszły serwerowy resolver po autoryzacji.
@@ -143,14 +144,19 @@ Rejestracja DI nie implementuje jeszcze autoryzacji ani weryfikacji profilu w SQ
 Sekrety i połączenia nie trafiają do klienta Avalonia.
 
 Każdy kontekst ma własną migrację początkową i snapshot. Fabryki projektowe
-generują model i SQL bez połączenia z bazą. Polecenia offline oraz plan późniejszego
-utworzenia Vatowiec_System i dwóch baz firmowych opisuje
+generują model i SQL bez połączenia z bazą. Polecenia offline i powtarzalne
+wdrożenie Vatowiec_System oraz dwóch baz firmowych opisuje
 [instrukcja](docs/database-per-company.md).
 
 Dotychczasowa migracja i snapshot Vatowiec_Dev są zachowane bez zmiany treści
 w `Persistence/LegacyMigrations`, poza kompilacją i historią nowych kontekstów.
 Nie uruchamiaj nowych migracji w Vatowiec_Dev ani historycznego Down.
-Baza i jej tabele core.Companies/core.Contractors pozostają niezmienione.
+Stara baza została usunięta za zgodą użytkownika po sprawdzeniu przeznaczenia,
+archiwalnej migracji i braku rekordów. Nie kopiowano danych.
+
+Pozostają trzy bazy testowe projektu: Vatowiec_System (katalog i lokalizacje)
+oraz Vatowiec_Company_A_Dev/B_Dev (osobne profile i kontrahenci). Każda ma własną
+__EFMigrationsHistory. Dane demonstracyjne nie zawierają autentycznych identyfikatorów.
 
 ## Sprawdzanie zmian
 
@@ -165,8 +171,17 @@ Testy offline weryfikują rozłączne modele, lokalny profil/FK, historie i SQL
 migracji, zgodność snapshotów, odmowę bez wyboru bazy, izolację scope,
 politykę połączeń, filtry, kontrolę zapisu i host API.
 
-Dziewięć testów SQL jest domyślnie pomijanych. Wymagają wcześniej zmigrowanych
-Vatowiec_System_Test oraz Vatowiec_Company_A_Test/B_Test. Nowa flaga
+Powyższy przebieg bez SQL zalicza 38 testów i pomija 12 testów SQL. Pełny przebieg:
+
+```powershell
+dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- test
+```
+
+Narzędzie sprawdza lokalny serwer, przygotowuje trzy oznaczone bazy *_Test,
+wykonuje wszystkie testy, zapisuje TRX, sprawdza rollbacky i usuwa te bazy w finally.
+Nie zmienia danych demonstracyjnych. Przebieg potwierdził **50/50, bez pominięć**.
+
+Przy ręcznym uruchamianiu testów z wcześniej przygotowanymi bazami flaga
 `VATOWIEC_DATABASE_PER_COMPANY_SQL=1` włącza je jawnie; stara flaga
 `VATOWIEC_SQL_INTEGRATION` nie działa. Szczegóły i nazwy zmiennych połączeń:
 [instrukcja testów](docs/database-per-company.md#testy).
@@ -178,8 +193,8 @@ transakcjach. Pominięcie nie jest zaliczeniem działania nowej struktury SQL.
 Zaimplementować logowanie, użytkowników i role, serwerową autoryzację i resolver
 z kontrolą fizycznego CompanyId/wersji bazy, potem wznawialny provisioning firmy
 z aplikacji, audyt z trwałą identyfikacją aktorów oraz niezależny backup/restore.
-Osobno wdrożyć nowe bazy po przeglądzie SQL i zgodzie na wykonanie.
-Nie przeniesiono danych z Vatowiec_Dev.
+Narzędzie wdrożeniowe jest dostępne poza API; pełny provisioning z aplikacji
+pozostaje osobnym etapem. Nie przeniesiono danych z usuniętej Vatowiec_Dev.
 
 Nie zaimplementowano podatków, KSeF, JPK ani wtyczek. M0 nie jest ukończone;
 nazwa pozostaje robocza, a licencja źródeł wymaga decyzji ADR-002.

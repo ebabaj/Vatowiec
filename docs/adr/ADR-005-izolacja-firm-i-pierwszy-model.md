@@ -6,7 +6,9 @@ Wymagania: ORG-001, ORG-004, podstawowa część ORG-005, E02–E04; §3.2, §8,
 
 Poniżej zachowano historyczną decyzję i opis zastosowanej migracji `Vatowiec_Dev`.
 Nie stanowią aktualnej architektury ani instrukcji wykonywania migracji.
-Przejście na database-per-company nie usuwa ani nie modyfikuje tej bazy.
+W etapie przygotowania nie zmieniano tej bazy. Następnie użytkownik zezwolił na
+jej usunięcie jako niepotrzebnej bazy testowej; po sprawdzeniu schematu, historii
+i braku rekordów została usunięta podczas lokalnego wdrożenia ADR-014.
 
 ## Decyzja i zakres
 

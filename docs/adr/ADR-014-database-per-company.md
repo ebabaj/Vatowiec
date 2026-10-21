@@ -1,8 +1,7 @@
 # ADR-014: Database-per-company i rozdzielenie persystencji
 
 Data: 2026-10-21  
-Status: architektura zaakceptowana przez użytkownika; realizacja kroków 1–2,
-bez tworzenia baz i wykonywania migracji.  
+Status: zaakceptowany i wdrożony lokalnie w zakresie modeli, migracji i demonstratora.
 Zastępuje: [ADR-005](ADR-005-izolacja-firm-i-pierwszy-model.md).  
 Wymagania: ORG-001, ORG-003–005, ORG-008–011, E02–E04; SPECYFIKACJA §3, §8,
 §11–12, M0. Scenariusze T-012, T-014, T-016–019.
@@ -52,10 +51,11 @@ Domain nie zna EF, HTTP, SQL ani sekretów.
   do CompanyProfile.CompanyId bez kaskady. SQL wymusza spójność z jedyną firmą.
 - Nie ma FK, widoków ani zapytań wymagających połączeń między bazami.
 
-Dotychczasowe `Vatowiec_Dev.core.Companies` i `core.Contractors` pozostają
-niezmienione. Późniejsze kopiowanie rozdzieli katalog i profile firm, a kontrahentów
-przypisze według CompanyId. Zachowa Id i daty źródłowe; rowversion po kopiowaniu
-będzie nowy. Katalogowa etykieta jest niezależna od lokalnej nazwy prawnej;
+W etapie przygotowania nie zmieniano `Vatowiec_Dev`. Następnie użytkownik
+potwierdził testowy charakter baz i zezwolił na usunięcie starej bazy. Po kontroli
+schematu, migracji i braku rekordów usunięto ją, bez kopiowania danych do nowych baz.
+Przy ewentualnym późniejszym imporcie innych danych trzeba zachować Id i daty,
+a rowversion po kopiowaniu będzie nowy. Katalogowa etykieta jest niezależna od lokalnej nazwy prawnej;
 nie tworzymy obowiązku atomowej synchronizacji tych dwóch pól między bazami.
 
 Trzy oryginalne pliki migracji/snapshotu przeniesiono bez zmiany treści do
@@ -90,8 +90,10 @@ Dokument, skutki, audyt i Outbox pozostają w jednej transakcji bazy firmy;
 nie wymagamy transakcji rozproszonych z katalogiem systemowym.
 
 Nowy klucz konfiguracji API: `ConnectionStrings:VatowiecSystem`.
-Stary `ConnectionStrings:Vatowiec` jest ignorowany. Oba appsettings pozostawiają
-połączenie puste. Polityka połączeń odrzuca Vatowiec_Dev, bazy techniczne SQL
+Stary `ConnectionStrings:Vatowiec` jest ignorowany. Po lokalnym wdrożeniu
+appsettings.Development.json wskazuje Vatowiec_System przez Windows Authentication;
+bazowy appsettings pozostawia połączenie puste. Polityka połączeń odrzuca
+Vatowiec_Dev, bazy techniczne SQL
 oraz bazę systemową jako cel firmy. Wymaga jawnego katalogu i szyfrowania;
 zaufanie certyfikatowi jest ograniczone do jawnych lokalnych baz Development.
 Różne instancje są dozwolone z poprawną walidacją TLS.
@@ -170,9 +172,16 @@ Nie dowodzą działania nowych baz ani uprawnień użytkowników.
 Testy SQL zostały dostosowane do dedykowanych Vatowiec_System_Test i dwóch baz
 Vatowiec_Company_A_Test/B_Test po migracjach. Domyślnie są pomijane; stara flaga
 VATOWIEC_SQL_INTEGRATION nie włącza ich. Nie tworzą/usuwają baz i nie migrują.
-Wynik SQL, provisioning, restore, rzeczywista równoczesność użytkowników i
-trwałość aktorów muszą zostać zweryfikowane w kolejnych etapach. Nie deklarujemy
-ukończenia całego M0 ani gotowości produkcyjnej.
+Po zgodzie na lokalne operacje SQL utworzono trzy bazy demonstracyjne i wykonano
+migracje. Narzędzie `tools/database/Vatowiec.DatabaseTools` sprawdza lokalną
+instancję, Windows Authentication, dokładną listę nazw i znaczniki przeznaczenia
+baz, przed usunięciem starej bazy także jej schemat i historię. Nie jest częścią
+startu API ani pełnym procesem provisioningu z aplikacji. Polecenie `test` tworzy
+tymczasowe bazy *_Test, uruchamia cały zestaw i usuwa je w finally. Zaliczone
+50 testów, w tym 12 na prawdziwym SQL, bez pominięć; sprawdzono rollback danych
+i historii oraz idempotentne ponowienie inicjalizacji demonstratora.
+Provisioning, restore, rzeczywista równoczesność zalogowanych użytkowników i
+trwałość aktorów wymagają kolejnych implementacji/testów. M0 nie jest ukończone.
 
 Plan uruchomienia: [database-per-company](../database-per-company.md).
 
