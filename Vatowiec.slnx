@@ -1,0 +1,27 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Desktop/">
+    <Project Path="src/Desktop/Vatowiec.Desktop.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Core/" />
+  <Folder Name="/src/Modules/Core/Application/">
+    <Project Path="src/Modules/Core/Application/Vatowiec.Core.Application.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Core/Domain/">
+    <Project Path="src/Modules/Core/Domain/Vatowiec.Core.Domain.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Core/Infrastructure/">
+    <Project Path="src/Modules/Core/Infrastructure/Vatowiec.Core.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Server/" />
+  <Folder Name="/src/Server/Api/">
+    <Project Path="src/Server/Api/Vatowiec.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/SharedContracts/">
+    <Project Path="src/SharedContracts/Vatowiec.SharedContracts.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Vatowiec.Tests/Vatowiec.Tests.csproj" />
+  </Folder>
+</Solution>

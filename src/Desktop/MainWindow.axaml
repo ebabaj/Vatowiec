@@ -1,0 +1,17 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Vatowiec.Desktop.MainWindow"
+        Title="Otwarty następca VATowca — M0"
+        Width="720" Height="420"
+        MinWidth="520" MinHeight="320"
+        WindowStartupLocation="CenterScreen">
+  <StackPanel Margin="40" Spacing="18" VerticalAlignment="Center">
+    <TextBlock Text="Otwarty następca VATowca"
+               FontSize="30" FontWeight="SemiBold" TextWrapping="Wrap" />
+    <TextBlock Text="Etap M0 · Szkielet aplikacji" FontSize="18" />
+    <TextBlock Text="Witaj! To początek aplikacji do prowadzenia firmy. Kolejne etapy dodadzą logowanie, wybór firmy i pracę z dokumentami."
+               FontSize="16" TextWrapping="Wrap" />
+    <TextBlock Text="Wersja techniczna — funkcje księgowe nie są jeszcze dostępne."
+               FontSize="14" TextWrapping="Wrap" />
+  </StackPanel>
+</Window>

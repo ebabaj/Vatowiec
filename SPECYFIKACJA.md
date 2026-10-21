@@ -555,6 +555,12 @@ Health check API/SQL/magazynu plików, diagnostyka błędów integracji, kolejka
 
 **Cel:** solidna baza techniczna bez deklarowania księgowej użyteczności.
 
+**Uzgodniony pierwszy etap techniczny (2026-10-21):** solution .NET 10,
+podstawowe API, okno Avalonia, konfiguracja EF Core dla SQL Server bez łączenia
+z bazą, testy xUnit i instrukcja VS Code. Architektura: ADR-013. Na tym etapie
+nie implementujemy modelu firm, logowania, kontrahentów ani migracji; pozostają
+one dalszą częścią M0. Ukończenie samego szkieletu nie oznacza ukończenia M0.
+
 - Publiczne repo, `LICENSE`, `README`, `CONTRIBUTING`, `SECURITY`, `AGENTS.md`.
 - Solution .NET 10, serwer ASP.NET Core, klient Avalonia, model modułowy.
 - SQL Server: migracje, konfiguracja połączenia, seed fikcyjnej firmy.
