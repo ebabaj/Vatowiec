@@ -561,6 +561,17 @@ z bazą, testy xUnit i instrukcja VS Code. Architektura: ADR-013. Na tym etapie
 nie implementujemy modelu firm, logowania, kontrahentów ani migracji; pozostają
 one dalszą częścią M0. Ukończenie samego szkieletu nie oznacza ukończenia M0.
 
+**Uzgodniony etap bazy (2026-10-21):** lokalny SQL Server 2025 Express,
+`localhost\SQLEXPRESS`, Windows Authentication, wyłącznie `Vatowiec_Dev`.
+ADR-005 rozstrzyga wspólną bazę i izolację przez CompanyId. Pierwsza migracja
+obejmuje firmy i podstawową kartotekę kontrahentów (ORG-001/ORG-005 częściowo),
+relacje, daty zmian i rowversion (ORG-004). Migracje są ręczne; testy SQL działają
+w wycofywanych transakcjach. Brak autoryzowanego kontekstu firmy oznacza pusty
+odczyt i odmowę zapisu. Logowanie, role, pełny audyt, adresy i rachunki pozostają
+dalszą częścią M0 / kolejnych iteracji kartotek. Nie powstają endpointy danych
+firmowych. Certyfikat lokalnego SQL można akceptować tylko w Development przy
+szyfrowanym połączeniu; to odrębne ustawienie od certyfikatu HTTPS API.
+
 - Publiczne repo, `LICENSE`, `README`, `CONTRIBUTING`, `SECURITY`, `AGENTS.md`.
 - Solution .NET 10, serwer ASP.NET Core, klient Avalonia, model modułowy.
 - SQL Server: migracje, konfiguracja połączenia, seed fikcyjnej firmy.
@@ -642,7 +653,7 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | ADR-002 | MPL-2.0 vs inna licencja | Przed pierwszym publicznym commitem z `LICENSE`; sprawdzić użyte zależności |
 | ADR-003 | SQLite/PostgreSQL jako opcja | Dopiero po stabilizacji SQL Server i kontraktów repozytorium |
 | ADR-004 | SQL Server na Linux / limit Express | Przed publikacją instrukcji instalacji linuksowej; rozbieżność dokumentacji |
-| ADR-005 | Rozdzielenie firm: wspólna baza czy osobne bazy | Przed migracjami schematu produkcyjnego; domyślnie wspólna baza + ścisłe scope |
+| [ADR-005](docs/adr/ADR-005-izolacja-firm-i-pierwszy-model.md) | Rozdzielenie firm: wspólna baza | Rozstrzygnięte dla etapu bazy M0: CompanyId, filtry, kontrola zapisu, klucze złożone; autoryzacja użytkownika w kolejnym etapie |
 | ADR-006 | Podpisywanie XML i przechowywanie certyfikatów | Przed implementacją wysyłek MF; nie przechowywać sekretów w zwykłej bazie |
 | ADR-007 | API pluginów: manifest, sandbox, granice dostępu | Przed pierwszą wykonywalną wtyczką |
 | ADR-008 | Pełny wykaz typów VAT i deklaracji na 1.0 | Przed M3; uzgodnić precyzyjne scenariusze |

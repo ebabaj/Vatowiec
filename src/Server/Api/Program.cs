@@ -6,7 +6,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks();
-builder.Services.AddInfrastructure(builder.Configuration.GetConnectionString("Vatowiec"));
+builder.Services.AddInfrastructure(builder.Configuration,
+    builder.Environment.IsDevelopment());
 
 var app = builder.Build();
 

@@ -22,7 +22,8 @@ public sealed class InfrastructureConfigurationTests
 
         Assert.Equal("Microsoft.EntityFrameworkCore.SqlServer", context.Database.ProviderName);
         Assert.Equal(ConnectionState.Closed, context.Database.GetDbConnection().State);
-        Assert.Empty(context.Model.GetEntityTypes());
+        Assert.Equal(2, context.Model.GetEntityTypes().Count());
+        Assert.Null(context.CurrentCompanyId);
     }
 
     [Fact]

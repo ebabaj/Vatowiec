@@ -4,6 +4,11 @@ Data: 2026-10-21
 Status: zaakceptowany w zakresie architektury przez użytkownika.  
 Powiązania: SPECYFIKACJA.md §4.2, M0, E01 i przygotowanie E02; AGENTS.md §8.
 
+Aktualizacja etapu bazy (2026-10-21): opis pustego DbContext poniżej dotyczy
+pierwszego szkieletu. Model, migracje i izolację danych w kolejnym etapie określa
+[ADR-005](ADR-005-izolacja-firm-i-pierwszy-model.md). Granice projektów pozostają
+aktualne.
+
 ## Kontekst i zakres
 
 Program ma obsługiwać wiele firm i stanowisk oraz umożliwiać rozwój modułów bez

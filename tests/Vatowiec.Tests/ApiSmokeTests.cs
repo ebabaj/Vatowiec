@@ -2,7 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Vatowiec.Core.Infrastructure.Persistence;
 using Vatowiec.SharedContracts;
 
 namespace Vatowiec.Tests;
@@ -14,6 +17,19 @@ public sealed class ApiSmokeTests : IClassFixture<WebApplicationFactory<Program>
     public ApiSmokeTests(WebApplicationFactory<Program> factory)
     {
         this.factory = factory;
+    }
+
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Production")]
+    public void TestHost_DbContextDoesNotInheritDevelopmentOrEnvironmentConnection(string environment)
+    {
+        using var application = CreateApplication(environment);
+        using var scope = application.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<CoreDbContext>();
+
+        Assert.True(string.IsNullOrEmpty(context.Database.GetConnectionString()));
+        Assert.Null(context.CurrentCompanyId);
     }
 
     [Fact]
