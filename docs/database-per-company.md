@@ -1,8 +1,11 @@
 # Lokalne wdrożenie database-per-company
 
 Status 2026-10-21: wdrożono trzy bazy demonstracyjne, wykonano migracje EF Core
-i zainicjalizowano dwie fikcyjne firmy. Zaliczone 50 testów, w tym 12 na SQL,
-bez pominięć. Decyzja: [ADR-014](adr/ADR-014-database-per-company.md).
+i zainicjalizowano dwie fikcyjne firmy. Następnie dodano Identity i autoryzowany
+resolver; pełny zestaw obejmuje 70 testów (32 SQL/API).
+Decyzje: [ADR-014](adr/ADR-014-database-per-company.md),
+[ADR-015](adr/ADR-015-identity-i-autoryzowany-wybor-bazy.md).
+Logowanie dwóch użytkowników: [instrukcja](authentication.md).
 
 ## Zgoda i zakres
 
@@ -25,9 +28,13 @@ Użyto istniejącego konta Windows operatora; nie tworzono loginów SQL ani hase
 
 | Baza | Tabele | Migracja |
 |---|---|---|
-| Vatowiec_System | core.Companies, core.CompanyDatabases, dbo.__EFMigrationsHistory | 20261021102909_InitialSystem |
+| Vatowiec_System | core.Companies, core.CompanyDatabases, dbo.__EFMigrationsHistory oraz dziewięć tabel security opisanych poniżej | InitialSystem i IdentityAndCompanyAccess |
 | Vatowiec_Company_A_Dev | core.CompanyProfile, core.Contractors, dbo.__EFMigrationsHistory | 20261021102912_InitialCompany |
 | Vatowiec_Company_B_Dev | core.CompanyProfile, core.Contractors, dbo.__EFMigrationsHistory | 20261021102912_InitialCompany |
+
+Tabele security: Users, Roles, UserRoles, UserClaims, UserLogins, UserTokens,
+RoleClaims, CompanyAccess i UserSessions. Druga migracja systemowa to
+20261021114324_IdentityAndCompanyAccess. Nie zmienia schematów firmowych.
 
 Katalog zawiera dokładnie dwie firmy i dwie lokalizacje. Nie zawiera dokumentów
 księgowych ani kontrahentów. Każda firma ma własną historię migracji i singleton
@@ -70,6 +77,10 @@ Polecenia mają jawny zakres:
   oznaczone bazy *_Test.
 - test: przygotowuje bazy *_Test, uruchamia wszystkie testy, zapisuje TRX, weryfikuje
   rollbacky i usuwa bazy *_Test w finally, także gdy testy zgłoszą błąd.
+- backup-system / migrate-system: kopia COPY_ONLY z CHECKSUM i VERIFYONLY oraz jawna
+  migracja wyłącznie bazy systemowej. Nie są wywoływane przy starcie API.
+- seed-users / verify-users: konta z lokalnej konfiguracji i próba dwóch sesji
+  na działającym HTTPS API; szczegóły w instrukcji logowania.
 
 Narzędzie sprawdza lokalną nazwę komputera, instancję SQLEXPRESS, wersję 17,
 edycję Express i Windows Authentication. Nazwy baz pochodzą z zamkniętej listy,
@@ -92,15 +103,16 @@ Bazowy appsettings poza Development nie ma domyślnego połączenia produkcyjneg
 Stary klucz ConnectionStrings__Vatowiec jest ignorowany.
 
 CompanyDatabases.ConnectionProfileKey = LocalWindows jest referencją do
-serwerowego sposobu połączenia. Resolver korzystający z tego katalogu i autoryzacja
-nie zostały jeszcze zaimplementowane. Sam wpis w katalogu nie udostępnia firmy.
-CompanyDbContext wymaga jawnego CompanyDatabaseSelection zgodnego z ICompanyContext.
+serwerowego sposobu połączenia. Resolver sprawdza aktualne CompanyAccess, dopasowuje
+serwerowy profil połączenia i weryfikuje fizyczny profil i schemat przed odczytem.
+Sam wpis w katalogu nie udostępnia firmy. Bezpośrednio uzyskiwany CompanyDbContext
+nadal wymaga jawnego CompanyDatabaseSelection zgodnego z ICompanyContext.
 Nie ma domyślnego wyboru firmy i nie ma migracji przy starcie API.
 
 To narzędzie lokalnego wdrożenia, nie pełny provisioning firmy z interfejsu.
-Logowanie, role, autoryzowany resolver z kontrolą fizycznego profilu, trwała
-operacja provisioningu z checkpointami, audyt aktorów i backup/restore pozostają
-kolejnymi zadaniami. Nie zaliczamy jeszcze ich scenariuszy ani całego M0.
+Identity, role, sesje i autoryzowany resolver są wdrożone zgodnie z ADR-015.
+Logowanie Avalonia, trwała operacja provisioningu z checkpointami, audyt księgowy
+aktorów i backup/restore z aplikacji pozostają kolejnymi zadaniami. M0 nie jest ukończone.
 
 ## Przegląd SQL offline
 
@@ -147,11 +159,11 @@ Encrypt=True; lokalne TrustServerCertificate=True jest dozwolone.
 Nie wskazuj baz demonstracyjnych w tych zmiennych.
 Stara flaga VATOWIEC_SQL_INTEGRATION nie włącza testów.
 
-Zwykłe dotnet test bez flagi SQL wykonuje 38 testów i pomija 12 testów SQL.
+Zwykłe dotnet test bez flagi SQL wykonuje 38 testów i pomija 32 testy SQL/API.
 Można wymusić ten tryb ustawiając VATOWIEC_DATABASE_PER_COMPANY_SQL=0.
 To odrębny wynik od pełnego przebiegu opisanego poniżej.
 
-Wykonana weryfikacja (2026-10-21):
+Weryfikacja wcześniejszego etapu trzech baz przed Identity (2026-10-21):
 
 - Build wszystkich ośmiu projektów: 0 błędów, 0 ostrzeżeń.
 - Wszystkie 50 testów zaliczone: 38 bez SQL i 12 na rzeczywistym SQL Server,
@@ -169,6 +181,8 @@ Wykonana weryfikacja (2026-10-21):
   brak Vatowiec_Dev i tymczasowych *_Test.
 - Formatowanie i git diff --check poprawne. Nie wykonano commit ani push.
 
-Test rowversion używa dwóch kontekstów; nie dowodzi jeszcze pracy dwóch
-zalogowanych operatorów przez API. Backup/restore, autoryzacja, provisioning
-z interfejsu i audyt po usunięciu konta wymagają dalszej implementacji i testów.
+Test rowversion używa dwóch kontekstów. W etapie Identity osobno sprawdzono
+równoczesne żądania HTTP dwóch zalogowanych użytkowników firmy A, odmowy dostępu,
+CSRF, wygasanie i unieważnianie sesji oraz rzeczywisty profil bazy. Wyniki etapu
+Identity i ręczna próba działającego HTTPS API są w docs/authentication.md.
+Backup/restore z aplikacji, provisioning i audyt księgowy pozostają poza tym etapem.

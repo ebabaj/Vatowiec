@@ -2,6 +2,9 @@
 
 Data: 2026-10-21  
 Status: zaakceptowany i wdrożony lokalnie w zakresie modeli, migracji i demonstratora.
+Aktualizacja: uwierzytelnianie, sesje, przypisania użytkowników i resolver opisuje
+[ADR-015](ADR-015-identity-i-autoryzowany-wybor-bazy.md). Poniższe informacje o ich
+braku odnoszą się do wcześniejszego etapu rozdzielenia i lokalnego wdrożenia baz.
 Zastępuje: [ADR-005](ADR-005-izolacja-firm-i-pierwszy-model.md).  
 Wymagania: ORG-001, ORG-003–005, ORG-008–011, E02–E04; SPECYFIKACJA §3, §8,
 §11–12, M0. Scenariusze T-012, T-014, T-016–019.

@@ -3,7 +3,8 @@
 Projekt wielostanowiskowej aplikacji dla polskich mikrofirm. Obecny stan to
 **lokalne wdrożenie persystencji M0 database-per-company**: szkielet API, okno
 desktopowe, osobne SystemDbContext i CompanyDbContext, trzy zmigrowane bazy SQL
-Server oraz dwie fikcyjne firmy. Wszystkie 50 testów przeszło, w tym 12 testów SQL.
+Server oraz dwie fikcyjne firmy. Działają Identity, sesje API i autoryzowany resolver
+bazy firmy. Pełny zestaw obejmuje 70 testów, w tym 32 z SQL/API.
 Nie jest to jeszcze program do prowadzenia księgowości.
 
 Wymagania produktu: [SPECYFIKACJA.md](SPECYFIKACJA.md).
@@ -11,6 +12,8 @@ Architektura i granice modułów: [ADR-013](docs/adr/ADR-013-architektura-modula
 Model i izolacja firm: [ADR-014](docs/adr/ADR-014-database-per-company.md).
 [ADR-005](docs/adr/ADR-005-izolacja-firm-i-pierwszy-model.md) jest historyczny.
 Plan baz, konfiguracja i testy: [database-per-company](docs/database-per-company.md).
+Logowanie dwóch kont i test odmowy dostępu: [instrukcja](docs/authentication.md),
+[ADR-015](docs/adr/ADR-015-identity-i-autoryzowany-wybor-bazy.md).
 
 ## Wymagane narzędzia
 
@@ -114,7 +117,7 @@ src/
     Domain/           # katalog, profil firmy, kontrahenci; bez ORM
     Application/      # kontrakt kontekstu firmy
     Infrastructure/   # dwa konteksty EF, rozłączne mapowania i migracje
-  Server/Api/         # host ASP.NET Core i endpointy techniczne
+  Server/Api/         # host, Identity/cookie/CSRF, autoryzowany odczyt firm
   Desktop/            # Avalonia UI
   SharedContracts/    # DTO publicznego API
 tests/Vatowiec.Tests/  # testy domeny/API i jawnie włączane testy SQL
@@ -128,19 +131,20 @@ Nie ma bezpośredniego dostępu klienta do SQL Server.
 
 ## Persystencja database-per-company
 
-`SystemDbContext` zawiera centralny katalog firm i wskazania baz.
+`SystemDbContext` zawiera centralny katalog firm, wskazania baz, Identity,
+przypisania/uprawnienia użytkowników i sesje.
 `CompanyDbContext` zawiera lokalny profil i kontrahentów jednej firmy.
-Użytkownicy/role, autoryzowany resolver, provisioning oraz audyt/backup/restore
-pozostają kolejnymi zadaniami. W bazie systemowej nie ma kartoteki kontrahentów
+Provisioning z aplikacji i audyt księgowy/backup/restore pozostają kolejnymi
+zadaniami. W bazie systemowej nie ma kartoteki kontrahentów
 ani dokumentów księgowych.
 
 API czyta `ConnectionStrings__VatowiecSystem` z konfiguracji serwera.
 appsettings.Development.json wskazuje lokalną Vatowiec_System przez Windows
 Authentication z Encrypt=True; poza Development połączenie jest puste. Stary klucz
 `ConnectionStrings__Vatowiec` jest ignorowany. Nie ma domyślnej bazy firmowej.
-Kontekst firmy wymaga jawnego CompanyDatabaseSelection zgodnego z ICompanyContext,
-dostarczonego w scope przez przyszły serwerowy resolver po autoryzacji.
-Rejestracja DI nie implementuje jeszcze autoryzacji ani weryfikacji profilu w SQL.
+API korzysta z resolvera po uwierzytelnieniu sesji i sprawdzeniu CompanyAccess.
+Resolver tworzy osobny kontekst i weryfikuje rzeczywisty profil oraz schemat SQL.
+Bezpośrednia rejestracja DI nadal odmawia kontekstu firmy bez jawnego wyboru.
 Sekrety i połączenia nie trafiają do klienta Avalonia.
 
 Każdy kontekst ma własną migrację początkową i snapshot. Fabryki projektowe
@@ -171,7 +175,7 @@ Testy offline weryfikują rozłączne modele, lokalny profil/FK, historie i SQL
 migracji, zgodność snapshotów, odmowę bez wyboru bazy, izolację scope,
 politykę połączeń, filtry, kontrolę zapisu i host API.
 
-Powyższy przebieg bez SQL zalicza 38 testów i pomija 12 testów SQL. Pełny przebieg:
+Powyższy przebieg bez SQL zalicza 38 testów i pomija 32 testy SQL/API. Pełny przebieg:
 
 ```powershell
 dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- test
@@ -179,20 +183,35 @@ dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- test
 
 Narzędzie sprawdza lokalny serwer, przygotowuje trzy oznaczone bazy *_Test,
 wykonuje wszystkie testy, zapisuje TRX, sprawdza rollbacky i usuwa te bazy w finally.
-Nie zmienia danych demonstracyjnych. Przebieg potwierdził **50/50, bez pominięć**.
+Nie zmienia danych demonstracyjnych. Pełny zestaw obejmuje **70 testów**.
 
 Przy ręcznym uruchamianiu testów z wcześniej przygotowanymi bazami flaga
 `VATOWIEC_DATABASE_PER_COMPANY_SQL=1` włącza je jawnie; stara flaga
 `VATOWIEC_SQL_INTEGRATION` nie działa. Szczegóły i nazwy zmiennych połączeń:
 [instrukcja testów](docs/database-per-company.md#testy).
-Testy nie tworzą baz i nie wykonują migracji; zapisują tylko w wycofywanych
-transakcjach. Pominięcie nie jest zaliczeniem działania nowej struktury SQL.
+Testy nie tworzą baz i nie wykonują migracji. Testy persystencji używają rollbacków,
+a testy Identity/API sprzątają dane dedykowanych fixture. Pominięcie nie jest zaliczeniem.
+
+## Logowanie demonstracyjne
+
+Konta operator.m0 (A i B) i czytelnik.m0 (tylko profil A) są w Vatowiec_System.
+Hasła pochodzą z lokalnego user-secrets poza repozytorium. Uruchom API poleceniem
+opisanym wyżej, a w drugim terminalu wykonaj:
+
+```powershell
+dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- verify-users
+```
+
+Narzędzie używa dwóch osobnych magazynów cookie, pobiera CSRF, loguje oba konta,
+sprawdza odczyt A oraz 403 dla próby czytelnika w B i wykonuje logout. Nie wypisuje
+haseł/tokenów i działa również przy zablokowanych skryptach PowerShell.
+Wymaga zaufanego certyfikatu deweloperskiego HTTPS; szczegóły i
+kontrakt HTTP: [logowanie](docs/authentication.md).
 
 ## Dalsze kroki
 
-Zaimplementować logowanie, użytkowników i role, serwerową autoryzację i resolver
-z kontrolą fizycznego CompanyId/wersji bazy, potem wznawialny provisioning firmy
-z aplikacji, audyt z trwałą identyfikacją aktorów oraz niezależny backup/restore.
+Kolejne etapy obejmą klienta Avalonia z logowaniem, wznawialny provisioning firmy
+z aplikacji, audyt księgowy z trwałą identyfikacją aktorów oraz niezależny backup/restore.
 Narzędzie wdrożeniowe jest dostępne poza API; pełny provisioning z aplikacji
 pozostaje osobnym etapem. Nie przeniesiono danych z usuniętej Vatowiec_Dev.
 

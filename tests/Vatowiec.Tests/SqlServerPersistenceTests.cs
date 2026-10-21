@@ -8,6 +8,7 @@ namespace Vatowiec.Tests;
 
 // Tylko dedykowane, wcześniej zmigrowane i puste bazy *_Test. Bez CREATE/DROP/Migrate.
 [Trait("Category", "SqlIntegration")]
+[Collection("LocalSql")]
 public sealed class SqlServerPersistenceTests
 {
     [SqlServerFact]
@@ -15,7 +16,8 @@ public sealed class SqlServerPersistenceTests
     {
         await using var session = await Session.Open("Vatowiec_System_Test", "ConnectionStrings__VatowiecSystemTest");
         await using var context = session.System();
-        Assert.EndsWith("_InitialSystem", Assert.Single(await context.Database.GetAppliedMigrationsAsync()));
+        Assert.Equal(2, (await context.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.EndsWith("_IdentityAndCompanyAccess", (await context.Database.GetAppliedMigrationsAsync()).Last());
         Assert.Empty(await context.Database.GetPendingMigrationsAsync());
         using var command = new SqlCommand("SELECT COUNT(*) FROM sys.tables WHERE schema_id = SCHEMA_ID('core')", session.Connection, session.Transaction);
         Assert.Equal(2, (int)(await command.ExecuteScalarAsync())!);
@@ -58,7 +60,8 @@ public sealed class SqlServerPersistenceTests
         Assert.Single(await first.Database.GetPendingMigrationsAsync());
         Assert.EndsWith("_InitialCompany", Assert.Single(await second.Database.GetAppliedMigrationsAsync()));
         Assert.Empty(await second.Database.GetPendingMigrationsAsync());
-        Assert.EndsWith("_InitialSystem", Assert.Single(await system.Database.GetAppliedMigrationsAsync()));
+        Assert.Equal(2, (await system.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.EndsWith("_IdentityAndCompanyAccess", (await system.Database.GetAppliedMigrationsAsync()).Last());
         Assert.Empty(await system.Database.GetPendingMigrationsAsync());
         // Usunięcie wpisu historii w A jest wycofywane przez Session.DisposeAsync.
     }

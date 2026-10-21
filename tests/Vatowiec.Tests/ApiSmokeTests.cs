@@ -61,7 +61,7 @@ public sealed class ApiSmokeTests : IClassFixture<WebApplicationFactory<Program>
 
     [Theory]
     [InlineData("Development", HttpStatusCode.OK)]
-    [InlineData("Production", HttpStatusCode.NotFound)]
+    [InlineData("Production", HttpStatusCode.Unauthorized)]
     public async Task OpenApi_IsAvailableOnlyInDevelopment(string environment, HttpStatusCode expected)
     {
         using var application = CreateApplication(environment);

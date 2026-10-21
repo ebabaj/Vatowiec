@@ -16,6 +16,8 @@ Wielostanowiskową aplikację księgowo-podatkową dla polskich mikrofirm: **KPi
 - **Database-per-company jest obowiązkowe**: `Vatowiec_System` przechowuje katalog firm, użytkowników, role, uprawnienia i lokalizacje baz; każda firma ma fizycznie oddzielną bazę SQL Server, także na innej instancji.
 - `SystemDbContext` nie może mapować kontrahentów, dokumentów ani ewidencji księgowych. `CompanyDbContext` mapuje dane dokładnie jednej firmy; oba konteksty mają osobne migracje i snapshoty.
 - Wybór bazy następuje wyłącznie na serwerze po uwierzytelnieniu i autoryzacji firmy. Brak wyboru lub niezgodność `CompanyId` oznacza odmowę; nie ma domyślnej bazy firmowej. Kontekst i wybór połączenia nie mogą być współdzielone między żądaniami.
+- Uwierzytelnianie i sesje API określa ADR-015: Identity w bazie systemowej, cookie HTTPS/HttpOnly, CSRF dla login/logout, absolutna ważność i serwerowe unieważnienie sesji. Rola globalna nie zastępuje CompanyAccess. Jedynym źródłem firmy jest ścieżka API; resolver weryfikuje rzeczywisty profil i historię migracji przed odczytem danych.
+- Hasła kont demonstracyjnych pochodzą wyłącznie z lokalnego user-secrets lub środowiska. Nie loguj haseł, tokenów, cookie ani connection stringów; nie dodawaj publicznego endpointu obchodzącego uwierzytelnianie na potrzeby demonstratora.
 - Logika domenowa nie może zależeć od Avalonia, HTTP, EF Core ani T-SQL.
 - Nie dodawaj mikrousług, event sourcingu ani nowego frameworka tylko ze względu na modę. Uzasadnij zmiany architektoniczne w ADR.
 

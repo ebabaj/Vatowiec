@@ -2,9 +2,13 @@ using System.Diagnostics;
 using System.Xml.Linq;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Vatowiec.Core.Application;
 using Vatowiec.Core.Domain;
 using Vatowiec.Core.Infrastructure.Persistence;
+using Vatowiec.Core.Infrastructure.Identity;
 
 namespace Vatowiec.DatabaseTools;
 
@@ -290,9 +294,11 @@ internal static class LocalDatabases
     private static async Task CheckEmptyFixtures()
     {
         await using var system = SystemContext(TestDatabases[0]);
-        if (await system.Companies.AnyAsync() || await system.CompanyDatabases.AnyAsync())
+        if (await system.Companies.AnyAsync() || await system.CompanyDatabases.AnyAsync() ||
+            await system.Users.AnyAsync() || await system.Roles.AnyAsync() || await system.CompanyAccesses.AnyAsync() ||
+            await system.UserSessions.AnyAsync())
             throw new InvalidOperationException("Testy pozostawiły rekordy w katalogu *_Test.");
-        if ((await system.Database.GetAppliedMigrationsAsync()).Count() != 1)
+        if (!(await system.Database.GetAppliedMigrationsAsync()).SequenceEqual(system.Database.GetMigrations()))
             throw new InvalidOperationException("Testy zmieniły historię bazy systemowej.");
         foreach (var database in TestDatabases.Skip(1))
         {
@@ -309,7 +315,7 @@ internal static class LocalDatabases
     {
         await CheckOwnership(database);
         var applied = (await context.Database.GetAppliedMigrationsAsync()).ToArray();
-        if (applied.Length != 1 || !applied[0].EndsWith(migrationSuffix, StringComparison.Ordinal) ||
+        if (applied.Length == 0 || !applied[^1].EndsWith(migrationSuffix, StringComparison.Ordinal) ||
             (await context.Database.GetPendingMigrationsAsync()).Any() || context.Database.HasPendingModelChanges())
             throw new InvalidOperationException($"Niezgodna historia migracji w {database}.");
         await using var connection = new SqlConnection(Connection(database));
@@ -323,15 +329,19 @@ internal static class LocalDatabases
         while (await reader.ReadAsync()) tables.Add(reader.GetString(0));
         if (!tables.Order().SequenceEqual(expectedTables.Order()))
             throw new InvalidOperationException($"Nieoczekiwane tabele w {database}.");
-        Console.WriteLine($"{database}: {string.Join(", ", tables)}; migracja {applied[0]}.");
+        Console.WriteLine($"{database}: {string.Join(", ", tables)}; migracje {string.Join(", ", applied)}.");
     }
 
     public static async Task Verify()
     {
         await using var system = SystemContext(SystemDatabase);
-        await ShowSchema(system, SystemDatabase, ["core.Companies", "core.CompanyDatabases", "dbo.__EFMigrationsHistory"], "_InitialSystem");
+        await ShowSchema(system, SystemDatabase, ["core.Companies", "core.CompanyDatabases", "dbo.__EFMigrationsHistory",
+            "security.Users", "security.Roles", "security.UserRoles", "security.UserClaims", "security.UserLogins",
+            "security.UserTokens", "security.RoleClaims", "security.CompanyAccess", "security.UserSessions"], "_IdentityAndCompanyAccess");
         if (await system.Companies.CountAsync() != 2 || await system.CompanyDatabases.CountAsync() != 2)
             throw new InvalidOperationException("Katalog demonstratora powinien zawierać dokładnie dwie firmy i dwa wskazania baz.");
+        var now = DateTimeOffset.UtcNow;
+        Console.WriteLine($"  Identity: użytkownicy={await system.Users.CountAsync()}, role={await system.Roles.CountAsync()}, przypisania={await system.CompanyAccesses.CountAsync()}, aktywne sesje={await system.UserSessions.CountAsync(x => x.RevokedAtUtc == null && x.ExpiresAtUtc > now)}.");
         foreach (var (id, _, database) in DemoCompanies)
         {
             var registration = await system.CompanyDatabases.SingleAsync(x => x.CompanyId == id);
@@ -344,5 +354,84 @@ internal static class LocalDatabases
                 throw new InvalidOperationException("Niezgodna tożsamość danych firmy.");
             Console.WriteLine($"  CompanyId={id}; profil=1; kontrahenci={await company.Contractors.CountAsync()}; NIP/REGON puste, dane fikcyjne.");
         }
+    }
+
+    public static async Task SeedUsers()
+    {
+        await CheckOwnership(SystemDatabase);
+        var config = new ConfigurationBuilder().AddUserSecrets("vatowiec-api-development")
+            .AddEnvironmentVariables().Build();
+        var operatorName = config["DemoUsers:Operator:UserName"];
+        var operatorPassword = config["DemoUsers:Operator:Password"];
+        var readerName = config["DemoUsers:Reader:UserName"];
+        var readerPassword = config["DemoUsers:Reader:Password"];
+        if (new[] { operatorName, operatorPassword, readerName, readerPassword }.Any(string.IsNullOrWhiteSpace) ||
+            string.Equals(operatorName, readerName, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Ustaw lokalnie odrębne DemoUsers:Operator/Reader:UserName i Password (user-secrets API lub zmienne środowiskowe).");
+        await using var system = SystemContext(SystemDatabase);
+        if ((await system.Database.GetPendingMigrationsAsync()).Any())
+            throw new InvalidOperationException("Najpierw wykonaj migracje poleceniem initialize.");
+        var services = new ServiceCollection().AddLogging().AddSingleton(system);
+        services.AddVatowiecIdentity();
+        await using var provider = services.BuildServiceProvider();
+        var users = provider.GetRequiredService<UserManager<ApplicationUser>>();
+        var roles = provider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
+        foreach (var role in new[] { "Operator", "Reader" })
+            if (!await roles.RoleExistsAsync(role))
+                Ensure(await roles.CreateAsync(new IdentityRole<Guid>(role) { Id = Guid.NewGuid() }));
+        foreach (var (name, password, role) in new[]
+                 { (operatorName!, operatorPassword!, "Operator"), (readerName!, readerPassword!, "Reader") })
+        {
+            var user = await users.FindByNameAsync(name);
+            if (user is null)
+            {
+                user = new ApplicationUser { Id = Guid.NewGuid(), UserName = name };
+                Ensure(await users.CreateAsync(user, password));
+            }
+            else if (!await users.CheckPasswordAsync(user, password))
+                Ensure(await users.ResetPasswordAsync(user, await users.GeneratePasswordResetTokenAsync(user), password));
+            if (!await users.IsInRoleAsync(user, role)) Ensure(await users.AddToRoleAsync(user, role));
+            foreach (var (id, _, _) in DemoCompanies)
+            {
+                var permissions = role == "Operator"
+                    ? (id == DemoCompanies[0].Id ? (CompanyPermission)7 : (CompanyPermission)3)
+                    : (id == DemoCompanies[0].Id ? CompanyPermission.ViewProfile : CompanyPermission.None);
+                var access = await system.CompanyAccesses.SingleOrDefaultAsync(x => x.UserId == user.Id && x.CompanyId == id);
+                if (permissions == CompanyPermission.None)
+                {
+                    if (access is not null) system.CompanyAccesses.Remove(access);
+                }
+                else if (access is null) system.CompanyAccesses.Add(new CompanyAccess(user.Id, id, permissions));
+                else access.ChangePermissions(permissions);
+            }
+            await system.SaveChangesAsync();
+            Console.WriteLine($"Konto demonstracyjne: {name}; rola {role}; hasło wyłącznie z lokalnej konfiguracji.");
+        }
+    }
+
+    private static void Ensure(IdentityResult result)
+    {
+        if (!result.Succeeded) throw new InvalidOperationException(string.Join(", ", result.Errors.Select(x => x.Code)));
+    }
+
+    public static async Task BackupSystem()
+    {
+        await CheckOwnership(SystemDatabase);
+        var directory = (string?)await Scalar("master", "SELECT CONVERT(nvarchar(4000), SERVERPROPERTY('InstanceDefaultBackupPath'));");
+        if (string.IsNullOrWhiteSpace(directory) || !Path.IsPathFullyQualified(directory))
+            throw new InvalidOperationException("Brak jawnego katalogu backupów lokalnej instancji SQL.");
+        var backup = Path.Combine(directory, $"Vatowiec_System_before_identity_{Guid.NewGuid():N}.bak");
+        await Execute("master", "BACKUP DATABASE [Vatowiec_System] TO DISK = @path WITH COPY_ONLY, CHECKSUM;",
+            new SqlParameter("@path", backup));
+        await Execute("master", "RESTORE VERIFYONLY FROM DISK = @path WITH CHECKSUM;", new SqlParameter("@path", backup));
+        Console.WriteLine($"Backup systemowy COPY_ONLY i VERIFYONLY z CHECKSUM: {backup}");
+    }
+
+    public static async Task MigrateSystem()
+    {
+        await CheckOwnership(SystemDatabase);
+        await using var system = SystemContext(SystemDatabase);
+        await system.Database.MigrateAsync();
+        await Verify();
     }
 }

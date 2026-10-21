@@ -1,6 +1,6 @@
 # Otwarty następca VATowca — specyfikacja produktu i architektury
 
-**Wersja dokumentu:** 0.2.0 (database-per-company, ADR-014)
+**Wersja dokumentu:** 0.3.0 (Identity i autoryzowany wybór bazy, ADR-015)
 **Data:** 2026-10-21  
 **Status:** projekt założeń; nie jest potwierdzeniem zgodności podatkowej gotowego oprogramowania  
 **Nazwa projektu:** robocza „Otwarty następca VATowca”; docelowa nazwa i użycie nazwy „VATowiec” wymagają odrębnej decyzji i sprawdzenia praw  
@@ -114,6 +114,14 @@ Wyłączenie oznacza brak w pierwszym wydaniu, nie zakaz dodania później.
 - Po awarii weryfikuje się stan fizycznej bazy, jej właściciela/znacznik operacji, migracje i profil, zamiast ufać samemu checkpointowi. Nie wolno przejmować lub usuwać zastanej bazy o niepotwierdzonym pochodzeniu; niejednoznaczność wymaga kontrolowanego uzgodnienia stanu.
 - Provisioning używa oddzielnej tożsamości z prawami tworzenia/migracji. Zwykłe konto zapisu księgowego nie ma DDL. Migracje istniejących baz nie uruchamiają się przy starcie API.
 - Proces nie zakłada transakcji SQL obejmującej bazę systemową i firmową. Trwałe etapy umożliwiają naprawę przerwania między zapisami. Szczegóły i bieżący zakres: ADR-014.
+
+### 3.5. Uwierzytelnianie i autoryzowany kontekst firmy (M0, ADR-015)
+
+- ASP.NET Core Identity w bazie systemowej przechowuje użytkowników, hashe haseł, role i przypisania do firm. CompanyAccess określa uprawnienia ViewProfile, ViewContractors, EditContractors; rola globalna sama nie nadaje dostępu do firmy.
+- API udostępnia HTTPS login/logout, token CSRF, dane własnej sesji i listę dostępnych firm. Sesja jest chroniona cookie Secure/HttpOnly/SameSite=Strict i centralnym rekordem; absolutne wygaśnięcie domyślnie 30 minut, bez sliding expiration. Logout unieważnia konkretną sesję także dla replay cookie. SecurityStamp i uprawnienia sprawdza się na serwerze przy kolejnych żądaniach.
+- Firma pochodzi wyłącznie ze ścieżki operacji API. Alternatywne query companyId i X-Company-Id oraz dodatkowe pola JSON są odrzucane. Po sprawdzeniu uprawnień resolver weryfikuje konfigurację serwera, CompanyProfile.CompanyId i fizyczną historię migracji. Brak uprawnienia daje 403; brak ważnej sesji 401; niedostępna/obca baza 503. Nie ma bazy domyślnej.
+- Każda operacja otrzymuje osobny CompanyDbContext. Równoczesne sesje dwóch użytkowników firmy A nie zmieniają sobie wybranej firmy. Login/logout wymaga CSRF, hasła mają politykę Identity, blokadę po błędnych próbach i limit żądań logowania.
+- Konta demonstracyjne i ich hasła konfiguruje się lokalnie poza repozytorium. Migracje i seed kont wykonuje osobne narzędzie, nigdy start API. Szczegóły kontraktu, sesji, testów i ograniczeń: ADR-015 oraz docs/authentication.md.
 
 ---
 
@@ -411,7 +419,7 @@ Bez rekompilacji aplikacji użytkownik tworzy nową definicję formularza: wybie
 
 Model jest rozdzielony na bazę systemową i bazy firmowe. Każda tabela domenowa z danymi firmy posiada `CompanyId`, identyfikator rekordu, daty utworzenia/modyfikacji i, gdzie możliwe, znacznik konkurencyjności. Poniższe nazwy są robocze.
 
-W `Vatowiec_System`: `Company` (katalog, nazwa wyświetlana, status), `CompanyDatabaseRegistration` (firma, serwer, baza, klucz serwerowego profilu połączenia), docelowo `User`, `Role`, `CompanyAccess`, trwały stan provisioningu oraz audyt administracyjny. Profil połączenia odsyła do konfiguracji/sekretów na serwerze; tabela nie zawiera haseł. Użytkownicy, role i stan procesu provisioningu nie są jeszcze zaimplementowane w etapie rozdzielenia kontekstów.
+W `Vatowiec_System`: `Company` (katalog, nazwa wyświetlana, status), `CompanyDatabaseRegistration` (firma, serwer, baza, klucz serwerowego profilu połączenia), Identity `User`/`Role` i tabele towarzyszące, `CompanyAccess` oraz `UserSession`. Profil połączenia odsyła do konfiguracji/sekretów na serwerze; tabela nie zawiera haseł SQL. Identity przechowuje wyłącznie hashe haseł użytkowników. Trwały proces provisioningu i pełny audyt administracyjny pozostają kolejnymi etapami; rejestr sesji nie jest audytem księgowym.
 
 W bazie jednej firmy: `CompanyProfile`, kontrahenci i wszystkie encje księgowe poniżej. Centralne `Company.Name` jest etykietą katalogową; źródłem nazwy prawnej i NIP/REGON jest lokalny profil. Lokalny profil ma PK `SingletonKey` z CHECK `= 1` i unikalny `CompanyId`; kontrahenci mają FK do tego lokalnego identyfikatora. Brak relacji SQL między bazami. Zarejestrowane połączenie trzeba zweryfikować względem rzeczywistego profilu i wersji schematu przed dopuszczeniem operacji.
 
@@ -611,7 +619,11 @@ szyfrowanym połączeniu; to odrębne ustawienie od certyfikatu HTTPS API.
 
 **Etap przygotowania database-per-company (2026-10-21):** decyzja ADR-014 zastępuje ADR-005. Rozdzielono modele `SystemDbContext` (katalog firm i lokalizacje baz) i `CompanyDbContext` (profil oraz kontrahenci jednej firmy), jawne konfiguracje, fabryki projektowe bez połączeń i osobne migracje początkowe. SQL wygenerowano offline; w tym wcześniejszym etapie nie zmieniano SQL Servera. Runtime nie ma domyślnego połączenia do firmy; przyszły resolver dostarczy niezmienny wybór po serwerowej autoryzacji. Dotychczasowa migracja jest archiwalna i nie należy do historii nowych kontekstów.
 
-**Aktualny etap lokalnego wdrożenia (2026-10-21):** użytkownik uznał wszystkie bazy projektu na `localhost\SQLEXPRESS` za testowe i upoważnił do ich tworzenia, modyfikowania i usuwania po sprawdzeniu dokładnej nazwy i przeznaczenia, bez ponawiania pytań. Wyłączone są bazy systemowe SQL i innych aplikacji. Po potwierdzeniu starego schematu, migracji i braku danych usunięto `Vatowiec_Dev`. Utworzono i zmigrowano `Vatowiec_System`, `Vatowiec_Company_A_Dev` i `Vatowiec_Company_B_Dev`. Katalog zawiera dwie fikcyjne firmy i dwa wskazania baz; każda baza firmowa ma własny profil i jednego fikcyjnego kontrahenta, bez NIP/REGON. Osobne narzędzie `Vatowiec.DatabaseTools` weryfikuje lokalną instancję i jawne nazwy/znaczniki baz, wykonuje migracje oraz inicjalizację; API nie migruje przy starcie. Narzędzie pełnych testów tworzy trzy tymczasowe bazy *_Test, uruchamia cały zestaw i usuwa je po sprawdzeniu rollbacków. Zaliczone 50 testów, w tym 12 SQL, bez pominięć; kompilacja ośmiu projektów bez błędów i ostrzeżeń. Domyślne połączenie systemowe Development wskazuje lokalną bazę przez Windows Authentication; poza Development pozostaje puste. Logowanie, użytkownicy/role, autoryzowany resolver, provisioning z aplikacji, audyt aktorów i backup/restore pozostają do implementacji; M0 nie jest ukończone. Instrukcja i wyniki: docs/database-per-company.md.
+**Etap lokalnego wdrożenia przed Identity (2026-10-21):** użytkownik uznał wszystkie bazy projektu na `localhost\SQLEXPRESS` za testowe i upoważnił do ich tworzenia, modyfikowania i usuwania po sprawdzeniu dokładnej nazwy i przeznaczenia, bez ponawiania pytań. Wyłączone są bazy systemowe SQL i innych aplikacji. Po potwierdzeniu starego schematu, migracji i braku danych usunięto `Vatowiec_Dev`. Utworzono i zmigrowano `Vatowiec_System`, `Vatowiec_Company_A_Dev` i `Vatowiec_Company_B_Dev`. Katalog zawiera dwie fikcyjne firmy i dwa wskazania baz; każda baza firmowa ma własny profil i jednego fikcyjnego kontrahenta, bez NIP/REGON. Osobne narzędzie `Vatowiec.DatabaseTools` weryfikuje lokalną instancję i jawne nazwy/znaczniki baz, wykonuje migracje oraz inicjalizację; API nie migruje przy starcie. Narzędzie pełnych testów tworzy trzy tymczasowe bazy *_Test, uruchamia cały zestaw i usuwa je po sprawdzeniu rollbacków. Zaliczone 50 testów, w tym 12 SQL, bez pominięć; kompilacja ośmiu projektów bez błędów i ostrzeżeń. Domyślne połączenie systemowe Development wskazuje lokalną bazę przez Windows Authentication; poza Development pozostaje puste. Logowanie, użytkownicy/role, autoryzowany resolver, provisioning z aplikacji, audyt aktorów i backup/restore pozostają do implementacji; M0 nie jest ukończone. Instrukcja i wyniki: docs/database-per-company.md.
+
+**Aktualny etap Identity i resolvera (2026-10-21, ADR-015):** wdrożono użytkowników, role, przypisania i uprawnienia do firm w SystemDbContext, cookie/sesje z CSRF, login/logout i listę firm. Resolver sprawdza uprawnienie, konfigurację SQL, rzeczywisty profil i schemat bazy przed odczytem danych. Udostępniono tylko odczyt profilu/kontrahentów. Migrację IdentityAndCompanyAccess wykonano jawnie po kopii bazy systemowej; schematy firmowe pozostały bez zmian. Konta operator.m0 i czytelnik.m0 mają różne uprawnienia; hasła są w lokalnym user-secrets. Nie dodano UI logowania Avalonia, księgowania ani automatycznego tworzenia firmy. Audyt księgowy, provisioning i backup/restore w aplikacji pozostają dalszą częścią M0. Ręczna próba: docs/authentication.md i tools/database/Test-Authentication.ps1.
+
+Weryfikacja etapu Identity: 70/70 testów, w tym 32 SQL/API, bez pominięć; build ośmiu projektów bez błędów i ostrzeżeń. Rzeczywista próba HTTPS dwóch kont potwierdziła profile A/B dla operatora, 403 dla czytelnika w B, 400 przy manipulacji CompanyId i 401 po logout. Dane dostępowe SQL nie trafiają do klienta.
 
 - Publiczne repo, `LICENSE`, `README`, `CONTRIBUTING`, `SECURITY`, `AGENTS.md`.
 - Solution .NET 10, serwer ASP.NET Core, klient Avalonia, model modułowy.
@@ -696,6 +708,7 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | ADR-004 | SQL Server na Linux / limit Express | Przed publikacją instrukcji instalacji linuksowej; rozbieżność dokumentacji |
 | [ADR-005](docs/adr/ADR-005-izolacja-firm-i-pierwszy-model.md) | Historyczna wspólna baza | Zastąpiony przez ADR-014; pozostaje zapisem zastosowanej migracji Vatowiec_Dev |
 | [ADR-014](docs/adr/ADR-014-database-per-company.md) | Database-per-company, dwa konteksty i cykl życia baz | Wdrożony lokalny demonstrator: trzy bazy, dwie fikcyjne firmy, migracje i pełne testy SQL |
+| [ADR-015](docs/adr/ADR-015-identity-i-autoryzowany-wybor-bazy.md) | Identity, sesje i autoryzowany wybór bazy | Wdrożone API logowania, uprawnienia do firm, resolver i sprawdzanie rzeczywistego profilu; bez UI Avalonia |
 | ADR-006 | Podpisywanie XML i przechowywanie certyfikatów | Przed implementacją wysyłek MF; nie przechowywać sekretów w zwykłej bazie |
 | ADR-007 | API pluginów: manifest, sandbox, granice dostępu | Przed pierwszą wykonywalną wtyczką |
 | ADR-008 | Pełny wykaz typów VAT i deklaracji na 1.0 | Przed M3; uzgodnić precyzyjne scenariusze |

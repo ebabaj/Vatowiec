@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Vatowiec.Core.Application;
 using Vatowiec.Core.Domain;
 using Vatowiec.Core.Infrastructure.Persistence;
+using Vatowiec.Core.Infrastructure.Identity;
 
 namespace Vatowiec.Tests;
 
@@ -32,8 +33,11 @@ public sealed class CompanyModelTests
     {
         using var system = new SystemDbContextFactory().CreateDbContext([]);
         using var company = new CompanyDbContextFactory().CreateDbContext([]);
-        Assert.Equal(new[] { typeof(Company), typeof(CompanyDatabaseRegistration) },
-            system.Model.GetEntityTypes().Select(x => x.ClrType).OrderBy(x => x.Name));
+        Assert.NotNull(system.Model.FindEntityType(typeof(ApplicationUser)));
+        Assert.NotNull(system.Model.FindEntityType(typeof(CompanyAccess)));
+        Assert.NotNull(system.Model.FindEntityType(typeof(UserSession)));
+        Assert.Null(system.Model.FindEntityType(typeof(Contractor)));
+        Assert.Null(system.Model.FindEntityType(typeof(CompanyProfile)));
         Assert.Equal(new[] { typeof(CompanyProfile), typeof(Contractor) },
             company.Model.GetEntityTypes().Select(x => x.ClrType).OrderBy(x => x.Name));
         var contractor = company.Model.FindEntityType(typeof(Contractor))!;
@@ -84,7 +88,8 @@ public sealed class CompanyModelTests
     {
         using var system = new SystemDbContextFactory().CreateDbContext([]);
         using var company = new CompanyDbContextFactory().CreateDbContext([]);
-        Assert.EndsWith("_InitialSystem", Assert.Single(system.Database.GetMigrations()));
+        Assert.Equal(2, system.Database.GetMigrations().Count());
+        Assert.EndsWith("_IdentityAndCompanyAccess", system.Database.GetMigrations().Last());
         Assert.EndsWith("_InitialCompany", Assert.Single(company.Database.GetMigrations()));
         Assert.False(system.Database.HasPendingModelChanges());
         Assert.False(company.Database.HasPendingModelChanges());
@@ -94,6 +99,9 @@ public sealed class CompanyModelTests
         var companySql = company.GetService<IMigrator>().GenerateScript();
         Assert.Contains("[core].[Companies]", systemSql);
         Assert.Contains("[core].[CompanyDatabases]", systemSql);
+        Assert.Contains("[security].[Users]", systemSql);
+        Assert.Contains("[security].[CompanyAccess]", systemSql);
+        Assert.Contains("[security].[UserSessions]", systemSql);
         Assert.DoesNotContain("[core].[Contractors]", systemSql);
         Assert.DoesNotContain("[core].[CompanyProfile]", systemSql);
         Assert.Contains("[core].[Contractors]", companySql);
