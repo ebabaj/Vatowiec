@@ -119,7 +119,8 @@ HTTPS i równoczesne żądania dwóch użytkowników. Zegara testowego nie konfi
 się z publicznego API. SQL fixture są serializowane i sprzątane; współbieżność
 dwóch klientów jest osobnym testem wewnątrz tej grupy.
 
-Nie implementujemy jeszcze logowania Avalonia, audytu księgowego, funkcji
+Zakres tego ADR nie obejmował logowania Avalonia; klienta dodaje ADR-016.
+Nie implementujemy jeszcze audytu księgowego, funkcji
 podatkowych, automatycznego tworzenia firm, backup/restore w UI ani kolejki zadań.
 
 ## Źródła techniczne

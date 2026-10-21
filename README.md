@@ -1,10 +1,10 @@
 # Otwarty następca VATowca
 
 Projekt wielostanowiskowej aplikacji dla polskich mikrofirm. Obecny stan to
-**lokalne wdrożenie persystencji M0 database-per-company**: szkielet API, okno
-desktopowe, osobne SystemDbContext i CompanyDbContext, trzy zmigrowane bazy SQL
+**pierwszy scenariusz desktopowy M0 database-per-company**: logowanie Avalonia,
+wybór firmy i odczyt kontrahentów, osobne SystemDbContext i CompanyDbContext, trzy bazy SQL
 Server oraz dwie fikcyjne firmy. Działają Identity, sesje API i autoryzowany resolver
-bazy firmy. Pełny zestaw obejmuje 70 testów, w tym 32 z SQL/API.
+bazy firmy. Pełny zestaw obejmuje 96 testów, w tym 35 z SQL/API.
 Nie jest to jeszcze program do prowadzenia księgowości.
 
 Wymagania produktu: [SPECYFIKACJA.md](SPECYFIKACJA.md).
@@ -14,6 +14,8 @@ Model i izolacja firm: [ADR-014](docs/adr/ADR-014-database-per-company.md).
 Plan baz, konfiguracja i testy: [database-per-company](docs/database-per-company.md).
 Logowanie dwóch kont i test odmowy dostępu: [instrukcja](docs/authentication.md),
 [ADR-015](docs/adr/ADR-015-identity-i-autoryzowany-wybor-bazy.md).
+Scenariusz okienkowy operatora i czytelnika: [desktop](docs/desktop.md),
+[ADR-016](docs/adr/ADR-016-desktop-logowanie-i-kontekst-firmy.md).
 
 ## Wymagane narzędzia
 
@@ -99,8 +101,12 @@ W drugim terminalu:
 dotnet run --project src/Desktop
 ```
 
-Otworzy się proste polskie okno startowe. Na tym etapie klient działa samodzielnie,
-nie wywołuje API i nie łączy się z bazą. Zamknij go przyciskiem okna.
+Otworzy się ekran logowania. Wpisz `operator.m0` i hasło z lokalnej konfiguracji,
+wybierz firmę A lub B i kliknij **Pokaż kontrahentów / odśwież**. Przyciski
+**Zmień firmę** i **Wyloguj** działają bez restartu. Klient komunikuje się wyłącznie
+z API HTTPS, domyślnie `https://localhost:7243`; adres można zmienić w oknie
+lub przez `VATOWIEC_API_URL`. Cookie i tokeny pozostają w pamięci.
+Szczegóły haseł, odmów dostępu i błędów: [instrukcja desktopu](docs/desktop.md).
 
 ### Skróty i debugowanie
 
@@ -175,7 +181,7 @@ Testy offline weryfikują rozłączne modele, lokalny profil/FK, historie i SQL
 migracji, zgodność snapshotów, odmowę bez wyboru bazy, izolację scope,
 politykę połączeń, filtry, kontrolę zapisu i host API.
 
-Powyższy przebieg bez SQL zalicza 38 testów i pomija 32 testy SQL/API. Pełny przebieg:
+Powyższy przebieg bez SQL zalicza 61 testów i pomija 35 testów SQL/API. Pełny przebieg:
 
 ```powershell
 dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- test
@@ -183,7 +189,7 @@ dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- test
 
 Narzędzie sprawdza lokalny serwer, przygotowuje trzy oznaczone bazy *_Test,
 wykonuje wszystkie testy, zapisuje TRX, sprawdza rollbacky i usuwa te bazy w finally.
-Nie zmienia danych demonstracyjnych. Pełny zestaw obejmuje **70 testów**.
+Nie zmienia danych demonstracyjnych. Pełny zestaw obejmuje **96 testów**.
 
 Przy ręcznym uruchamianiu testów z wcześniej przygotowanymi bazami flaga
 `VATOWIEC_DATABASE_PER_COMPANY_SQL=1` włącza je jawnie; stara flaga
@@ -210,7 +216,7 @@ kontrakt HTTP: [logowanie](docs/authentication.md).
 
 ## Dalsze kroki
 
-Kolejne etapy obejmą klienta Avalonia z logowaniem, wznawialny provisioning firmy
+Kolejne etapy obejmą wznawialny provisioning firmy
 z aplikacji, audyt księgowy z trwałą identyfikacją aktorów oraz niezależny backup/restore.
 Narzędzie wdrożeniowe jest dostępne poza API; pełny provisioning z aplikacji
 pozostaje osobnym etapem. Nie przeniesiono danych z usuniętej Vatowiec_Dev.

@@ -14,6 +14,8 @@ using Vatowiec.Core.Application;
 using Vatowiec.Core.Domain;
 using Vatowiec.Core.Infrastructure.Identity;
 using Vatowiec.Core.Infrastructure.Persistence;
+using Vatowiec.Desktop.Services;
+using Vatowiec.Desktop.ViewModels;
 
 namespace Vatowiec.Tests;
 
@@ -113,6 +115,60 @@ public sealed class AuthenticationIntegrationTests : IAsyncLifetime
             await company.CompanyProfiles.ExecuteDeleteAsync();
         }
         await application.DisposeAsync();
+    }
+
+    [SqlServerFact]
+    public async Task DesktopClient_LogsInSwitchesPhysicalDatabasesAndLogsOut()
+    {
+        using var model = new MainViewModel(_ => new VatowiecApiClient(Client())) { UserName = "operator.test" };
+        await model.Login(password);
+        Assert.True(model.IsCompanySelection, model.Message);
+        Assert.Equal(2, model.Companies.Length);
+        foreach (var id in new[] { companyA, companyB })
+        {
+            model.SelectedCompany = model.Companies.Single(x => x.CompanyId == id);
+            await model.OpenCompany();
+            Assert.True(model.IsWorkspace, model.Message);
+            await model.LoadContractors();
+            var contractor = Assert.Single(model.Contractors);
+            Assert.Equal(id, contractor.CompanyId);
+            Assert.Equal(id == companyA ? "Kontrahent A" : "Kontrahent B", contractor.Name);
+            await model.ChangeCompany();
+            Assert.Empty(model.Contractors);
+        }
+        await model.Logout();
+        Assert.True(model.IsLogin);
+        Assert.Empty(model.Message);
+        using var scope = application!.Services.CreateScope();
+        Assert.False(await scope.ServiceProvider.GetRequiredService<SystemDbContext>().UserSessions.AnyAsync(x => x.RevokedAtUtc == null));
+    }
+
+    [SqlServerFact]
+    public async Task DesktopClient_ReaderCannotDownloadContractorsOrForeignCompany()
+    {
+        using var api = new VatowiecApiClient(Client());
+        await api.Login("reader.test", password);
+        Assert.False(Assert.Single(await api.Companies()).CanViewContractors);
+        Assert.Equal(403, (await Assert.ThrowsAsync<ApiException>(() => api.Contractors(companyA))).StatusCode);
+        Assert.Equal(403, (await Assert.ThrowsAsync<ApiException>(() => api.Profile(companyB))).StatusCode);
+        Assert.Equal(403, (await Assert.ThrowsAsync<ApiException>(() => api.Contractors(companyB))).StatusCode);
+        await api.Logout();
+    }
+
+    [SqlServerFact]
+    public async Task DesktopClient_ServerSessionExpiryReturnsToLoginAndClearsData()
+    {
+        using var model = new MainViewModel(_ => new VatowiecApiClient(Client())) { UserName = "operator.test" };
+        await model.Login(password);
+        model.SelectedCompany = model.Companies.Single(x => x.CompanyId == companyA);
+        await model.OpenCompany();
+        await model.LoadContractors();
+        Assert.Single(model.Contractors);
+        clock.Advance(TimeSpan.FromMinutes(31));
+        await model.LoadContractors();
+        Assert.True(model.IsLogin, model.Message);
+        Assert.Empty(model.Contractors);
+        Assert.Empty(model.Companies);
     }
 
     [SqlServerFact]

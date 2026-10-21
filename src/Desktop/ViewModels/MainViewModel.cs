@@ -1,0 +1,190 @@
+using System.ComponentModel;
+using System.Net.Http;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
+using Vatowiec.Desktop.Services;
+using Vatowiec.SharedContracts;
+
+namespace Vatowiec.Desktop.ViewModels;
+
+public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
+{
+    private readonly Func<string, IVatowiecApiClient> connect;
+    private readonly TimeProvider clock;
+    private IVatowiecApiClient? api;
+    private SessionResponse? session;
+    private bool busy;
+    private string message = "";
+    private CompanyResponse[] companies = [];
+    private CompanyResponse? selectedCompany;
+    private CompanyProfileResponse? profile;
+    private ContractorResponse[] contractors = [];
+    private bool contractorsLoaded;
+    private bool disposed;
+
+    public MainViewModel(Func<string, IVatowiecApiClient>? connect = null, TimeProvider? clock = null)
+    {
+        this.connect = connect ?? VatowiecApiClient.Connect;
+        this.clock = clock ?? TimeProvider.System;
+        ApiAddress = Environment.GetEnvironmentVariable("VATOWIEC_API_URL") ?? "https://localhost:7243";
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public string ApiAddress { get; set; }
+    public string UserName { get; set; } = "";
+    public bool IsBusy => busy;
+    public bool CanInteract => !busy;
+    public bool IsLogin => session is null;
+    public bool IsCompanySelection => session is not null && profile is null;
+    public bool IsWorkspace => session is not null && profile is not null;
+    public string CurrentUser => session?.UserName ?? "";
+    public string CurrentCompany => profile?.Name ?? "";
+    public string SessionExpiry => session is null ? "" : $"Sesja do {session.ExpiresAtUtc.ToLocalTime():HH:mm}";
+    public string Message => message;
+    public CompanyResponse[] Companies => companies;
+    public CompanyResponse? SelectedCompany
+    {
+        get => selectedCompany;
+        set { selectedCompany = value; Changed(); }
+    }
+    public ContractorResponse[] Contractors => contractors;
+    public bool CanViewContractors => IsWorkspace && selectedCompany?.CanViewContractors == true;
+    public bool CannotViewContractors => IsWorkspace && !CanViewContractors;
+    public string ContractorStatus => !contractorsLoaded ? "Wybierz „Pokaż kontrahentów”, aby pobrać aktualne dane."
+        : contractors.Length == 0 ? "Brak kontrahentów w wybranej firmie." : $"Liczba kontrahentów: {contractors.Length}";
+
+    public async Task Login(string password)
+    {
+        if (busy || !IsLogin) return;
+        await Run(async () =>
+        {
+            if (string.IsNullOrWhiteSpace(UserName) || string.IsNullOrEmpty(password))
+                throw new ArgumentException("Wpisz login i hasło.");
+            ResetSession();
+            api = connect(ApiAddress.Trim());
+            session = await api.Login(UserName.Trim(), password);
+            ChangedAll();
+            companies = await api.Companies();
+            ChangedAll();
+        });
+        if (session is null) ResetSession();
+    }
+
+    public Task RefreshCompanies() => Run(async () =>
+    {
+        if (api is null || session is null) return;
+        companies = [];
+        selectedCompany = null;
+        companies = await api.Companies();
+    });
+
+    public Task OpenCompany() => Run(async () =>
+    {
+        if (api is null || session is null || selectedCompany is null)
+            throw new ArgumentException("Wybierz firmę z listy.");
+        var id = selectedCompany.CompanyId;
+        ClearCompanyData();
+        var result = await api.Profile(id);
+        if (result.CompanyId != id) throw new ApiException(502, "API zwróciło dane innej firmy. Odmowa wyświetlenia danych.");
+        profile = result;
+    });
+
+    public Task LoadContractors() => Run(async () =>
+    {
+        contractors = [];
+        contractorsLoaded = false;
+        ChangedAll();
+        if (api is null || profile is null || !CanViewContractors)
+            throw new ApiException(403, "Brak uprawnień do kartoteki kontrahentów.");
+        var rows = await api.Contractors(profile.CompanyId);
+        if (rows.Any(x => x.CompanyId != profile.CompanyId))
+            throw new ApiException(502, "API zwróciło dane innej firmy. Odmowa wyświetlenia danych.");
+        contractors = rows;
+        contractorsLoaded = true;
+    });
+
+    public Task ChangeCompany() => Run(async () =>
+    {
+        ClearCompanyData();
+        selectedCompany = null;
+        companies = [];
+        ChangedAll();
+        if (api is not null) companies = await api.Companies();
+    });
+
+    public Task Logout() => Run(async () =>
+    {
+        try { if (api is not null) await api.Logout(); }
+        catch (Exception ex) when (IsExpected(ex))
+        {
+            if (ex is not ApiException { StatusCode: 401 })
+                message = "Wylogowano lokalnie. Nie potwierdzono wylogowania na serwerze; sesja wygaśnie zgodnie z terminem ważności.";
+        }
+        finally { ResetSession(); }
+    });
+
+    // Nie usuwamy sesji podczas aktywnego żądania. Run ponownie sprawdzi termin po odpowiedzi.
+    public void CheckExpiry()
+    {
+        if (!busy && session is not null && clock.GetUtcNow() >= session.ExpiresAtUtc)
+        {
+            ResetSession();
+            message = "Sesja wygasła. Zaloguj się ponownie.";
+            ChangedAll();
+        }
+    }
+
+    private async Task Run(Func<Task> action)
+    {
+        if (busy || disposed) return;
+        var wasAuthenticated = session is not null;
+        CheckExpiry();
+        if (wasAuthenticated && session is null) return;
+        busy = true;
+        message = "";
+        ChangedAll();
+        try { await action(); }
+        catch (ApiException ex)
+        {
+            if (ex.StatusCode == 401) ResetSession();
+            if (ex.StatusCode == 403) ClearCompanyData();
+            message = ex.Message;
+        }
+        catch (ArgumentException ex) { message = ex.Message; }
+        catch (Exception ex) when (IsExpected(ex))
+        {
+            message = "Nie można połączyć się z API. Sprawdź adres HTTPS, zaufanie certyfikatu i połączenie. Spróbuj ponownie.";
+        }
+        finally
+        {
+            busy = false;
+            if (disposed) ResetSession();
+            CheckExpiry();
+            ChangedAll();
+        }
+    }
+
+    private static bool IsExpected(Exception ex) => ex is ApiException or HttpRequestException or TaskCanceledException or JsonException;
+    private void ClearCompanyData()
+    {
+        profile = null;
+        contractors = [];
+        contractorsLoaded = false;
+    }
+    private void ResetSession()
+    {
+        api?.Dispose();
+        api = null;
+        session = null;
+        companies = [];
+        selectedCompany = null;
+        ClearCompanyData();
+    }
+    private void Changed([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    private void ChangedAll() => Changed(string.Empty);
+    public void Dispose()
+    {
+        disposed = true;
+        if (!busy) ResetSession();
+    }
+}

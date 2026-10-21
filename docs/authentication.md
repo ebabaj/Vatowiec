@@ -3,7 +3,8 @@
 Decyzja: [ADR-015](adr/ADR-015-identity-i-autoryzowany-wybor-bazy.md).
 Uwierzytelnianie, role, przypisania i sesje są w Vatowiec_System.
 CompanyProfile i Contractors pozostają wyłącznie w bazach firmowych.
-Nie ma jeszcze interfejsu logowania Avalonia, operacji księgowych ani provisioningu firm.
+Interfejs logowania, wyboru firmy i odczytu kartoteki opisuje [desktop](desktop.md).
+Nie ma operacji księgowych ani provisioningu firm.
 
 ## Dwa konta demonstracyjne
 

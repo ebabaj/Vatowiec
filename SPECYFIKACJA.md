@@ -1,6 +1,6 @@
 # Otwarty następca VATowca — specyfikacja produktu i architektury
 
-**Wersja dokumentu:** 0.3.0 (Identity i autoryzowany wybór bazy, ADR-015)
+**Wersja dokumentu:** 0.4.0 (scenariusz desktopowy, ADR-016)
 **Data:** 2026-10-21  
 **Status:** projekt założeń; nie jest potwierdzeniem zgodności podatkowej gotowego oprogramowania  
 **Nazwa projektu:** robocza „Otwarty następca VATowca”; docelowa nazwa i użycie nazwy „VATowiec” wymagają odrębnej decyzji i sprawdzenia praw  
@@ -122,6 +122,13 @@ Wyłączenie oznacza brak w pierwszym wydaniu, nie zakaz dodania później.
 - Firma pochodzi wyłącznie ze ścieżki operacji API. Alternatywne query companyId i X-Company-Id oraz dodatkowe pola JSON są odrzucane. Po sprawdzeniu uprawnień resolver weryfikuje konfigurację serwera, CompanyProfile.CompanyId i fizyczną historię migracji. Brak uprawnienia daje 403; brak ważnej sesji 401; niedostępna/obca baza 503. Nie ma bazy domyślnej.
 - Każda operacja otrzymuje osobny CompanyDbContext. Równoczesne sesje dwóch użytkowników firmy A nie zmieniają sobie wybranej firmy. Login/logout wymaga CSRF, hasła mają politykę Identity, blokadę po błędnych próbach i limit żądań logowania.
 - Konta demonstracyjne i ich hasła konfiguruje się lokalnie poza repozytorium. Migracje i seed kont wykonuje osobne narzędzie, nigdy start API. Szczegóły kontraktu, sesji, testów i ograniczeń: ADR-015 oraz docs/authentication.md.
+
+### 3.6. Pierwszy scenariusz Avalonia (M0, ADR-016)
+
+- Polski klient loguje przez API HTTPS, pobiera dostępne firmy, otwiera profil wybranej firmy i odczytuje kontrahentów. Zmiana firmy i wylogowanie nie wymagają restartu. Okno pokazuje aktualną firmę, użytkownika i termin sesji.
+- Adres API jest konfigurowalny przez VATOWIEC_API_URL i ekran logowania. Klient zachowuje standardową walidację certyfikatów; nie akceptuje HTTP ani przekierowań. Hasło nie jest zapisywane, cookie i CSRF są tylko w pamięci. Login/logout zachowują wymagania ADR-015.
+- ViewContractors jest sprawdzane przez serwer niezależnie od widoczności przycisku. Brak uprawnień, sesja 401, błąd resolvera i utrata połączenia nie powodują wyboru domyślnej firmy. Zmiana firmy i odświeżanie kartoteki usuwają stare rekordy; wygaśnięcie sesji czyści całą sesję także podczas bezczynności. Operacje UI są serializowane, opóźnione dane po terminie sesji są odrzucane.
+- Nie ma dodawania/edycji kontrahentów ani automatycznego provisioningu. Instrukcja kont i ograniczeń wylogowania offline: docs/desktop.md. Architektura database-per-company i migracje pozostają bez zmian.
 
 ---
 
@@ -621,9 +628,11 @@ szyfrowanym połączeniu; to odrębne ustawienie od certyfikatu HTTPS API.
 
 **Etap lokalnego wdrożenia przed Identity (2026-10-21):** użytkownik uznał wszystkie bazy projektu na `localhost\SQLEXPRESS` za testowe i upoważnił do ich tworzenia, modyfikowania i usuwania po sprawdzeniu dokładnej nazwy i przeznaczenia, bez ponawiania pytań. Wyłączone są bazy systemowe SQL i innych aplikacji. Po potwierdzeniu starego schematu, migracji i braku danych usunięto `Vatowiec_Dev`. Utworzono i zmigrowano `Vatowiec_System`, `Vatowiec_Company_A_Dev` i `Vatowiec_Company_B_Dev`. Katalog zawiera dwie fikcyjne firmy i dwa wskazania baz; każda baza firmowa ma własny profil i jednego fikcyjnego kontrahenta, bez NIP/REGON. Osobne narzędzie `Vatowiec.DatabaseTools` weryfikuje lokalną instancję i jawne nazwy/znaczniki baz, wykonuje migracje oraz inicjalizację; API nie migruje przy starcie. Narzędzie pełnych testów tworzy trzy tymczasowe bazy *_Test, uruchamia cały zestaw i usuwa je po sprawdzeniu rollbacków. Zaliczone 50 testów, w tym 12 SQL, bez pominięć; kompilacja ośmiu projektów bez błędów i ostrzeżeń. Domyślne połączenie systemowe Development wskazuje lokalną bazę przez Windows Authentication; poza Development pozostaje puste. Logowanie, użytkownicy/role, autoryzowany resolver, provisioning z aplikacji, audyt aktorów i backup/restore pozostają do implementacji; M0 nie jest ukończone. Instrukcja i wyniki: docs/database-per-company.md.
 
-**Aktualny etap Identity i resolvera (2026-10-21, ADR-015):** wdrożono użytkowników, role, przypisania i uprawnienia do firm w SystemDbContext, cookie/sesje z CSRF, login/logout i listę firm. Resolver sprawdza uprawnienie, konfigurację SQL, rzeczywisty profil i schemat bazy przed odczytem danych. Udostępniono tylko odczyt profilu/kontrahentów. Migrację IdentityAndCompanyAccess wykonano jawnie po kopii bazy systemowej; schematy firmowe pozostały bez zmian. Konta operator.m0 i czytelnik.m0 mają różne uprawnienia; hasła są w lokalnym user-secrets. Nie dodano UI logowania Avalonia, księgowania ani automatycznego tworzenia firmy. Audyt księgowy, provisioning i backup/restore w aplikacji pozostają dalszą częścią M0. Ręczna próba: docs/authentication.md i tools/database/Test-Authentication.ps1.
+**Etap Identity i resolvera (2026-10-21, ADR-015):** wdrożono użytkowników, role, przypisania i uprawnienia do firm w SystemDbContext, cookie/sesje z CSRF, login/logout i listę firm. Resolver sprawdza uprawnienie, konfigurację SQL, rzeczywisty profil i schemat bazy przed odczytem danych. Udostępniono tylko odczyt profilu/kontrahentów. Migrację IdentityAndCompanyAccess wykonano jawnie po kopii bazy systemowej; schematy firmowe pozostały bez zmian. Konta operator.m0 i czytelnik.m0 mają różne uprawnienia; hasła są w lokalnym user-secrets. Etap ten nie obejmował UI logowania Avalonia, księgowania ani automatycznego tworzenia firmy. Audyt księgowy, provisioning i backup/restore w aplikacji pozostają dalszą częścią M0. Ręczna próba: docs/authentication.md i tools/database/Test-Authentication.ps1.
 
 Weryfikacja etapu Identity: 70/70 testów, w tym 32 SQL/API, bez pominięć; build ośmiu projektów bez błędów i ostrzeżeń. Rzeczywista próba HTTPS dwóch kont potwierdziła profile A/B dla operatora, 403 dla czytelnika w B, 400 przy manipulacji CompanyId i 401 po logout. Dane dostępowe SQL nie trafiają do klienta.
+
+**Aktualny etap desktopowy (2026-10-21, ADR-016):** logowanie, lista dostępnych firm, otwieranie profilu, odczyt kontrahentów, zmiana firmy i wylogowanie w jednym procesie Avalonia. Weryfikacja: 96/96 testów, w tym 35 SQL/API, bez pominięć; build ośmiu projektów bez błędów i ostrzeżeń. Rzeczywista próba Windows UI Automation potwierdziła konto operatora i odrębne kartoteki A/B przez HTTPS, zmianę firmy i logout. Hasła/sesje nie są utrwalane przez klienta. M0 nadal wymaga m.in. audytu i cyklu życia firm. Instrukcja: docs/desktop.md.
 
 - Publiczne repo, `LICENSE`, `README`, `CONTRIBUTING`, `SECURITY`, `AGENTS.md`.
 - Solution .NET 10, serwer ASP.NET Core, klient Avalonia, model modułowy.
@@ -709,6 +718,7 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | [ADR-005](docs/adr/ADR-005-izolacja-firm-i-pierwszy-model.md) | Historyczna wspólna baza | Zastąpiony przez ADR-014; pozostaje zapisem zastosowanej migracji Vatowiec_Dev |
 | [ADR-014](docs/adr/ADR-014-database-per-company.md) | Database-per-company, dwa konteksty i cykl życia baz | Wdrożony lokalny demonstrator: trzy bazy, dwie fikcyjne firmy, migracje i pełne testy SQL |
 | [ADR-015](docs/adr/ADR-015-identity-i-autoryzowany-wybor-bazy.md) | Identity, sesje i autoryzowany wybór bazy | Wdrożone API logowania, uprawnienia do firm, resolver i sprawdzanie rzeczywistego profilu; bez UI Avalonia |
+  | [ADR-016](docs/adr/ADR-016-desktop-logowanie-i-kontekst-firmy.md) | Avalonia: logowanie i kontekst firmy | Wdrożony scenariusz desktopowy, odczyt kontrahentów, zmiana firmy i wylogowanie |
 | ADR-006 | Podpisywanie XML i przechowywanie certyfikatów | Przed implementacją wysyłek MF; nie przechowywać sekretów w zwykłej bazie |
 | ADR-007 | API pluginów: manifest, sandbox, granice dostępu | Przed pierwszą wykonywalną wtyczką |
 | ADR-008 | Pełny wykaz typów VAT i deklaracji na 1.0 | Przed M3; uzgodnić precyzyjne scenariusze |
