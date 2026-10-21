@@ -4,10 +4,11 @@ Data: 2026-10-21
 Status: zaakceptowany w zakresie architektury przez użytkownika.  
 Powiązania: SPECYFIKACJA.md §4.2, M0, E01 i przygotowanie E02; AGENTS.md §8.
 
-Aktualizacja etapu bazy (2026-10-21): opis pustego DbContext poniżej dotyczy
-pierwszego szkieletu. Model, migracje i izolację danych w kolejnym etapie określa
-[ADR-005](ADR-005-izolacja-firm-i-pierwszy-model.md). Granice projektów pozostają
-aktualne.
+Aktualizacja etapu bazy (2026-10-21): opis pustego CoreDbContext i konfiguracji
+poniżej jest historyczny. Obowiązuje [ADR-014](ADR-014-database-per-company.md),
+zastępujący ADR-005: SystemDbContext i CompanyDbContext, osobne fizyczne bazy
+oraz migracje. Granice i referencje projektów pozostają aktualne. „Wspólne
+kartoteki” oznaczają współdzielenie w obrębie jednej firmy, nie między firmami.
 
 ## Kontekst i zakres
 

@@ -11,18 +11,18 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
-        string? connectionString,
+        string? systemConnectionString,
         bool isDevelopment = false)
     {
-        DevelopmentDatabase.ValidateRuntime(connectionString, isDevelopment);
-        return RegisterInfrastructure(services, _ => connectionString, isDevelopment);
+        DatabaseConnectionPolicy.ValidateSystem(systemConnectionString, isDevelopment);
+        return RegisterInfrastructure(services, _ => systemConnectionString, isDevelopment);
     }
 
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration,
         bool isDevelopment) =>
-        RegisterInfrastructure(services, _ => configuration.GetConnectionString("Vatowiec"), isDevelopment);
+        RegisterInfrastructure(services, _ => configuration.GetConnectionString("VatowiecSystem"), isDevelopment);
 
     private static IServiceCollection RegisterInfrastructure(
         IServiceCollection services,
@@ -30,11 +30,11 @@ public static class DependencyInjection
         bool isDevelopment)
     {
         services.TryAddScoped<ICompanyContext>(_ => new CompanyContext(null));
-        services.AddDbContext<CoreDbContext>((provider, options) =>
+        services.AddDbContext<SystemDbContext>((provider, options) =>
         {
             // Odczyt po złożeniu konfiguracji hosta, w tym nadpisań testowych.
             var connectionString = getConnectionString(provider);
-            DevelopmentDatabase.ValidateRuntime(connectionString, isDevelopment);
+            DatabaseConnectionPolicy.ValidateSystem(connectionString, isDevelopment);
             if (string.IsNullOrWhiteSpace(connectionString))
             {
                 // Konfiguracja providera bez adresu serwera i bez otwierania połączenia.
@@ -44,6 +44,20 @@ public static class DependencyInjection
             {
                 options.UseSqlServer(connectionString);
             }
+        });
+
+        services.AddDbContext<CompanyDbContext>((provider, options) =>
+        {
+            var company = provider.GetRequiredService<ICompanyContext>();
+            var selection = provider.GetService<CompanyDatabaseSelection>();
+            if (company.CompanyId is null || company.CompanyId == Guid.Empty ||
+                selection is null || selection.CompanyId != company.CompanyId)
+            {
+                throw new InvalidOperationException("Baza firmy wymaga jawnego wyboru zgodnego z autoryzowanym kontekstem.");
+            }
+
+            DatabaseConnectionPolicy.ValidateCompany(selection.ConnectionString, isDevelopment);
+            options.UseSqlServer(selection.ConnectionString);
         });
 
         return services;

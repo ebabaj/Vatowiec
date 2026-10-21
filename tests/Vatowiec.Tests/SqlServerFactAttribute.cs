@@ -4,9 +4,9 @@ public sealed class SqlServerFactAttribute : FactAttribute
 {
     public SqlServerFactAttribute()
     {
-        if (Environment.GetEnvironmentVariable("VATOWIEC_SQL_INTEGRATION") != "1")
+        if (Environment.GetEnvironmentVariable("VATOWIEC_DATABASE_PER_COMPANY_SQL") != "1")
         {
-            Skip = "Włącz VATOWIEC_SQL_INTEGRATION=1 i skonfiguruj lokalną Vatowiec_Dev (README).";
+            Skip = "Wymaga osobnych Vatowiec_System_Test i Vatowiec_Company_A_Test/B_Test po migracjach; patrz README. Nie wykonano na nowej strukturze baz.";
         }
     }
 }

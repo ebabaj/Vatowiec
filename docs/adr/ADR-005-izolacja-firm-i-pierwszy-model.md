@@ -1,8 +1,12 @@
 # ADR-005: Wspólna baza i pierwszy model firmowy
 
 Data: 2026-10-21  
-Status: przyjęty dla etapu bazy M0 w zakresie zleconym przez użytkownika.  
+Status: zastąpiony przez [ADR-014](ADR-014-database-per-company.md), 2026-10-21.
 Wymagania: ORG-001, ORG-004, podstawowa część ORG-005, E02–E04; §3.2, §8, §11.
+
+Poniżej zachowano historyczną decyzję i opis zastosowanej migracji `Vatowiec_Dev`.
+Nie stanowią aktualnej architektury ani instrukcji wykonywania migracji.
+Przejście na database-per-company nie usuwa ani nie modyfikuje tej bazy.
 
 ## Decyzja i zakres
 

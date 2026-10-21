@@ -26,10 +26,10 @@ public sealed class ApiSmokeTests : IClassFixture<WebApplicationFactory<Program>
     {
         using var application = CreateApplication(environment);
         using var scope = application.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<CoreDbContext>();
+        var context = scope.ServiceProvider.GetRequiredService<SystemDbContext>();
 
         Assert.True(string.IsNullOrEmpty(context.Database.GetConnectionString()));
-        Assert.Null(context.CurrentCompanyId);
+        Assert.Throws<InvalidOperationException>(() => scope.ServiceProvider.GetRequiredService<CompanyDbContext>());
     }
 
     [Fact]
@@ -86,7 +86,8 @@ public sealed class ApiSmokeTests : IClassFixture<WebApplicationFactory<Program>
             builder.ConfigureAppConfiguration((_, configuration) =>
                 configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["ConnectionStrings:Vatowiec"] = null
+                    ["ConnectionStrings:VatowiecSystem"] = null,
+                    ["ConnectionStrings:Vatowiec"] = "Server=legacy.invalid;Database=Vatowiec_Dev;Encrypt=True"
                 }));
         });
 

@@ -1,9 +1,6 @@
 namespace Vatowiec.Core.Domain;
 
-public interface ICompanyEntity
+public interface ICompanyEntity : ITrackedEntity
 {
     Guid CompanyId { get; }
-    DateTimeOffset CreatedAtUtc { get; }
-    DateTimeOffset UpdatedAtUtc { get; }
-    byte[] RowVersion { get; }
 }

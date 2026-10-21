@@ -1,13 +1,16 @@
 # Otwarty następca VATowca
 
 Projekt wielostanowiskowej aplikacji dla polskich mikrofirm. Obecny stan to
-**etap bazy danych M0**: szkielet API, okno desktopowe oraz model firm
-i kontrahentów z pierwszą migracją EF Core. Nie jest to jeszcze program do
-prowadzenia księgowości.
+**przebudowa persystencji M0 na database-per-company**: szkielet API, okno
+desktopowe, osobne SystemDbContext i CompanyDbContext oraz migracje przygotowane
+offline. Nowe bazy nie zostały jeszcze utworzone ani zmigrowane. Nie jest to
+jeszcze program do prowadzenia księgowości.
 
 Wymagania produktu: [SPECYFIKACJA.md](SPECYFIKACJA.md).
 Architektura i granice modułów: [ADR-013](docs/adr/ADR-013-architektura-modularnego-monolitu.md).
-Model i izolacja firm: [ADR-005](docs/adr/ADR-005-izolacja-firm-i-pierwszy-model.md).
+Model i izolacja firm: [ADR-014](docs/adr/ADR-014-database-per-company.md).
+[ADR-005](docs/adr/ADR-005-izolacja-firm-i-pierwszy-model.md) jest historyczny.
+Plan baz, konfiguracja i testy: [database-per-company](docs/database-per-company.md).
 
 ## Wymagane narzędzia
 
@@ -20,10 +23,10 @@ Model i izolacja firm: [ADR-005](docs/adr/ADR-005-izolacja-firm-i-pierwszy-model
 - Dostęp do nuget.org podczas pierwszego pobrania pakietów.
 - Git do pracy z repozytorium.
 
-Do migracji i testów SQL potrzebny jest lokalny **SQL Server 2025 Express**,
-instancja `localhost\SQLEXPRESS`, oraz Windows Authentication z uprawnieniem
-utworzenia bazy `Vatowiec_Dev` i zmiany jej schematu. SQL nie jest potrzebny do
-samej kompilacji, testów bez bazy i uruchomienia obecnego okna desktopowego.
+Do późniejszych testów SQL potrzebny będzie lokalny **SQL Server 2025 Express**,
+instancja `localhost\SQLEXPRESS`, Windows Authentication i trzy dedykowane bazy
+`*_Test`. Obecny etap nie tworzy baz i nie wykonuje migracji. SQL nie jest potrzebny
+do kompilacji, generowania migracji/skryptów, testów bez bazy ani startu okna.
 Nie trzeba instalować szablonów Avalonia ani dodatkowych workloadów .NET.
 Avalonia i EF Core pobierają się jako pakiety NuGet; lokalne narzędzie `dotnet-ef`
 10.0.13 jest przypięte w `dotnet-tools.json`.
@@ -108,175 +111,75 @@ Zadanie **test** jest dostępne przez **Terminal → Run Task**.
 ```text
 src/
   Modules/Core/
-    Domain/           # Company, Contractor, walidacja strukturalna bez ORM
+    Domain/           # katalog, profil firmy, kontrahenci; bez ORM
     Application/      # kontrakt kontekstu firmy
-    Infrastructure/   # EF Core, mapowania SQL, filtry i migracje
+    Infrastructure/   # dwa konteksty EF, rozłączne mapowania i migracje
   Server/Api/         # host ASP.NET Core i endpointy techniczne
   Desktop/            # Avalonia UI
   SharedContracts/    # DTO publicznego API
 tests/Vatowiec.Tests/  # testy domeny/API i jawnie włączane testy SQL
 docs/adr/             # decyzje architektoniczne
-tools/database/       # odczyt schematu Vatowiec_Dev
+tools/database/       # historyczny skrypt odczytu Vatowiec_Dev (nieużywany przez nowe modele)
 ```
 
 Application zależy od Domain; Infrastructure od Application. API składa serwer
 i korzysta z kontraktów. Desktop ma dostęp wyłącznie do SharedContracts.
 Nie ma bezpośredniego dostępu klienta do SQL Server.
 
-## Lokalna baza SQL Server
+## Persystencja database-per-company
 
-API w Development odczytuje `src/Server/Api/appsettings.Development.json`:
+`SystemDbContext` zawiera centralny katalog firm i wskazania baz.
+`CompanyDbContext` zawiera lokalny profil i kontrahentów jednej firmy.
+Użytkownicy/role, autoryzowany resolver, provisioning oraz audyt/backup/restore
+pozostają kolejnymi zadaniami. W bazie systemowej nie ma kartoteki kontrahentów
+ani dokumentów księgowych.
 
-```text
-Server=localhost\SQLEXPRESS;Database=Vatowiec_Dev;Integrated Security=True;Encrypt=True;TrustServerCertificate=True
-```
+API czyta `ConnectionStrings__VatowiecSystem` z konfiguracji serwera.
+Oba appsettings domyślnie pozostawiają ten klucz pusty. Stary klucz
+`ConnectionStrings__Vatowiec` jest ignorowany. Nie ma domyślnej bazy firmowej.
+Kontekst firmy wymaga jawnego CompanyDatabaseSelection zgodnego z ICompanyContext,
+dostarczonego w scope przez przyszły serwerowy resolver po autoryzacji.
+Rejestracja DI nie implementuje jeszcze autoryzacji ani weryfikacji profilu w SQL.
+Sekrety i połączenia nie trafiają do klienta Avalonia.
 
-To konfiguracja lokalna bez hasła: SQL uwierzytelnia konto Windows uruchamiające
-proces. Desktop nie otrzymuje tego połączenia. Poza Development podstawowy
-`appsettings.json` pozostawia połączenie puste; nie ma domyślnego adresu produkcji.
-Można nadpisać konfigurację zmienną `ConnectionStrings__Vatowiec` lub user secrets
-API. Fabryka migracji i testy SQL celowo korzystają wyłącznie ze zmiennej.
+Każdy kontekst ma własną migrację początkową i snapshot. Fabryki projektowe
+generują model i SQL bez połączenia z bazą. Polecenia offline oraz plan późniejszego
+utworzenia Vatowiec_System i dwóch baz firmowych opisuje
+[instrukcja](docs/database-per-company.md).
 
-`TrustServerCertificate=True` dotyczy tylko lokalnego SQL w Development;
-`Encrypt=True` zachowuje szyfrowanie. Warstwa konfiguracji EF odrzuca akceptację
-niezweryfikowanego certyfikatu poza Development, a w Development ogranicza ją
-do wskazanego serwera i bazy. Nie zmieniamy magazynu zaufania Windows ani
-ustawień serwera. Na produkcji potrzebny będzie poprawnie weryfikowany
-certyfikat SQL z `TrustServerCertificate=False`. Szczegóły:
-[TLS w SqlClient](https://learn.microsoft.com/sql/connect/ado-net/encryption-and-certificate-validation).
-Certyfikat HTTPS API jest odrębnym certyfikatem opisanym wyżej.
-
-### Ręczne wykonanie migracji
-
-W PowerShell z głównego katalogu repozytorium:
-
-```powershell
-dotnet tool restore
-dotnet restore Vatowiec.slnx
-$env:DOTNET_ENVIRONMENT = 'Development'
-$env:ConnectionStrings__Vatowiec = 'Server=localhost\SQLEXPRESS;Database=Vatowiec_Dev;Integrated Security=True;Encrypt=True;TrustServerCertificate=True'
-dotnet build Vatowiec.slnx --no-restore
-dotnet ef migrations script 0 --project src/Modules/Core/Infrastructure --no-build --output src/Modules/Core/Infrastructure/obj/initial.sql
-```
-
-Przejrzyj wygenerowany `initial.sql`, a następnie wykonaj:
-
-```powershell
-dotnet ef database update --project src/Modules/Core/Infrastructure --no-build
-```
-
-Fabryka projektowa odrzuca inne środowisko, serwer, bazę, brak szyfrowania i SQL
-Authentication. EF utworzy `Vatowiec_Dev`, jeśli nie istnieje; do tej operacji
-technicznie łączy się z `master`, bez zmian innych baz użytkownika. Kolejne
-wykonanie pomija już zastosowane migracje. API nie uruchamia migracji, nie
-wywołuje `EnsureCreated` i nie seeduje danych przy starcie.
-
-Pierwszą migrację zastosowano do nowej, pustej bazy. Przed migracją istniejącej
-bazy z danymi wykonaj jej backup i sprawdź zgodność. Nie uruchamiaj `database
-update 0` na używanej bazie: `Down` usuwa tabele wraz z danymi. Ten etap nie
-przeprowadza migracji ani importu danych z oryginalnego VATowca.
-
-### Powstałe tabele i ograniczenia
-
-| Tabela | Zawartość i główne ograniczenia |
-|---|---|
-| `core.Companies` | Firmy; PK `Id`, nazwa, opcjonalny NIP/REGON, status aktywności, daty UTC, `rowversion` |
-| `core.Contractors` | Kontrahenci; PK `(CompanyId, Id)`, FK do firmy bez kaskadowego usuwania, unikalny `(CompanyId, Code)`, nazwa, kraj, opcjonalny identyfikator podatkowy, status, daty UTC, `rowversion` |
-| `dbo.__EFMigrationsHistory` | Historia zastosowanych migracji EF Core |
-
-Osiem ograniczeń CHECK chroni niepuste identyfikatory i nazwy, kod kontrahenta,
-strukturę kodu kraju i kolejność dat. Limity długości pól są techniczne; nie
-zaimplementowano walidacji prawnej NIP/REGON ani weryfikacji rejestrów publicznych.
-Adresy i rachunki będą osobnymi elementami przyszłych iteracji kartotek.
-
-W SSMS odśwież **Databases → Vatowiec_Dev → Tables**. Możesz też uruchomić
-[skrypt inspekcji](tools/database/Inspect-VatowiecDev.sql) w kontekście
-`Vatowiec_Dev` albo użyć opcjonalnego `sqlcmd`:
-
-```powershell
-sqlcmd -S 'localhost\SQLEXPRESS' -E -d Vatowiec_Dev -b -i tools/database/Inspect-VatowiecDev.sql
-```
-
-DbContext otrzymuje niezmienny kontekst firmy, filtruje odczyty i sprawdza
-zapisy. Bez firmy wyniki są puste, a zapis jest odrzucany. Logowanie i nadawanie
-uprawnień nie zostały jeszcze wdrożone; API nie udostępnia danych firmowych.
-Jawny kontekst stosowany w testach nie stanowi dowodu autoryzacji użytkowników.
+Dotychczasowa migracja i snapshot Vatowiec_Dev są zachowane bez zmiany treści
+w `Persistence/LegacyMigrations`, poza kompilacją i historią nowych kontekstów.
+Nie uruchamiaj nowych migracji w Vatowiec_Dev ani historycznego Down.
+Baza i jej tabele core.Companies/core.Contractors pozostają niezmienione.
 
 ## Sprawdzanie zmian
 
 ```powershell
-dotnet build Vatowiec.slnx
+dotnet build Vatowiec.slnx --no-restore
+$env:VATOWIEC_DATABASE_PER_COMPANY_SQL = '0'
 dotnet test Vatowiec.slnx --no-build
 dotnet format Vatowiec.slnx --verify-no-changes --no-restore
 ```
 
-Domyślnie wykonuje się 19 przypadków bez bazy, a 9 testów SQL jest oznaczanych
-jako pominięte. Testy bez bazy obejmują API, konfigurację, walidację modelu,
-odmowę zapisu bez zgodnego kontekstu firmy i ograniczenie zaufania certyfikatu.
-Host testowy API działa w pamięci z nadpisanym pustym połączeniem, niezależnie
-od konfiguracji developerskiej i zmiennych procesu; nie potrzebuje HTTPS.
+Testy offline weryfikują rozłączne modele, lokalny profil/FK, historie i SQL
+migracji, zgodność snapshotów, odmowę bez wyboru bazy, izolację scope,
+politykę połączeń, filtry, kontrolę zapisu i host API.
 
-Po wykonaniu migracji włącz pełny zestaw w swoim PowerShell:
-
-```powershell
-$env:DOTNET_ENVIRONMENT = 'Development'
-$env:ConnectionStrings__Vatowiec = 'Server=localhost\SQLEXPRESS;Database=Vatowiec_Dev;Integrated Security=True;Encrypt=True;TrustServerCertificate=True'
-$env:VATOWIEC_SQL_INTEGRATION = '1'
-dotnet test Vatowiec.slnx --no-build
-Remove-Item Env:VATOWIEC_SQL_INTEGRATION
-```
-
-Testy integracyjne sprawdzają schemat i historię migracji, odczyt/zapis oraz daty,
-izolację dwóch firm, odmowę niezgodnego zapisu, unikalność, FK, CHECK, konflikty
-`rowversion`, atomowość zapisu i rollback. Każdy test używa losowych identyfikatorów
-i wycofywanej transakcji. Nie tworzą/usuwają baz, nie migrują schematu i nie
-usuwają istniejących danych. Włączenie testów SQL bez poprawnej konfiguracji
-lub dostępu do bazy powoduje błąd, a nie pominięcie testów.
-
-### Weryfikacja etapu bazy M0 (2026-10-21)
-
-- Utworzono wyłącznie `Vatowiec_Dev` na `localhost\SQLEXPRESS` (SQL Server
-  17.0.1000.7), migracja `20261021092204_InitialCompaniesAndContractors` / EF 10.0.13.
-- Inspekcja SQL potwierdziła trzy tabele, PK, FK bez kaskady, unikalny indeks,
-  osiem aktywnych i zaufanych CHECK oraz dwa pola `rowversion`.
-- Wszystkie 28 testów przeszło, w tym 9 na rzeczywistym SQL Server, bez pominięć.
-- Test regresyjny potwierdził pusty connection string hosta testowego API
-  w Development i Production mimo ustawionej zmiennej połączenia SQL.
-- Po testach obie tabele domenowe pozostały puste; rekordy testowe wycofano.
-- Całe rozwiązanie buduje się bez błędów i ostrzeżeń. W piaskownicy zadanie
-  Avalonia nie mogło zapisać swojego logu w AppData; build wykonano w profilu
-  użytkownika bez zmiany uprawnień plików ani zabezpieczeń Windows.
-
-### Ponowna weryfikacja szkieletu M0 (2026-10-21)
-
-- .NET SDK 10.0.402, runtime 10.0.13.
-- `dotnet test Vatowiec.slnx --logger 'console;verbosity=normal'`: wszystkie
-  9 przypadków xUnit przeszło, bez pominiętych i nieudanych testów.
-- `dotnet build Vatowiec.slnx --no-restore`: wszystkie siedem projektów
-  skompilowano, zero błędów i ostrzeżeń.
-- `dotnet run --project src/Desktop --no-build`: uruchomiono okno
-  „Otwarty następca VATowca — M0”. System potwierdził uchwyt okna i odpowiadający
-  proces, z załadowanymi `Avalonia.Skia.dll`, `SkiaSharp.dll` i `libSkiaSharp.dll`.
-  W tym przebiegu wcześniejsza blokada Windows App Control nie wystąpiła.
-- API uruchomiono profilem `https`: nasłuchuje na localhost:7243 i localhost:5243.
-  W profilu użytkownika jest ważny certyfikat deweloperski `localhost`, lecz
-  brakuje zaufania. Pozostaje wykonać opisane wyżej `dotnet dev-certs https --trust`
-  i potwierdzić komunikat Windows. Próba HTTPS z pełną walidacją certyfikatu
-  zakończyła się `SEC_E_UNTRUSTED_ROOT` (curl: 60); po zaufaniu certyfikatowi
-  trzeba ponowić sprawdzenie.
-- `git check-ignore -v` potwierdził wykluczenia `bin`, `obj`, `TestResults`,
-  lokalnych ustawień, logów i plików PFX. `git ls-files --cached --ignored
-  --exclude-standard` nie wykazał śledzonych plików objętych wykluczeniami;
-  wśród nieignorowanych plików nie ma wyników kompilacji.
-
-Nie zmieniano zabezpieczeń Windows ani zaufania certyfikatów. Nie były potrzebne
-poprawki kodu aplikacji ani `.gitignore`; zaktualizowano instrukcję i wynik
-weryfikacji. SQL Server nie był używany ani potrzebny podczas tych sprawdzeń.
-To weryfikacja pierwszego szkieletu technicznego, nie ukończenie całego M0.
+Dziewięć testów SQL jest domyślnie pomijanych. Wymagają wcześniej zmigrowanych
+Vatowiec_System_Test oraz Vatowiec_Company_A_Test/B_Test. Nowa flaga
+`VATOWIEC_DATABASE_PER_COMPANY_SQL=1` włącza je jawnie; stara flaga
+`VATOWIEC_SQL_INTEGRATION` nie działa. Szczegóły i nazwy zmiennych połączeń:
+[instrukcja testów](docs/database-per-company.md#testy).
+Testy nie tworzą baz i nie wykonują migracji; zapisują tylko w wycofywanych
+transakcjach. Pominięcie nie jest zaliczeniem działania nowej struktury SQL.
 
 ## Dalsze kroki
 
-Kolejna część M0 obejmie logowanie, role, audyt, API i interfejs kartoteki
-kontrahentów z autoryzacją oraz rozbudowę danych firm i kontrahentów.
-Nie zaimplementowano podatków, KSeF, JPK ani wtyczek. Nazwa projektu pozostaje
-robocza, a licencja źródeł wymaga decyzji ADR-002; nie dodajemy jeszcze `LICENSE`.
+Zaimplementować logowanie, użytkowników i role, serwerową autoryzację i resolver
+z kontrolą fizycznego CompanyId/wersji bazy, potem wznawialny provisioning firmy
+z aplikacji, audyt z trwałą identyfikacją aktorów oraz niezależny backup/restore.
+Osobno wdrożyć nowe bazy po przeglądzie SQL i zgodzie na wykonanie.
+Nie przeniesiono danych z Vatowiec_Dev.
+
+Nie zaimplementowano podatków, KSeF, JPK ani wtyczek. M0 nie jest ukończone;
+nazwa pozostaje robocza, a licencja źródeł wymaga decyzji ADR-002.

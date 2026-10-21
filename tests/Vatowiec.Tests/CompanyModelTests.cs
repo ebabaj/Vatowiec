@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Vatowiec.Core.Application;
 using Vatowiec.Core.Domain;
-using Vatowiec.Core.Infrastructure;
 using Vatowiec.Core.Infrastructure.Persistence;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Vatowiec.Tests;
 
@@ -14,10 +14,12 @@ public sealed class CompanyModelTests
     {
         Assert.Throws<ArgumentException>(() => new Company(Guid.Empty, "Firma testowa"));
         Assert.Throws<ArgumentException>(() => new Company(Guid.NewGuid(), " "));
-        Assert.Throws<ArgumentException>(() => new Company(Guid.NewGuid(), new string('X', 257)));
+        Assert.Throws<ArgumentException>(() => new CompanyProfile(Guid.Empty, "Firma testowa"));
+        Assert.Throws<ArgumentException>(() => new CompanyProfile(Guid.NewGuid(), new string('X', 257)));
+        Assert.Throws<ArgumentException>(() => new CompanyDatabaseRegistration(Guid.Empty, "sql", "db", "profile"));
+        Assert.Throws<ArgumentException>(() => new CompanyDatabaseRegistration(Guid.NewGuid(), " ", "db", "profile"));
         Assert.Throws<ArgumentException>(() => new Contractor(Guid.Empty, Guid.NewGuid(), "A", "Test", "PL"));
         Assert.Throws<ArgumentException>(() => new Contractor(Guid.NewGuid(), Guid.NewGuid(), "A", "Test", "P1"));
-        Assert.Throws<ArgumentException>(() => new Contractor(Guid.NewGuid(), Guid.NewGuid(), " ", "Test", "PL"));
         var contractor = new Contractor(Guid.NewGuid(), Guid.NewGuid(), " abc ", " Test ", "pl");
         Assert.Equal("ABC", contractor.Code);
         Assert.Equal("Test", contractor.Name);
@@ -25,43 +27,81 @@ public sealed class CompanyModelTests
         Assert.Null(contractor.TaxIdentifier);
     }
 
+    [Fact]
+    public void Models_AreDisjointAndCompanyForeignKeysStayLocal()
+    {
+        using var system = new SystemDbContextFactory().CreateDbContext([]);
+        using var company = new CompanyDbContextFactory().CreateDbContext([]);
+        Assert.Equal(new[] { typeof(Company), typeof(CompanyDatabaseRegistration) },
+            system.Model.GetEntityTypes().Select(x => x.ClrType).OrderBy(x => x.Name));
+        Assert.Equal(new[] { typeof(CompanyProfile), typeof(Contractor) },
+            company.Model.GetEntityTypes().Select(x => x.ClrType).OrderBy(x => x.Name));
+        var contractor = company.Model.FindEntityType(typeof(Contractor))!;
+        Assert.Equal(typeof(CompanyProfile), Assert.Single(contractor.GetForeignKeys()).PrincipalEntityType.ClrType);
+        Assert.Equal(new[] { "CompanyId", "Id" }, contractor.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.True(contractor.FindProperty("RowVersion")!.IsConcurrencyToken);
+        var profile = company.Model.FindEntityType(typeof(CompanyProfile))!;
+        Assert.Equal("SingletonKey", Assert.Single(profile.FindPrimaryKey()!.Properties).Name);
+        Assert.Contains(profile.GetKeys(), x => x.Properties.Select(p => p.Name).SequenceEqual(new[] { "CompanyId" }));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task SaveChanges_RejectsMissingAndMismatchedCompanyBeforeConnecting(bool async)
     {
-        var options = new DbContextOptionsBuilder<CoreDbContext>().UseSqlServer().Options;
-        var companyId = Guid.NewGuid();
+        var options = new DbContextOptionsBuilder<CompanyDbContext>().UseSqlServer().Options;
+        var id = Guid.NewGuid();
         foreach (var scope in new Guid?[] { null, Guid.Empty, Guid.NewGuid() })
         {
-            await using var context = new CoreDbContext(options, new CompanyContext(scope));
-            context.Companies.Add(new Company(companyId, "Firma testowa"));
+            await using var context = new CompanyDbContext(options, new CompanyContext(scope));
+            context.CompanyProfiles.Add(new CompanyProfile(id, "Firma testowa"));
+            context.Contractors.Add(new Contractor(id, Guid.NewGuid(), "A", "Test", "PL"));
             if (async)
-            {
                 await Assert.ThrowsAsync<InvalidOperationException>(() => context.SaveChangesAsync());
-            }
             else
-            {
                 Assert.Throws<InvalidOperationException>(() => context.SaveChanges());
-            }
         }
     }
 
-    [Theory]
-    [InlineData("Server=localhost\\SQLEXPRESS;Database=Other;Integrated Security=True;Encrypt=True")]
-    [InlineData("Server=remote;Database=Vatowiec_Dev;Integrated Security=True;Encrypt=True")]
-    [InlineData("Server=localhost\\SQLEXPRESS;Database=Vatowiec_Dev;Integrated Security=False;Encrypt=True")]
-    [InlineData("Server=localhost\\SQLEXPRESS;Database=Vatowiec_Dev;Integrated Security=True;Encrypt=False")]
-    public void DevelopmentTools_RejectOtherDatabasesServersAndAuthentication(string connection) =>
-        Assert.Throws<InvalidOperationException>(() => DevelopmentDatabase.Validate(connection));
+    [Fact]
+    public void QueryFilters_AreParameterizedPerContext()
+    {
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        var options = new DbContextOptionsBuilder<CompanyDbContext>().UseSqlServer().Options;
+        using var first = new CompanyDbContext(options, new CompanyContext(a));
+        using var second = new CompanyDbContext(options, new CompanyContext(b));
+        var firstSql = first.Contractors.ToQueryString();
+        var secondSql = second.Contractors.ToQueryString();
+        Assert.Contains(a.ToString(), firstSql);
+        Assert.DoesNotContain(b.ToString(), firstSql);
+        Assert.Contains(b.ToString(), secondSql);
+    }
 
     [Fact]
-    public void CertificateTrust_IsLimitedToExactDevelopmentDatabase()
+    public void MigrationSets_ContainOnlyTheirOwnTablesAndMatchSnapshots()
     {
-        const string local = "Server=localhost\\SQLEXPRESS;Database=Vatowiec_Dev;Integrated Security=True;Encrypt=True;TrustServerCertificate=True";
-        Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddInfrastructure(local));
-        new ServiceCollection().AddInfrastructure(local, isDevelopment: true);
-        Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddInfrastructure(
-            local.Replace("Vatowiec_Dev", "Other", StringComparison.Ordinal), isDevelopment: true));
+        using var system = new SystemDbContextFactory().CreateDbContext([]);
+        using var company = new CompanyDbContextFactory().CreateDbContext([]);
+        Assert.EndsWith("_InitialSystem", Assert.Single(system.Database.GetMigrations()));
+        Assert.EndsWith("_InitialCompany", Assert.Single(company.Database.GetMigrations()));
+        Assert.False(system.Database.HasPendingModelChanges());
+        Assert.False(company.Database.HasPendingModelChanges());
+        Assert.NotEqual(system.GetService<IMigrationsAssembly>().ModelSnapshot!.GetType(),
+            company.GetService<IMigrationsAssembly>().ModelSnapshot!.GetType());
+        var systemSql = system.GetService<IMigrator>().GenerateScript();
+        var companySql = company.GetService<IMigrator>().GenerateScript();
+        Assert.Contains("[core].[Companies]", systemSql);
+        Assert.Contains("[core].[CompanyDatabases]", systemSql);
+        Assert.DoesNotContain("[core].[Contractors]", systemSql);
+        Assert.DoesNotContain("[core].[CompanyProfile]", systemSql);
+        Assert.Contains("[core].[Contractors]", companySql);
+        Assert.Contains("[core].[CompanyProfile]", companySql);
+        Assert.Contains("[SingletonKey] = 1", companySql);
+        Assert.DoesNotContain("[core].[Companies]", companySql);
+        Assert.DoesNotContain("[core].[CompanyDatabases]", companySql);
+        Assert.True(string.IsNullOrEmpty(system.Database.GetConnectionString()));
+        Assert.True(string.IsNullOrEmpty(company.Database.GetConnectionString()));
     }
 }

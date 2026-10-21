@@ -1,6 +1,6 @@
 # Otwarty następca VATowca — specyfikacja produktu i architektury
 
-**Wersja dokumentu:** 0.1.0 (wersja inicjalna, do przeglądu)  
+**Wersja dokumentu:** 0.2.0 (database-per-company, ADR-014)
 **Data:** 2026-10-21  
 **Status:** projekt założeń; nie jest potwierdzeniem zgodności podatkowej gotowego oprogramowania  
 **Nazwa projektu:** robocza „Otwarty następca VATowca”; docelowa nazwa i użycie nazwy „VATowiec” wymagają odrębnej decyzji i sprawdzenia praw  
@@ -89,19 +89,31 @@ Wyłączenie oznacza brak w pierwszym wydaniu, nie zakaz dodania później.
 
 - Instalacja serwera może obsługiwać **wiele firm** i wielu użytkowników.
 - Każda firma ma własne ustawienia podatkowe, kalendarz rozliczeń, numeracje, uprawnienia oraz ewidencję.
-- Każdy rekord firmowy ma identyfikator `CompanyId`; serwer automatycznie ogranicza zapytania do uprawnionej firmy.
-- Eksport i odtworzenie danych **jednej firmy** powinny być możliwe bez konieczności przenoszenia całej instalacji; techniczna metoda odtworzenia per firma zostanie uściślona w ADR (pełna baza / eksport logiczny).
+- **[USTALONE] Database-per-company:** każda firma ma fizycznie oddzielną bazę SQL Server. Jedna baza nie przechowuje księgowości wielu firm.
+- Centralna baza `Vatowiec_System` zawiera użytkowników, role, katalog firm, uprawnienia i wskazania baz. Nie zawiera dokumentów księgowych, kontrahentów ani ewidencji podatkowych.
+- Jedna aplikacja ASP.NET Core obsługuje wszystkie firmy. Dopiero po uwierzytelnieniu i sprawdzeniu uprawnienia do firmy wybiera serwerowe połączenie. Bazy firm mogą znajdować się na różnych instancjach SQL Server.
+- Każdy rekord firmowy zachowuje `CompanyId` jako dodatkowy warunek spójności; nie zastępuje to fizycznej izolacji baz ani autoryzacji. Lokalny profil identyfikuje jedyną firmę w danej bazie.
+- Każda baza ma niezależną historię migracji, backup i odtworzenie/przeniesienie jednej firmy wraz z załącznikami i wymaganymi kluczami, bez przenoszenia innych firm.
 - Użytkownik może posiadać różne role w różnych firmach.
 
 ### 3.3. Wielostanowiskowość — wymóg bezwarunkowy
 
 - Minimum dwa komputery w sieci lokalnej i jednoczesna praca dwóch operatorów.
-- Wspólna baza i wspólny stan dokumentów widoczny po odświeżeniu/zdarzeniu.
+- Operatorzy tej samej firmy pracują równolegle na tej samej bazie firmowej i widzą wspólny stan dokumentów po odświeżeniu/zdarzeniu. Inne firmy mają inne fizyczne bazy.
 - Równoczesna edycja tego samego dokumentu nie może niezauważenie nadpisywać zmian: mechanizm `rowversion`/ETag i komunikat konfliktu.
 - Numeracja dokumentów musi być odporna na kolizje oraz wycofania transakcji.
 - Komunikacja klient–serwer przez HTTPS i uwierzytelnione API; **żadnych poświadczeń SQL w aplikacji użytkownika**.
 - Dostęp spoza LAN przez prywatną sieć/VPN albo prawidłowo zabezpieczone publiczne API; nie wystawiamy portu SQL Server do Internetu.
 - Przerwy w łączności nie mogą powodować „połowicznego zaksięgowania”. Tryb offline z kolejką synchronizacji nie należy do zakresu 1.0 — tylko wyraźna obsługa zerwanego połączenia.
+
+### 3.4. Tworzenie firmy i cykl życia bazy
+
+- Docelowa komenda „Utwórz firmę” automatycznie rezerwuje firmę i bazę, zakłada bazę, wykonuje migracje i inicjalizuje lokalny profil. Użytkownik aplikacji nie musi korzystać z SSMS.
+- Operacja ma trwały identyfikator, klucz idempotencji, niezmienny plan docelowy, checkpointy, błąd i liczbę prób. Ponowienie tego samego żądania z inną treścią jest odrzucane; zgodne żądanie wznawia tę samą operację i bazę.
+- Etapy: `Requested → DatabaseCreated → SchemaApplied → ProfileInitialized → Ready`. Błąd zachowuje ostatni ukończony etap. Tylko `Ready` dopuszcza zwykłe operacje firmowe. Blokada/lease i token konkurencyjności wykluczają dwóch wykonawców tej samej operacji.
+- Po awarii weryfikuje się stan fizycznej bazy, jej właściciela/znacznik operacji, migracje i profil, zamiast ufać samemu checkpointowi. Nie wolno przejmować lub usuwać zastanej bazy o niepotwierdzonym pochodzeniu; niejednoznaczność wymaga kontrolowanego uzgodnienia stanu.
+- Provisioning używa oddzielnej tożsamości z prawami tworzenia/migracji. Zwykłe konto zapisu księgowego nie ma DDL. Migracje istniejących baz nie uruchamiają się przy starcie API.
+- Proces nie zakłada transakcji SQL obejmującej bazę systemową i firmową. Trwałe etapy umożliwiają naprawę przerwania między zapisami. Szczegóły i bieżący zakres: ADR-014.
 
 ---
 
@@ -112,7 +124,7 @@ Wyłączenie oznacza brak w pierwszym wydaniu, nie zakaz dodania później.
 | Język i runtime | **C# / .NET 10** [PROPOZYCJA] | Wydajne tworzenie, testowanie i utrzymanie aplikacji biznesowej |
 | Klient desktopowy | **Avalonia UI** [PROPOZYCJA] | Windows i Linux, dobre tabele i formularze |
 | Serwer | **ASP.NET Core Web API** [PROPOZYCJA] | Centralna logika, autoryzacja, dostęp z wielu stanowisk, integracje |
-| Główna baza | **Microsoft SQL Server 2025 Express** [USTALONE co do preferencji SQL Server, wersja PROPOZYCJA] | Centralna, transakcyjna baza, wygodne narzędzia administracyjne |
+| Bazy danych | **Microsoft SQL Server 2025 Express** [USTALONE co do SQL Server i database-per-company, wersja PROPOZYCJA] | Baza systemowa i niezależne, transakcyjne bazy firmowe; możliwe różne instancje |
 | Rozszerzanie bazy | **SQL Server Standard** bez zmian aplikacji [PROPOZYCJA] | Skalowanie po wyczerpaniu limitów Express |
 | Dostęp do danych | **EF Core** dla CRUD/migracji + jawne SQL, gdy potrzebne [PROPOZYCJA] | Zachowujemy pełną kontrolę nad zapytaniami i wydajnością |
 | Testy | **xUnit**, testy integracyjne na prawdziwym SQL Server [PROPOZYCJA] | Powtarzalna kontrola obliczeń i transakcji |
@@ -129,13 +141,17 @@ Wyłączenie oznacza brak w pierwszym wydaniu, nie zakaz dodania później.
 Komputer A: klient Avalonia ─┐
                              ├──HTTPS──> ASP.NET Core API + silniki domenowe
 Komputer B: klient Avalonia ─┘                       │
-                                                   ├── SQL Server (dane)
+                                                   ├── Vatowiec_System (katalog i dostęp)
+                                                   ├── SQL instancja 1: baza firmy A
+                                                   ├── SQL instancja 1 lub 2: baza firmy B
 Program zewnętrzny ─── OAuth/API key* ────────────>├── Magazyn załączników (plikowy)
                                                    └── Kolejka zadań/Outbox
 * metodę uwierzytelnienia integracji określamy osobno
 ```
 
 Serwer aplikacji i SQL Server mogą działać na tym samym komputerze. Klient nigdy nie otwiera bazy SQL bezpośrednio.
+
+`SystemDbContext` i `CompanyDbContext` mają rozłączne modele oraz osobne zestawy migracji. Wybór firmy jest niezmienny w zakresie pojedynczego żądania/jednostki pracy; żadnego globalnego „aktywnego CompanyId”. Connection stringi i sekrety pozostają w infrastrukturze serwera. Baza systemowa nie staje się agregatem kopii danych firmowych. Moduły księgowe korzystają ze wspólnej transakcji bazy jednej firmy przez jawne kontrakty, zachowując granice właścicieli tabel.
 
 ### 4.2. Architektura kodu
 
@@ -214,6 +230,10 @@ Legenda: **P0** — fundament wymagany przed udostępnieniem produkcyjnym; **P1*
 | ORG-005 | Kartoteka kontrahentów, w tym osoby fizyczne, zagraniczni, wielu adresów i kont | P0 |
 | ORG-006 | Uprawnienia biura rachunkowego i grupowanie obsługiwanych firm | P2 |
 | ORG-007 | Weryfikacja NIP / rejestrów publicznych z datą i zapisem wyniku | P1 |
+| ORG-008 | Fizycznie oddzielna baza SQL Server dla każdej firmy, centralny katalog i autoryzowany wybór bazy; różne instancje | P0 |
+| ORG-009 | Automatyczne utworzenie bazy i profilu firmy z aplikacji, migracje, idempotencja i wznowienie po awarii | P0 |
+| ORG-010 | Niezależny backup, samodzielne odtworzenie i przeniesienie jednej firmy przez uprawnionego użytkownika aplikacji | P0 |
+| ORG-011 | Trwała identyfikacja aktora w historii księgowej mimo usunięcia jego konta z bazy systemowej | P0 |
 
 ### 6.2. Dokumenty i fakturowanie
 
@@ -389,13 +409,16 @@ Bez rekompilacji aplikacji użytkownik tworzy nową definicję formularza: wybie
 
 ## 8. Model danych — projekt logiczny, nie gotowy DDL
 
-Każda tabela domenowa z danymi firmy posiada `CompanyId`, identyfikator rekordu, daty utworzenia/modyfikacji i, gdzie możliwe, znacznik konkurencyjności. Poniższe nazwy są robocze.
+Model jest rozdzielony na bazę systemową i bazy firmowe. Każda tabela domenowa z danymi firmy posiada `CompanyId`, identyfikator rekordu, daty utworzenia/modyfikacji i, gdzie możliwe, znacznik konkurencyjności. Poniższe nazwy są robocze.
+
+W `Vatowiec_System`: `Company` (katalog, nazwa wyświetlana, status), `CompanyDatabaseRegistration` (firma, serwer, baza, klucz serwerowego profilu połączenia), docelowo `User`, `Role`, `CompanyAccess`, trwały stan provisioningu oraz audyt administracyjny. Profil połączenia odsyła do konfiguracji/sekretów na serwerze; tabela nie zawiera haseł. Użytkownicy, role i stan procesu provisioningu nie są jeszcze zaimplementowane w etapie rozdzielenia kontekstów.
+
+W bazie jednej firmy: `CompanyProfile`, kontrahenci i wszystkie encje księgowe poniżej. Centralne `Company.Name` jest etykietą katalogową; źródłem nazwy prawnej i NIP/REGON jest lokalny profil. Lokalny profil ma PK `SingletonKey` z CHECK `= 1` i unikalny `CompanyId`; kontrahenci mają FK do tego lokalnego identyfikatora. Brak relacji SQL między bazami. Zarejestrowane połączenie trzeba zweryfikować względem rzeczywistego profilu i wersji schematu przed dopuszczeniem operacji.
 
 | Encja | Minimalne istotne pola / relacje |
 |---|---|
-| `Company` | `Id`, NIP, REGON, nazwa, status, konfiguracja |
+| `CompanyProfile` | `SingletonKey = 1`, `CompanyId`, NIP, REGON, nazwa prawna; dokładnie jeden po inicjalizacji bazy firmy |
 | `TaxProfile` | `CompanyId`, typ podatnika, forma PIT, VAT, `ValidFrom`, `ValidTo` |
-| `User`, `Role`, `CompanyAccess` | użytkownik, rola, firma, uprawnienia |
 | `Contractor`, `ContractorAccount` | dane, identyfikatory, kraj, rachunki, historia zmian |
 | `Document` | `Id`, `CompanyId`, typ, numer/seria, kontrahent, daty, waluta, status, wersja, `SourceSystem`, `ExternalId`, `RowVersion` |
 | `DocumentLine` | dokument, rodzaj towar/usługa, ilość, cena, podatki, kategorie, kwoty |
@@ -410,7 +433,7 @@ Każda tabela domenowa z danymi firmy posiada `CompanyId`, identyfikator rekordu
 | `JpkPackage` | rodzaj, schemat, okres, hash XML, dane wejściowe/snapshot, wynik walidacji |
 | `Submission` | kanał, status, identyfikator, historia odpowiedzi, UPO/artefakt |
 | `KsefExchange` | XML wejścia/wyjścia, identyfikatory, numer KSeF, statusy, UPO |
-| `AuditEvent` | aktor, firma, moment UTC, czynność, identyfikator, przed/po lub delta, korelacja |
+| `AuditEvent` | niezmienny `ActorId`, `ActorIssuerId`, historyczny opis aktora, firma, moment UTC, czynność, identyfikator, przed/po lub delta, korelacja; bez FK do centralnego użytkownika |
 | `ExtensionPackage` | manifest, wersja, uprawnienia, publikator, podpis/hash |
 | `ExtensionSettings` | firma/użytkownik, ustawienia i referencje do sekretów |
 | `OutboxEvent` | typ, identyfikator zdarzenia, payload, próby, status, następne uruchomienie |
@@ -424,7 +447,9 @@ Każda tabela domenowa z danymi firmy posiada `CompanyId`, identyfikator rekordu
 - Klucze obce i ochrona spójności, w tym właściwe powiązanie wszystkich relacji z tą samą firmą.
 - Zakaz fizycznego usuwania zatwierdzonych dokumentów z publicznego API.
 - Audyt z atomowym powiązaniem ze skutkami transakcji.
-- Migracje schematu wersjonowane, odwracalne tylko gdy bezpieczne; przed migracją backup i weryfikacja zgodności.
+- Dokument, ewidencje, audyt księgowy i Outbox są zatwierdzane w jednej transakcji bazy firmowej, bez transakcji rozproszonych obejmujących katalog systemowy.
+- Osobne migracje `SystemDbContext` i `CompanyDbContext`; każda fizyczna baza ma własną `dbo.__EFMigrationsHistory`. Wspólny zestaw migracji firmowych wdraża się osobno do każdej firmy, z kontrolą wersji obsługiwanych przez API. Historia w katalogu nie zastępuje historii fizycznej bazy.
+- Migracje schematu wersjonowane, odwracalne tylko gdy bezpieczne; przed aktualizacją istniejącej bazy backup i weryfikacja zgodności. Automatyczny provisioning wykonuje migracje tylko jawnie wskazanej nowej firmy; start API nie migruje baz.
 
 ### 8.2. Załączniki
 
@@ -492,14 +517,21 @@ Ważne jest odróżnienie **daty zmiany przepisów** od **daty wydania aktualiza
 
 Rejestr: kto, kiedy, z jakiego stanowiska/kontekstu, co utworzył/zmienił/zatwierdził, źródło żądania, identyfikator korelacji, poprzednia i nowa istotna wartość. Odróżniamy log techniczny od audytu biznesowego. Retencja, zakres danych osobowych i prawo do usunięcia są projektowane z uwzględnieniem obowiązków księgowych i RODO, a nie przez proste usuwanie zapisów podatkowych.
 
+Historia księgowa jest samowystarczalna w bazie firmy: zapisuje niezmienny `ActorId`, przestrzeń identyfikatorów źródłowej instalacji (`ActorIssuerId`) i historyczny opis pozwalający zidentyfikować wykonawcę. Identyfikatory nie są ponownie używane; zmiana nazwy ani fizyczne usunięcie centralnego konta nie zmienia zapisanej identyfikacji. Bez FK/kaskad do `User` i bez wymogu odczytu centralnej kartoteki do wyświetlenia historii. Restore lub przeniesienie firmy zachowuje identyfikację dawnych aktorów, ale nie nadaje im bieżących uprawnień. Model oraz zapis audytu biznesowego będą osobną implementacją; same daty encji nie są audytem.
+
 ### 11.3. Backup i odtwarzanie
 
-- Automatyczne pełne kopie bazy na harmonogramie, archiwizacja załączników oraz bezpieczne przechowywanie kluczy.
+- Każda baza firmowa ma własny harmonogram, historię, retencję i kopie niezależne od innych firm. Oddzielnie chronimy `Vatowiec_System`.
+- Uprawniony użytkownik sam zleca backup i odtworzenie własnej firmy przez aplikację, bez SSMS i uprawnień SQL na kliencie. Oddzielny proces techniczny wykonuje operację i raportuje jej stan.
+- Automatyczne pełne kopie bazy na harmonogramie, archiwizacja załączników oraz bezpieczne przechowywanie kluczy. Pakiet firmy zawiera manifest tożsamości, wersji schematu/aplikacji, integralności, załączników i wymaganych kluczy.
 - Kopia poza urządzeniem źródłowym lub na zasobie z kontrolą dostępu; możliwość szyfrowania.
 - Rotacja i weryfikacja integralności, **regularny test restore**.
 - Dla Express harmonogram organizuje własny proces / Windows Task Scheduler / systemd timer, nie SQL Server Agent.
 - Instrukcja odtwarzania po awarii: baza + załączniki + konfiguracja + sekrety + zgodna wersja programu.
 - Aktualizacja aplikacji nie może automatycznie nadpisać jedynej działającej kopii danych.
+- Restore najpierw odtwarza do nowej bazy roboczej, weryfikuje integralność, `CompanyId`, schemat i załączniki; przełączenie jest kontrolowane i poprzedzone kopią dotychczasowej bazy oraz zatrzymaniem zapisów danej firmy. Inne firmy mogą pracować dalej. Nie odtwarzamy centralnych kont/uprawnień z pakietu firmy.
+- Przeniesienie na inną instancję zachowuje `CompanyId`, przygotowuje tożsamość techniczną i sekrety docelowego serwera, aktualizuje centralne przypisanie i unieważnia stare wybory połączenia. Klon jako nowa firma wymaga osobnej procedury; nie jest zwykłym restore.
+- W tym etapie backup/restore to wymagania i plan, nie działające funkcje. ADR-011 pozostaje otwarty w zakresie RPO/RTO, harmonogramów i retencji.
 
 ### 11.4. Monitoring
 
@@ -513,6 +545,7 @@ Health check API/SQL/magazynu plików, diagnostyka błędów integracji, kolejka
 
 - **Unit/domain**: obliczenia kwot, zaokrąglenia, daty, odliczenia, kursy i reguły okresowe.
 - **Integration**: SQL Server, migracje, transakcje, `rowversion`, izolacja firm, autoryzacja.
+- **Database-per-company**: oddzielna baza systemowa i dwie fizyczne bazy firmowe; test modelu/SQL offline nie dowodzi wykonania migracji ani izolacji rzeczywistych baz. Dedykowane bazy `*_Test`, nigdy `Vatowiec_Dev`.
 - **Contract**: OpenAPI, XSD, formaty importerów/eksporterów, manifesty wtyczek.
 - **E2E**: klient → API → księgowanie → JPK → podpis/wysyłka testowa → UPO.
 - **Security**: IDOR (firma A nie czyta B), eskalacja uprawnień, złe dodatki, niebezpieczne XML/XXE, wyciek sekretów.
@@ -538,6 +571,10 @@ Health check API/SQL/magazynu plików, diagnostyka błędów integracji, kolejka
 | T-013 | Wtyczka odmawia działania lub kończy się błędem | Nie cofa poprawnego zaksięgowania, błąd widoczny do obsługi |
 | T-014 | Przeniesienie instalacji na nowy serwer | Poprawnie odtworzona baza, załączniki i połączenia |
 | T-015 | Rozliczenie starego roku po aktualizacji reguł | Poprzedni zestaw zasad i powtarzalny wynik |
+| T-016 | Awaria tworzenia firmy po każdym etapie i ponowienie żądania | Ta sama firma/baza, bez duplikatów, bez przejmowania obcej bazy; dostęp dopiero po Ready |
+| T-017 | Odtworzenie kopii firmy A na inną instancję | Zachowane dane, załączniki i historia; firma B i centralne uprawnienia pozostają niezależne |
+| T-018 | Fizyczne usunięcie konta centralnego wykonawcy księgowania | Historia firmy nadal jednoznacznie identyfikuje aktora, także po restore |
+| T-019 | Katalog omyłkowo wskazuje bazę innej firmy | Odmowa przed udostępnieniem danych z powodu niezgodnej tożsamości bazy |
 
 ### 12.3. Niefunkcjonalne cele początkowe [PROPOZYCJA]
 
@@ -561,9 +598,9 @@ z bazą, testy xUnit i instrukcja VS Code. Architektura: ADR-013. Na tym etapie
 nie implementujemy modelu firm, logowania, kontrahentów ani migracji; pozostają
 one dalszą częścią M0. Ukończenie samego szkieletu nie oznacza ukończenia M0.
 
-**Uzgodniony etap bazy (2026-10-21):** lokalny SQL Server 2025 Express,
+**Historyczny etap bazy (2026-10-21, zastąpiony przez ADR-014):** lokalny SQL Server 2025 Express,
 `localhost\SQLEXPRESS`, Windows Authentication, wyłącznie `Vatowiec_Dev`.
-ADR-005 rozstrzyga wspólną bazę i izolację przez CompanyId. Pierwsza migracja
+ADR-005 rozstrzygał wspólną bazę i izolację przez CompanyId. Pierwsza migracja
 obejmuje firmy i podstawową kartotekę kontrahentów (ORG-001/ORG-005 częściowo),
 relacje, daty zmian i rowversion (ORG-004). Migracje są ręczne; testy SQL działają
 w wycofywanych transakcjach. Brak autoryzowanego kontekstu firmy oznacza pusty
@@ -572,10 +609,12 @@ dalszą częścią M0 / kolejnych iteracji kartotek. Nie powstają endpointy dan
 firmowych. Certyfikat lokalnego SQL można akceptować tylko w Development przy
 szyfrowanym połączeniu; to odrębne ustawienie od certyfikatu HTTPS API.
 
+**Aktualny etap database-per-company (2026-10-21):** decyzja ADR-014 zastępuje ADR-005. Rozdzielamy modele `SystemDbContext` (katalog firm i lokalizacje baz) i `CompanyDbContext` (profil oraz kontrahenci jednej firmy), jawne konfiguracje, fabryki projektowe bez połączeń i osobne migracje początkowe. Generujemy i sprawdzamy SQL offline. Runtime nie ma domyślnego połączenia do firmy; przyszły resolver dostarczy niezmienny wybór po serwerowej autoryzacji. Nie tworzymy baz, nie wykonujemy migracji, nie zmieniamy `Vatowiec_Dev` ani nie kopiujemy danych. Dotychczasowa migracja jest archiwalna i nie należy do historii nowych kontekstów. Logowanie, użytkownicy/role, resolver z weryfikacją rzeczywistej tożsamości bazy, provisioning, audyt aktorów i backup/restore pozostają do implementacji; nie deklarujemy ukończenia M0.
+
 - Publiczne repo, `LICENSE`, `README`, `CONTRIBUTING`, `SECURITY`, `AGENTS.md`.
 - Solution .NET 10, serwer ASP.NET Core, klient Avalonia, model modułowy.
-- SQL Server: migracje, konfiguracja połączenia, seed fikcyjnej firmy.
-- Logowanie, dwie firmy, role, podstawowy audyt.
+- SQL Server: osobne migracje i konfiguracja bazy systemowej oraz dwóch przykładowych baz firmowych, profile fikcyjnych firm.
+- Logowanie, dwie firmy w oddzielnych bazach, role, podstawowy audyt z trwałą identyfikacją aktorów; wznawialny provisioning i niezależny backup/restore.
 - Jedna komenda API, ekran klientów, test izolacji danych i równoczesnej edycji.
 - CI: build, testy, skan zależności, formatowanie.
 
@@ -653,13 +692,14 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | ADR-002 | MPL-2.0 vs inna licencja | Przed pierwszym publicznym commitem z `LICENSE`; sprawdzić użyte zależności |
 | ADR-003 | SQLite/PostgreSQL jako opcja | Dopiero po stabilizacji SQL Server i kontraktów repozytorium |
 | ADR-004 | SQL Server na Linux / limit Express | Przed publikacją instrukcji instalacji linuksowej; rozbieżność dokumentacji |
-| [ADR-005](docs/adr/ADR-005-izolacja-firm-i-pierwszy-model.md) | Rozdzielenie firm: wspólna baza | Rozstrzygnięte dla etapu bazy M0: CompanyId, filtry, kontrola zapisu, klucze złożone; autoryzacja użytkownika w kolejnym etapie |
+| [ADR-005](docs/adr/ADR-005-izolacja-firm-i-pierwszy-model.md) | Historyczna wspólna baza | Zastąpiony przez ADR-014; pozostaje zapisem zastosowanej migracji Vatowiec_Dev |
+| [ADR-014](docs/adr/ADR-014-database-per-company.md) | Database-per-company, dwa konteksty i cykl życia baz | Zaakceptowana architektura; obecnie rozdzielenie kodu i migracje offline, bez zmian SQL |
 | ADR-006 | Podpisywanie XML i przechowywanie certyfikatów | Przed implementacją wysyłek MF; nie przechowywać sekretów w zwykłej bazie |
 | ADR-007 | API pluginów: manifest, sandbox, granice dostępu | Przed pierwszą wykonywalną wtyczką |
 | ADR-008 | Pełny wykaz typów VAT i deklaracji na 1.0 | Przed M3; uzgodnić precyzyjne scenariusze |
 | ADR-009 | PIT-28/36/36L, załączniki, roczne deklaracje | Przed M3; granice zastosowania i właściwe podpisy |
 | ADR-010 | Migracja starych danych z oryginalnego VATowca | Opcjonalny importer; po uzyskaniu legalnych danych testowych i dokumentacji |
-| ADR-011 | Model backupów / RPO / RTO | Przed pierwszym produkcyjnym wdrożeniem |
+| ADR-011 | Backup/restore per firma: harmonogramy, retencja, RPO/RTO | Niezależność baz ustala ADR-014; szczegóły operacyjne przed wdrożeniem |
 | ADR-012 | Wtyczki zamknięte i dystrybucja bibliotek | Weryfikacja prawna każdej zależności przed dołączeniem |
 
 ### 15.1. Główne ryzyka
@@ -693,7 +733,7 @@ Zmiana może zostać zaakceptowana, jeśli:
 ## 17. Podsumowanie ustaleń
 
 **Podstawa produktu:** księgowość uproszczona + podatki + elektroniczne rozliczenia w Polsce.  
-**Podstawa techniczna:** wielostanowiskowy modularny monolit na ASP.NET Core, klient Avalonia, centralny SQL Server, wersjonowane API.  
+**Podstawa techniczna:** wielostanowiskowy modularny monolit na ASP.NET Core, klient Avalonia, centralna baza systemowa i fizycznie oddzielne bazy SQL Server per firma (również różne instancje), wersjonowane API.
 **Wyróżnik:** użytkownik może dopisać własny formularz, eksport, raport, walidator lub integrację bez czekania na autora i bez przebudowy rdzenia.  
 **Granica bezpieczeństwa:** otwarte API nie jest zgodą na niekontrolowane modyfikacje zatwierdzonych zapisów podatkowych.  
 **Filozofia wydań:** odpowiedzialna wersja beta jest lepsza niż wersja „produkcyjna” bez zweryfikowanych obliczeń i wysyłek.

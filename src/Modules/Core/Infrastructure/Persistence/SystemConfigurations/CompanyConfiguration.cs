@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Vatowiec.Core.Domain;
 
-namespace Vatowiec.Core.Infrastructure.Persistence;
+namespace Vatowiec.Core.Infrastructure.Persistence.SystemConfigurations;
 
 internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
 {
@@ -16,10 +16,7 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
         });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).ValueGeneratedNever();
-        builder.Ignore(x => x.CompanyId);
         builder.Property(x => x.Name).HasMaxLength(256).IsRequired();
-        builder.Property(x => x.Nip).HasMaxLength(32);
-        builder.Property(x => x.Regon).HasMaxLength(14);
         builder.Property(x => x.RowVersion).IsRowVersion();
     }
 }

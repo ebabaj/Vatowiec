@@ -2,7 +2,7 @@
 
 Projekt: **Otwarty następca VATowca** (nazwa robocza).  
 Główne źródło wymagań: [`SPECYFIKACJA.md`](./SPECYFIKACJA.md).  
-Status: zasady początkowe, 2026-10-21.
+Status: architektura database-per-company, 2026-10-21; decyzja ADR-014.
 
 ## 1. Co budujemy
 
@@ -13,6 +13,9 @@ Wielostanowiskową aplikację księgowo-podatkową dla polskich mikrofirm: **KPi
 - C# / .NET 10; **Avalonia UI** (klient); **ASP.NET Core** (API/serwer); **SQL Server** (domyślnie Express); **xUnit**.
 - **Modularny monolit**: `Domain`, `Application`, `Infrastructure`, `Api`, `Desktop` i wyraźne moduły biznesowe.
 - **Klient nie komunikuje się bezpośrednio z SQL Server**. Dane, autoryzacja i księgowanie należą do API.
+- **Database-per-company jest obowiązkowe**: `Vatowiec_System` przechowuje katalog firm, użytkowników, role, uprawnienia i lokalizacje baz; każda firma ma fizycznie oddzielną bazę SQL Server, także na innej instancji.
+- `SystemDbContext` nie może mapować kontrahentów, dokumentów ani ewidencji księgowych. `CompanyDbContext` mapuje dane dokładnie jednej firmy; oba konteksty mają osobne migracje i snapshoty.
+- Wybór bazy następuje wyłącznie na serwerze po uwierzytelnieniu i autoryzacji firmy. Brak wyboru lub niezgodność `CompanyId` oznacza odmowę; nie ma domyślnej bazy firmowej. Kontekst i wybór połączenia nie mogą być współdzielone między żądaniami.
 - Logika domenowa nie może zależeć od Avalonia, HTTP, EF Core ani T-SQL.
 - Nie dodawaj mikrousług, event sourcingu ani nowego frameworka tylko ze względu na modę. Uzasadnij zmiany architektoniczne w ADR.
 
@@ -26,6 +29,10 @@ Wielostanowiskową aplikację księgowo-podatkową dla polskich mikrofirm: **KPi
 6. Kwoty pieniężne i stawki liczymy na `decimal`, **nie** `float`/`double`.
 7. Reguły podatkowe i schematy JPK mają wersje oraz okres obowiązywania. Nie zastępuj reguł historycznych bieżącymi.
 8. Nie umieszczaj sekretów ani autentycznych danych podatników w repozytorium, testach lub logach.
+9. Historia księgowa zawiera trwały identyfikator aktora (z przestrzenią identyfikatorów źródłowej instalacji) i historyczny opis użytkownika w bazie firmy. Usunięcie konta centralnego nie może usuwać ani anonimizować tej identyfikacji; nie stosuj FK ani kaskad do centralnej kartoteki użytkowników. Identyfikatorów aktorów nie używa się ponownie.
+10. Dokument, skutki ewidencyjne, audyt księgowy i Outbox zapisuje się atomowo w bazie firmy. Nie uzależniaj księgowania od transakcji obejmującej bazę systemową lub inną instancję SQL.
+11. Każda firma ma niezależny backup/restore bazy, załączników i wymaganych kluczy. Odtworzenie firmy nie odtwarza centralnych kont ani uprawnień.
+12. Docelowe utworzenie firmy w aplikacji automatycznie tworzy bazę, wykonuje migracje i inicjalizuje profil. Osobna tożsamość techniczna obsługuje provisioning; zwykłe API nie otrzymuje uprawnień CREATE DATABASE/DDL. Proces ma trwały klucz idempotencji, checkpointy i bezpieczne wznowienie, bez usuwania zastanej bazy.
 
 ## 4. Podatki i integracje
 
@@ -57,6 +64,7 @@ Podczas kodowania:
 4. Twórz możliwie małe, kompilowalne zmiany.
 5. Pisz testy jednostkowe, integracyjne i testy konfliktów/uprawnień odpowiednio do zmiany.
 6. Wprowadzając migrację SQL, opisz sposób wdrożenia i ryzyko niezgodności danych.
+   Generowanie migracji i SQL offline jest odrębne od ich wykonania. Nie uruchamiaj migracji wszystkich baz przy starcie API. Provisioning wykonuje je jawnie dla nowo tworzonej firmy; aktualizacje istniejących firm są kontrolowane osobno.
 7. W API zwracaj konkretne błędy biznesowe zamiast surowych wyjątków SQL.
 
 Po kodowaniu:
@@ -106,6 +114,8 @@ Nie twórz wszystkich katalogów pustymi szablonami bez potrzeby; szkielet jest 
 ## 8. Pierwsze zadanie dla Codexa
 
 > Przygotuj propozycję i minimalny szkielet repozytorium według M0 w `SPECYFIKACJA.md`: solution .NET 10, ASP.NET Core Web API, Avalonia Desktop, projekt Domain/Application/Infrastructure, integracja z SQL Server, testy xUnit i instrukcja uruchomienia. Zacznij od dokumentu ADR opisującego podział projektów i granice modułów. Nie implementuj podatków, KSeF ani schematów JPK bez osobnych wymagań i testów. Zapewnij możliwość zalogowania dwóch użytkowników oraz podstawowy model dwóch firm z izolacją danych.
+
+Aktualny etap po zaakceptowaniu ADR-014: rozdzielenie modeli i przygotowanie migracji offline. Nie tworzymy baz, nie wykonujemy migracji i nie usuwamy ani nie modyfikujemy `Vatowiec_Dev`. Testy SQL wymagają jawnego włączenia nowego zestawu i dedykowanych baz `*_Test`; pominiętych testów nie raportujemy jako zaliczonych. Wykonanie operacji na SQL będzie osobnym etapem po przeglądzie skryptów.
 
 ## 9. Licencje i cudze materiały
 

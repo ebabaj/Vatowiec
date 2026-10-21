@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Vatowiec.Core.Domain;
 
-namespace Vatowiec.Core.Infrastructure.Persistence;
+namespace Vatowiec.Core.Infrastructure.Persistence.CompanyConfigurations;
 
 internal sealed class ContractorConfiguration : IEntityTypeConfiguration<Contractor>
 {
@@ -24,8 +24,8 @@ internal sealed class ContractorConfiguration : IEntityTypeConfiguration<Contrac
         builder.Property(x => x.CountryCode).HasMaxLength(2).IsRequired();
         builder.Property(x => x.TaxIdentifier).HasMaxLength(32);
         builder.Property(x => x.RowVersion).IsRowVersion();
-        builder.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId)
-            .OnDelete(DeleteBehavior.NoAction);
+        builder.HasOne<CompanyProfile>().WithMany().HasForeignKey(x => x.CompanyId)
+            .HasPrincipalKey(x => x.CompanyId).OnDelete(DeleteBehavior.NoAction);
         builder.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
     }
 }
