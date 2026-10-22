@@ -1,5 +1,20 @@
 # Kartoteka kontrahentów — dodawanie, edycja, wyszukiwanie i konflikty
 
+**Aktualizacja projektowa 2026-10-22:** wdrożenie nowych funkcji wstrzymano.
+[ADR-018](adr/ADR-018-docelowy-model-kontrahentow.md) opisuje docelowy model
+oraz pozostałe szczegóły implementacyjne: preferowany int IDENTITY zamiast GUID,
+usunięcie zbędnego CompanyId z Contractors, grupowanie ParentId bez dziedziczenia,
+własne adresy, uniwersalne kontakty i rachunki. Zatwierdzone są ContractorAddresses,
+ContractorContacts, ContractorBankAccounts oraz otwarty AddressTypes. TaxId i VatEuId
+mają do 100 znaków, duplikaty i błędy można świadomie zatwierdzać z odpowiednim prawem,
+bez uzasadnienia, z audytem. Domyślne rachunki są osobne według waluty, także NULL.
+Pozostają KsefIdWew, wersjonowana walidacja w tabeli SQL oraz
+osobna historia ExternalVerifications. Te zmiany nie są zaimplementowane.
+Poniższa instrukcja opisuje dotychczasowy demonstrator. Jego fikcyjne rekordy
+i identyfikatory nie wymagają przenoszenia ani zachowania; po zatwierdzeniu
+szczegółów modelu demonstracyjne bazy projektu mogą zostać odtworzone od podstaw.
+W obecnym zadaniu nie zmieniamy danych ani schematu.
+
 Etap z 2026-10-22: podstawowa kartoteka pięciu pól istniejącego modelu,
 bez faktur i księgowania. Decyzja: [ADR-017](adr/ADR-017-kartoteka-kontrahentow-i-audyt.md).
 Instrukcję kont i haseł zawiera [logowanie](authentication.md).

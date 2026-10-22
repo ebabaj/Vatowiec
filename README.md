@@ -8,6 +8,16 @@ Server oraz dwie fikcyjne firmy. Działają Identity, sesje API i autoryzowany r
 bazy firmy. Pełny zestaw obejmuje 117 testów, w tym 46 z SQL/API.
 Nie jest to jeszcze program do prowadzenia księgowości.
 
+**Aktualny etap: projektowanie docelowego modelu kontrahentów, wyłącznie dokumentacja.**
+Implementacja nowych funkcji jest wstrzymana. [ADR-018](docs/adr/ADR-018-docelowy-model-kontrahentow.md)
+zawiera doprecyzowany model: ParentId bez dziedziczenia, własne adresy/kontakty/rachunki,
+TaxId/VatEuId do 100 znaków z audytowanymi ostrzeżeniami i domyślne rachunki według waluty.
+Oddziela go od pozostałych szczegółów implementacyjnych; poniższe instrukcje i wynik
+117 testów opisują wdrożony etap ADR-017. Obecny kod, schemat i dane pozostają
+bez zmian. Fikcyjnych danych demonstracyjnych nie trzeba przenosić: przy przyszłej
+zaakceptowanej implementacji można odtworzyć wyłącznie demonstracyjne bazy VATowca.
+Nie projektujemy migracji ich GUID ani zgodności ze starym schematem.
+
 Wymagania produktu: [SPECYFIKACJA.md](SPECYFIKACJA.md).
 Architektura i granice modułów: [ADR-013](docs/adr/ADR-013-architektura-modularnego-monolitu.md).
 Model i izolacja firm: [ADR-014](docs/adr/ADR-014-database-per-company.md).

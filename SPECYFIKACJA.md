@@ -1,6 +1,6 @@
 # Otwarty następca VATowca — specyfikacja produktu i architektury
 
-**Wersja dokumentu:** 0.5.0 (kartoteka kontrahentów i audyt, ADR-017)
+**Wersja dokumentu:** 0.7.1 (definicje adresów i rachunków kontrahentów — wyłącznie dokumentacja, ADR-018)
 **Data:** 2026-10-22
 **Status:** projekt założeń; nie jest potwierdzeniem zgodności podatkowej gotowego oprogramowania  
 **Nazwa projektu:** robocza „Otwarty następca VATowca”; docelowa nazwa i użycie nazwy „VATowiec” wymagają odrębnej decyzji i sprawdzenia praw  
@@ -56,6 +56,7 @@ Nie kopiujemy oryginalnego kodu, binariów, zasobów graficznych, chronionych tr
 6. **Otwartość funkcjonalna**: raporty, reguły mapowania, dodatkowe formularze, importery, eksportery, skrypty i wtyczki przez stabilne API.
 7. **Trwałość danych**: audyt, backup/restore, możliwość eksportu kompletu danych i niezależność od dostawcy usługi chmurowej.
 8. **Dobra ergonomia** dla użytkowników księgujących duże serie dokumentów: szybka klawiatura, tabele, filtry i skróty.
+9. **„Użytkownik ma zawsze rację”**: uprawniony użytkownik może świadomie zapisać identyfikator mimo wyjaśnionego ostrzeżenia walidacji podatkowej, z audytem odstępstwa. Nie oznacza to obejścia autoryzacji, integralności danych, konfliktu wersji ani wymogów systemów zewnętrznych. Docelowe zasady: ADR-018 i §8.3.
 
 ### 2.2. Kryterium gotowości do użytku produkcyjnego
 
@@ -92,7 +93,7 @@ Wyłączenie oznacza brak w pierwszym wydaniu, nie zakaz dodania później.
 - **[USTALONE] Database-per-company:** każda firma ma fizycznie oddzielną bazę SQL Server. Jedna baza nie przechowuje księgowości wielu firm.
 - Centralna baza `Vatowiec_System` zawiera użytkowników, role, katalog firm, uprawnienia i wskazania baz. Nie zawiera dokumentów księgowych, kontrahentów ani ewidencji podatkowych.
 - Jedna aplikacja ASP.NET Core obsługuje wszystkie firmy. Dopiero po uwierzytelnieniu i sprawdzeniu uprawnienia do firmy wybiera serwerowe połączenie. Bazy firm mogą znajdować się na różnych instancjach SQL Server.
-- Każdy rekord firmowy zachowuje `CompanyId` jako dodatkowy warunek spójności; nie zastępuje to fizycznej izolacji baz ani autoryzacji. Lokalny profil identyfikuje jedyną firmę w danej bazie.
+- Wdrożony demonstrator ADR-014/017 powiela `CompanyId` w rekordach firmowych. Docelowo, zgodnie z ADR-018, usuwamy zbędne `CompanyId` z tabel danych tylko jednej firmy, zwłaszcza `core.Contractors`. Lokalny profil nadal identyfikuje jedyną firmę w bazie; `CompanyId` pozostaje w centralnym katalogu i mechanizmach autoryzacji. Usunięcie zbędnej kolumny nie zastępuje serwerowej kontroli firmy ani weryfikacji tożsamości bazy.
 - Każda baza ma niezależną historię migracji, backup i odtworzenie/przeniesienie jednej firmy wraz z załącznikami i wymaganymi kluczami, bez przenoszenia innych firm.
 - Użytkownik może posiadać różne role w różnych firmach.
 
@@ -130,7 +131,7 @@ Wyłączenie oznacza brak w pierwszym wydaniu, nie zakaz dodania później.
 - ViewContractors jest sprawdzane przez serwer niezależnie od widoczności przycisku. Brak uprawnień, sesja 401, błąd resolvera i utrata połączenia nie powodują wyboru domyślnej firmy. Zmiana firmy i odświeżanie kartoteki usuwają stare rekordy; wygaśnięcie sesji czyści całą sesję także podczas bezczynności. Operacje UI są serializowane, opóźnione dane po terminie sesji są odrzucane.
 - Etap ADR-016 obejmował odczyt; edycję dodaje §3.7. Instrukcja kont i ograniczeń wylogowania offline: docs/desktop.md. Automatyczny provisioning pozostaje kolejnym zadaniem.
 
-### 3.7. Podstawowa kartoteka kontrahentów (ADR-017)
+### 3.7. Wdrożona podstawowa kartoteka kontrahentów (ADR-017, opis demonstratora)
 
 - Avalonia umożliwia dodanie i edycję kodu, nazwy, opcjonalnego identyfikatora podatkowego, dwuliterowego kraju i aktywności. Dezaktywacja zachowuje rekord i historię; nie ma fizycznego usuwania z API. Skróty: Ctrl+N, F2, Ctrl+F, Ctrl+S, Esc. Formularz i szkice nie są utrwalane lokalnie.
 - API wymaga ViewContractors do odczytu oraz ViewContractors + EditContractors i CSRF do POST/PUT. Dotychczasowe HTTPS, cookie i resolver obowiązują także przy zapisie. Filtry q/country/active oraz offset/limit działają w SQL; API zwraca domyślnie 50, maksymalnie 100 pozycji. Klient pokazuje strony po 50 i sprawdza istnienie następnej.
@@ -140,6 +141,14 @@ Wyłączenie oznacza brak w pierwszym wydaniu, nie zakaz dodania później.
 - Walidacja odpowiada długościom istniejącego modelu; nie dodano weryfikacji podatkowej NIP/rejestrów (ORG-007), adresów i rachunków ani dokumentów księgowych. Instrukcja testu, migracji i granic: docs/contractors.md, ADR-017.
 
 Weryfikacja etapu 2026-10-22: 117/117 testów (46 SQL/API, 71 bez SQL), bez pominięć; kompilacja ośmiu projektów bez błędów i ostrzeżeń oraz poprawne formatowanie. W dwóch rzeczywistych oknach Avalonia sprawdzono dodanie i edycję, wyszukiwanie, konflikt z zachowaniem pól, świadome rozstrzygnięcie i dezaktywację. SQL potwierdził pięć atomowo zapisanych zdarzeń dla fikcyjnej próby GUI-60D3A33B; próba odrzucona przez konflikt nie dopisała audytu. Migracje trzech baz wykonano jawnie po zweryfikowanych kopiach. M0 nadal wymaga cyklu życia firm i audytu operacji księgowych.
+
+### 3.8. Projektowanie docelowej kartoteki (ADR-018, bez implementacji)
+
+Implementacja nowych funkcji jest wstrzymana na czas wspólnego projektowania modelu. Obecny etap obejmuje wyłącznie dokumentację: bez zmian C#, SQL, migracji EF Core i danych demonstracyjnych. Ustalenia zatwierdzone i pytania otwarte oddziela [ADR-018](docs/adr/ADR-018-docelowy-model-kontrahentow.md); nie jest to gotowy schemat do wdrożenia.
+
+W bazach projektu są wyłącznie fikcyjne dane, które nie wymagają zachowania. Przy przyszłej implementacji po zatwierdzeniu szczegółów można usunąć i odtworzyć wyłącznie demonstracyjne bazy VATowca, po sprawdzeniu ich nazwy i przeznaczenia. Nie projektujemy migracji istniejących danych, przenoszenia GUID, zachowywania przykładowych kontrahentów ani kompatybilności z dotychczasowym demonstratorem. Nie dotyczy to baz systemowych SQL ani innych aplikacji i nie oznacza wykonywania operacji SQL teraz.
+
+Zatwierdzony model: database-per-company bez zbędnego CompanyId w tabelach jednej firmy; preferowane klucze danych kontrahentów int IDENTITY; Contractors dla podmiotów, grup i jednostek, z ParentId służącym grupowaniu i bez dziedziczenia. Osobne ContractorAddresses, ContractorContacts i ContractorBankAccounts; otwarty AddressTypes. TaxId i pełne VatEuId z prefiksem są opcjonalnymi tekstami do 100 znaków, z dozwolonymi duplikatami po ostrzeżeniu i świadomej akceptacji przez uprawnionego użytkownika. KsefIdWew pozostaje odrębnym opcjonalnym identyfikatorem jednostki. Pozostają niezależna od Id idempotencja tworzenia, prawidłowe relacje, kontrola uprawnień, rowversion i audyt. Zmiana lokalnego klucza nie usuwa CompanyId z katalogu, kontekstu API ani autoryzacji. Szczegóły opisuje §8.3.
 
 ---
 
@@ -435,18 +444,28 @@ Bez rekompilacji aplikacji użytkownik tworzy nową definicję formularza: wybie
 
 ## 8. Model danych — projekt logiczny, nie gotowy DDL
 
-Model jest rozdzielony na bazę systemową i bazy firmowe. Każda tabela domenowa z danymi firmy posiada `CompanyId`, identyfikator rekordu, daty utworzenia/modyfikacji i, gdzie możliwe, znacznik konkurencyjności. Poniższe nazwy są robocze.
+Model jest rozdzielony na bazę systemową i bazy firmowe. W modelu docelowym ADR-018 nie powielamy zbędnego `CompanyId` w tabelach danych wyłącznie jednej firmy. Tożsamość bazy oraz centralny katalog i autoryzacja nadal używają `CompanyId`. Rekordy mają identyfikatory, a tam, gdzie właściwe, daty i znacznik konkurencyjności. Poniższe nazwy są robocze poza elementami wyraźnie zatwierdzonymi w §8.3; model logiczny nie jest opisem wdrożenia.
 
 W `Vatowiec_System`: `Company` (katalog, nazwa wyświetlana, status), `CompanyDatabaseRegistration` (firma, serwer, baza, klucz serwerowego profilu połączenia), Identity `User`/`Role` i tabele towarzyszące, `CompanyAccess` oraz `UserSession`. Profil połączenia odsyła do konfiguracji/sekretów na serwerze; tabela nie zawiera haseł SQL. Identity przechowuje wyłącznie hashe haseł użytkowników. Trwały proces provisioningu i pełny audyt administracyjny pozostają kolejnymi etapami; rejestr sesji nie jest audytem księgowym.
 
-W bazie jednej firmy: `CompanyProfile`, kontrahenci i wszystkie encje księgowe poniżej. Centralne `Company.Name` jest etykietą katalogową; źródłem nazwy prawnej i NIP/REGON jest lokalny profil. Lokalny profil ma PK `SingletonKey` z CHECK `= 1` i unikalny `CompanyId`; kontrahenci mają FK do tego lokalnego identyfikatora. Brak relacji SQL między bazami. Zarejestrowane połączenie trzeba zweryfikować względem rzeczywistego profilu i wersji schematu przed dopuszczeniem operacji.
+W bazie jednej firmy: `CompanyProfile`, kontrahenci i wszystkie encje księgowe poniżej. Centralne `Company.Name` jest etykietą katalogową; źródłem nazwy prawnej i NIP/REGON jest lokalny profil. Wdrożony profil ma PK `SingletonKey` z CHECK `= 1` i unikalny `CompanyId`, a kontrahenci FK do tego identyfikatora. ADR-018 zmienia docelowy model Contractors i jego powiązań, zachowując identyfikację bazy przez profil. Nie ma relacji SQL między bazami; zarejestrowane połączenie nadal trzeba zweryfikować względem rzeczywistego profilu i wersji schematu przed dopuszczeniem operacji.
+
+Tabela uwzględnia również słownik metadanych AddressTypes; jego umiejscowienie
+w topologii baz, podobnie jak TaxIdentifierSchemes, pozostaje do doprecyzowania.
+Nie oznacza to przenoszenia firmowych adresów lub kontaktów do bazy systemowej.
 
 | Encja | Minimalne istotne pola / relacje |
 |---|---|
 | `CompanyProfile` | `SingletonKey = 1`, `CompanyId`, NIP, REGON, nazwa prawna; dokładnie jeden po inicjalizacji bazy firmy |
-| `TaxProfile` | `CompanyId`, typ podatnika, forma PIT, VAT, `ValidFrom`, `ValidTo` |
-| `Contractor`, `ContractorAccount` | dane, identyfikatory, kraj, rachunki, historia zmian |
-| `Document` | `Id`, `CompanyId`, typ, numer/seria, kontrahent, daty, waluta, status, wersja, `SourceSystem`, `ExternalId`, `RowVersion` |
+| `TaxProfile` | typ podatnika, forma PIT, VAT, `ValidFrom`, `ValidTo`; kontekst bazy firmy |
+| `core.Contractors` — docelowo | preferowany `Id int IDENTITY`, `ParentId` grupujący podmioty/grupy/jednostki bez dziedziczenia, opcjonalne `TaxId` i `VatEuId` do 100 znaków oraz `KsefIdWew`; bez zbędnego `CompanyId`; szczegóły §8.3 |
+| `core.ContractorAddresses` — docelowo | wiele własnych adresów kontrahenta, także tego samego rodzaju z ref.AddressTypes; najwyżej jeden preferowany na ContractorId i AddressTypeId; pełne kolumny i typy w ADR-018 §3.7 |
+| `ref.AddressTypes` — docelowo | otwarty słownik: Adres rejestrowy, Adres korespondencyjny i rodzaje dopisywane przez użytkownika |
+| `core.ContractorContacts` — docelowo | jeden uniwersalny model kontaktu: obowiązkowe Name, opcjonalna funkcja/telefon/e-mail/adres/uwagi, bez FK do ContractorAddresses |
+| `core.ContractorBankAccounts` — docelowo | wiele rachunków bez unikalności numeru, CurrencyCode char(3) NULL, IsDefault bit, najwyżej jeden domyślny w grupie ContractorId/waluta, także NULL; brak obowiązku domyślnego; pełne kolumny i typy w ADR-018 §3.9 |
+| `audit.ContractorChanges` | historia zmian kartoteki, dostosowywana do docelowego modelu, z atomowym audytem świadomych odstępstw od walidacji |
+| `audit.ExternalVerifications` — docelowo | niezmienne sprawdzenia zewnętrzne w bazie firmy, niezależne od edycji kartoteki; zakres informacji w §8.3 |
+| `Document` | `Id`, typ, numer/seria, kontrahent, daty, waluta, status, wersja, `SourceSystem`, `ExternalId`, `RowVersion`; kontekst bazy firmy |
 | `DocumentLine` | dokument, rodzaj towar/usługa, ilość, cena, podatki, kategorie, kwoty |
 | `DocumentCorrection` | dokument oryginalny / korygujący, powód i rodzaj korekty |
 | `DocumentAttachment` | typ MIME, hash SHA-256, ścieżka/obiekt, uprawnienia, metadane |
@@ -464,15 +483,20 @@ W bazie jednej firmy: `CompanyProfile`, kontrahenci i wszystkie encje księgowe 
 | `ExtensionSettings` | firma/użytkownik, ustawienia i referencje do sekretów |
 | `OutboxEvent` | typ, identyfikator zdarzenia, payload, próby, status, następne uruchomienie |
 
+Osobno projektujemy tabelę SQL `ref.TaxIdentifierSchemes` z wersjonowanymi regułami dla co najmniej wszystkich państw UE. Dokładną lokalizację słowników ref w topologii baz trzeba doprecyzować; same nazwy AddressTypes i TaxIdentifierSchemes nie przesądzają ich centralnego przechowywania. Dane kontrahentów, adresów, kontaktów, rachunków i historii należą do bazy firmy.
+
 **Uwaga o projektowaniu:** kwot historycznych i złożonych deklaracji nie obliczamy ponownie po aktualizacji reguł „w miejscu”. `TaxCalculation` i `JpkPackage` powinny mieć zamrożony zestaw danych wejściowych / identyfikator obliczeń, wersję reguł i wersję schematu. Każda korekta tworzy nową rewizję z odsyłaczem do poprzedniej. Audyt i dane potrzebne do odtworzenia muszą być odporne na usunięcie z UI.
 
 ### 8.1. Kluczowe ograniczenia SQL
 
 - Unikalność numerów wystawianych dokumentów w ramach właściwej firmy, rodzaju/serii i okresu.
-- Idempotencja importów i wysyłek (unikat na `(CompanyId, SourceSystem, ExternalId)` tam, gdzie stosowne).
+- Idempotencja importów, wysyłek i tworzenia rekordów w zakresie właściwej firmy. Unikaty są lokalne dla fizycznej bazy firmy; nie wymagają powielania `CompanyId` w jej tabelach. ADR-018 opisuje niewidoczny mechanizm tworzenia Contractors z int IDENTITY: trwały klucz operacji i jej wynik zapisane atomowo z kontrahentem i audytem, bez powielenia po ponowieniu lub restarcie API.
+- Docelowo najwyżej jeden preferowany adres na ContractorId i AddressTypeId; wiele adresów tej samej pary jest dozwolone. Ograniczenie dotyczy preferencji, a nie liczby adresów danego rodzaju.
+- Docelowo najwyżej jeden domyślny rachunek dla ContractorId i każdej grupy CurrencyCode, w tym osobnej grupy NULL; baza chroni unikalność także przy równoczesnych zapisach. Zmiana automatycznie odznacza poprzedni domyślny rachunek tej samej grupy w jednej transakcji. Nie ma obowiązku wyboru domyślnego i nie tworzymy ContractorDefaultBankAccounts.
 - Klucze obce i ochrona spójności, w tym właściwe powiązanie wszystkich relacji z tą samą firmą.
 - Zakaz fizycznego usuwania zatwierdzonych dokumentów z publicznego API.
 - Audyt z atomowym powiązaniem ze skutkami transakcji.
+- Integralność strukturalna SQL (klucze, relacje i właściwe ograniczenia) pozostaje obowiązkowa. Walidację podatkową identyfikatorów wykonuje Application/API z wersjonowanymi regułami i audytowanym świadomym odstępstwem; nie realizujemy jej podatkowymi CHECK CONSTRAINT.
 - Dokument, ewidencje, audyt księgowy i Outbox są zatwierdzane w jednej transakcji bazy firmowej, bez transakcji rozproszonych obejmujących katalog systemowy.
 - Osobne migracje `SystemDbContext` i `CompanyDbContext`; każda fizyczna baza ma własną `dbo.__EFMigrationsHistory`. Wspólny zestaw migracji firmowych wdraża się osobno do każdej firmy, z kontrolą wersji obsługiwanych przez API. Historia w katalogu nie zastępuje historii fizycznej bazy.
 - Migracje schematu wersjonowane, odwracalne tylko gdy bezpieczne; przed aktualizacją istniejącej bazy backup i weryfikacja zgodności. Automatyczny provisioning wykonuje migracje tylko jawnie wskazanej nowej firmy; start API nie migruje baz.
@@ -480,6 +504,30 @@ W bazie jednej firmy: `CompanyProfile`, kontrahenci i wszystkie encje księgowe 
 ### 8.2. Załączniki
 
 Załączniki mogą być przechowywane w katalogu kontrolowanym przez serwer lub w adapterze object storage. W SQL przechowujemy metadane, identyfikator, hash, rozmiar, ścieżkę logiczną, firmę i uprawnienia. Nie przechowujemy pełnej treści dokumentów w losowych katalogach dostępnych z klienta. Eksport firmy uwzględnia zarówno SQL, jak i załączniki.
+
+### 8.3. Docelowy model kontrahentów — ustalenia i granice (ADR-018)
+
+**Hierarchia i własne dane:** Contractors przechowuje samodzielne podmioty, grupy i jednostki organizacyjne. ParentId służy przede wszystkim grupowaniu i nie wyznacza automatycznie zależności podatkowej. Nie ma dziedziczenia żadnych danych: każdy rekord ma własną nazwę, identyfikatory, adresy, rachunki i kontakty. W przyszłej fakturze wybranie grupy bez identyfikatora podatkowego wyświetla powiązane podmioty do wyboru. Samodzielny podmiot z odpowiednim identyfikatorem może być nabywcą; jednostka niebędąca samodzielnym nabywcą może wystąpić jako Podmiot3 według roli i kontraktu KSeF. Faktur ani integracji teraz nie implementujemy.
+
+**Identyfikatory:** TaxId i VatEuId są dwoma opcjonalnymi polami tekstowymi, każde do 100 znaków; VatEuId zawiera cały numer VAT UE wraz z prefiksem. Dopuszczamy duplikaty: aplikacja ostrzega, a użytkownik z prawem akceptowania ostrzeżeń może świadomie zapisać wartość. Nie tworzymy ContractorTaxIdentifiers. ref.TaxIdentifierSchemes będzie tabelą SQL z wersjonowaniem reguł, docelowo dla co najmniej wszystkich państw UE. Application/API normalizuje i waliduje numery przed propozycją zapisu; konkretne algorytmy krajowe i VAT UE ustalimy przy implementacji walidatorów na podstawie źródeł i testów.
+
+**KsefIdWew:** odrębny, opcjonalny pełny identyfikator jednostki wewnętrznej KSeF (IDWew/InternalId), nie NIP samodzielnego podatnika ani int Id kartoteki. Oficjalny format to dziesięć cyfr NIP podatnika, łącznik i pięć dodatkowych cyfr, razem 16 znaków. Przeznaczenie, źródła MF i rozróżnienie Podmiot3 od nabywcy są w ADR-018 §3.3.1; nie wdrażamy walidatora, generowania identyfikatorów ani integracji. [Źródło formatu: oficjalne OpenAPI KSeF PR v2](https://api.ksef.mf.gov.pl/docs/v2/openapi.json).
+
+**Adresy:** core.ContractorAddresses przechowuje wiele własnych adresów kontrahenta, również kilka tego samego rodzaju. W ramach ContractorId i AddressTypeId najwyżej jeden może mieć IsDefault. ref.AddressTypes jest otwartym słownikiem, początkowo z Adresem rejestrowym i Adresem korespondencyjnym, rozszerzanym przez użytkownika. Zatwierdzona definicja obejmuje Id int IDENTITY, ContractorId, AddressTypeId, Name, Street, BuildingNo, ApartmentNo, PostalCode, City, Region, CountryCode, IsDefault, IsActive i RowVersion. Pełne typy SQL, długości i wymagalność określa [ADR-018 §3.7](docs/adr/ADR-018-docelowy-model-kontrahentow.md#37-adresy-i-otwarty-słownik-ich-rodzajów). Oddziały nie dziedziczą adresów.
+
+**Kontakty:** jedna core.ContractorContacts dla osób, skrzynek, działów i miejsc, bez rozdzielania ich na osobne tabele i bez CRM. Kontakt ma jedno obowiązkowe Name; opcjonalne są funkcja/stanowisko, telefon, e-mail, własne pola adresowe i uwagi. Może zawierać jednocześnie telefon, e-mail i adres. Adres kontaktu nie ma powiązania z ContractorAddresses i nie jest automatycznie synchronizowany z kartoteką adresów.
+
+**Rachunki:** jedna core.ContractorBankAccounts obejmuje Id int IDENTITY, ContractorId, AccountNumber, BankName, Bic, CurrencyCode char(3) NULL, AccountHolderName, Name, IsDefault bit, IsActive, Notes i RowVersion. Pełne typy SQL, długości i wymagalność określa [ADR-018 §3.9](docs/adr/ADR-018-docelowy-model-kontrahentow.md#39-rachunki-bankowe-i-domyślność-według-waluty); AccountNumber to wymagany nvarchar(100), a Bic to varchar(11) NULL. Kontrahent może mieć wiele rachunków. Najwyżej jeden domyślny na każdą walutę; NULL jest osobną grupą z takim samym limitem. Brak domyślnego jest dozwolony. Wybranie nowego automatycznie odznacza poprzedni z tej samej grupy w atomowej, audytowanej operacji, a unikalność domyślności zabezpiecza baza. Numery rachunków nie muszą być unikalne. Ich walidacja odbywa się w Application/API, ze świadomą akceptacją ostrzeżenia przez uprawnionego użytkownika i audytem odstępstwa. Nie tworzymy ContractorDefaultBankAccounts ani osobnej kartoteki banków na tym etapie.
+
+**„Użytkownik ma zawsze rację”:** po wyjaśnieniu ostrzeżenia użytkownik z prawem akceptacji ostrzeżeń może świadomie zapisać błędną wartość lub duplikat **bez podawania uzasadnienia**. Odstępstwo jest audytowane wraz ze zmianą, wykonawcą, czasem i kontekstem ostrzeżenia/reguły. Nie jest to uznanie numeru za poprawny ani obejście praw, spójności, rowversion, CSRF czy wymagań zewnętrznych. Do technicznego dopracowania pozostają nazwa uprawnienia i kontrakt API, a nie wymóg uzasadnienia.
+
+**Idempotencja:** preferowane int IDENTITY nie wymaga GUID jako głównego klucza. Niewidoczny klucz tej samej operacji utworzenia i jej utrwalony wynik pozwalają po utracie odpowiedzi zwrócić ten sam int Id bez nowego rekordu ani audytu. Zapisy kartoteki, audytu i wyniku operacji są atomowe w bazie firmy, z ochroną przed równoległym wykonaniem. ADR-018 §3.1 opisuje przebieg bez narzucania dodatkowej tabeli; fizyczny zapis i retencję dopracujemy przy implementacji.
+
+**Dwie historie w bazie firmy:** zachowujemy `audit.ContractorChanges` jako atomowo zapisywaną historię edycji kartoteki, z możliwością dostosowania implementacji. Osobne `audit.ExternalVerifications` przechowuje niezmienne zdarzenia sprawdzeń, w tym białej listy VAT i VIES. Zakres informacji obejmuje źródło, rodzaj sprawdzenia, identyfikator kontrahenta, opcjonalny rachunek, dane rzeczywiście użyte w zapytaniu, datę stanu sprawdzanego, odrębny czas wykonania zapytania, wynik, referencję urzędu, ewentualny błąd i użytkownika. Dane zapytania są historycznym zapisem, a nie tylko odsyłaczem do później zmienionej kartoteki. Trwałość identyfikacji wykonawcy po usunięciu konta obowiązuje obie historie.
+
+Wynik negatywny jest odrębny od niedostępności usługi, timeoutu lub braku odpowiedzi. Ponowne sprawdzenie dopisuje zdarzenie bez wymogu zmiany kontrahenta, jego rowversion ani pozornej edycji w ContractorChanges. Późniejsza zmiana danych nie przepisuje dawnego sprawdzenia. Dokładne nazwy kolumn, statusy i odwzorowania odpowiedzi urzędowych pozostają do ustalenia.
+
+**Pozostałe doprecyzowania:** konkretne algorytmy walidacji numerów rachunków i identyfikatorów, dobór schematu walidacji, umiejscowienie i dystrybucja słowników oraz techniczne kontrakty audytu, ostrzeżeń, idempotencji i adapterów. ADR-018 §4 pokazuje, jak rozstrzygnięto wcześniejsze K-01–K-09. Kolumny i typy adresów oraz rachunków, preferencja adresu według rodzaju i brak unikalności numerów rachunków są zatwierdzone. Nie dodajemy pól ani tabel bez uzasadnionej potrzeby i akceptacji użytkownika. Nie projektujemy migracji danych demonstracyjnych ani map dawnych GUID. Etap nadal jest wyłącznie dokumentacyjny.
 
 ---
 
@@ -546,6 +594,8 @@ Rejestr: kto, kiedy, z jakiego stanowiska/kontekstu, co utworzył/zmienił/zatwi
 Historia księgowa jest samowystarczalna w bazie firmy: zapisuje niezmienny `ActorId`, przestrzeń identyfikatorów źródłowej instalacji (`ActorIssuerId`) i historyczny opis pozwalający zidentyfikować wykonawcę. Identyfikatory nie są ponownie używane; zmiana nazwy ani fizyczne usunięcie centralnego konta nie zmienia zapisanej identyfikacji. Bez FK/kaskad do `User` i bez wymogu odczytu centralnej kartoteki do wyświetlenia historii. Restore lub przeniesienie firmy zachowuje identyfikację dawnych aktorów, ale nie nadaje im bieżących uprawnień. ADR-017 implementuje te zasady dla audytu kartoteki kontrahentów; audyt dokumentów księgowych pozostaje osobnym zadaniem. Same daty encji nie są audytem.
 
 ### 11.3. Backup i odtwarzanie
+
+Zakres tej sekcji opisuje docelową ochronę używanego systemu. Obecne fikcyjne dane demonstracyjne nie wymagają zachowania: §3.8 i ADR-018 dopuszczają przyszłe odtworzenie wyłącznie demonstracyjnych baz projektu bez migracji danych. Nie oznacza to zgody na utratę przyszłych danych rzeczywistych ani operacji SQL w bieżącym etapie dokumentacyjnym.
 
 - Każda baza firmowa ma własny harmonogram, historię, retencję i kopie niezależne od innych firm. Oddzielnie chronimy `Vatowiec_System`.
 - Uprawniony użytkownik sam zleca backup i odtworzenie własnej firmy przez aplikację, bez SSMS i uprawnień SQL na kliencie. Oddzielny proces techniczny wykonuje operację i raportuje jej stan.
@@ -615,6 +665,8 @@ Health check API/SQL/magazynu plików, diagnostyka błędów integracji, kolejka
 ## 13. Plan etapowania i definicja wersji
 
 ### M0 — Repozytorium i architektura
+
+**Bieżący etap dokumentacyjny (2026-10-22, ADR-018):** implementację nowych funkcji wstrzymano na czas wspólnego projektowania docelowego modelu kontrahentów. §3.8 i §8.3 opisują zatwierdzone kierunki, a ADR-018 oddziela pytania otwarte. Kod, tabele, migracje i dane demonstracyjne pozostają bez zmian; nie projektujemy migracji ich identyfikatorów ani kompatybilności ze starym schematem. Wcześniejsze wyniki testów poniżej i w §3.7 dotyczą wdrożonego demonstratora, nie nowego modelu.
 
 **Cel:** solidna baza techniczna bez deklarowania księgowej użyteczności.
 
@@ -731,6 +783,7 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | [ADR-015](docs/adr/ADR-015-identity-i-autoryzowany-wybor-bazy.md) | Identity, sesje i autoryzowany wybór bazy | Wdrożone API logowania, uprawnienia do firm, resolver i sprawdzanie rzeczywistego profilu; bez UI Avalonia |
 | [ADR-016](docs/adr/ADR-016-desktop-logowanie-i-kontekst-firmy.md) | Avalonia: logowanie i kontekst firmy | Wdrożony scenariusz desktopowy, odczyt kontrahentów, zmiana firmy i wylogowanie |
 | [ADR-017](docs/adr/ADR-017-kartoteka-kontrahentow-i-audyt.md) | Edycja kontrahentów, filtry, rowversion i atomowy audyt | Wdrożony formularz, serwerowe filtrowanie/strony i autoryzowany zapis; jawne migracje systemowa i firmowa |
+| [ADR-018](docs/adr/ADR-018-docelowy-model-kontrahentow.md) | Docelowy model kontrahentów i niezależne weryfikacje | Uzupełniony o ParentId bez dziedziczenia, nazwy tabel, reguły identyfikatorów i domyślność walutową; ślad rozstrzygnięć K-01–K-09, pozostałe doprecyzowania w §4; bez implementacji i migracji danych demonstracyjnych |
 | ADR-006 | Podpisywanie XML i przechowywanie certyfikatów | Przed implementacją wysyłek MF; nie przechowywać sekretów w zwykłej bazie |
 | ADR-007 | API pluginów: manifest, sandbox, granice dostępu | Przed pierwszą wykonywalną wtyczką |
 | ADR-008 | Pełny wykaz typów VAT i deklaracji na 1.0 | Przed M3; uzgodnić precyzyjne scenariusze |

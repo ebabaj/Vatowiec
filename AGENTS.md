@@ -2,7 +2,14 @@
 
 Projekt: **Otwarty następca VATowca** (nazwa robocza).  
 Główne źródło wymagań: [`SPECYFIKACJA.md`](./SPECYFIKACJA.md).  
-Status: architektura database-per-company, 2026-10-21; decyzja ADR-014.
+Status: projektowanie docelowego modelu kontrahentów, 2026-10-22; decyzja ADR-018.
+
+**Aktualny etap jest wyłącznie dokumentacyjny.** Implementacja nowych funkcji
+jest wstrzymana na czas wspólnego projektowania modelu. Nie zmieniaj C#, SQL,
+migracji EF Core ani danych demonstracyjnych w ramach tego etapu. Zatwierdzone
+kierunki i pytania otwarte rozdziela
+[ADR-018](docs/adr/ADR-018-docelowy-model-kontrahentow.md); nie traktuj ich jako
+ukończonej implementacji ani zgody na odtworzenie baz teraz.
 
 ## 1. Co budujemy
 
@@ -20,6 +27,13 @@ Wielostanowiskową aplikację księgowo-podatkową dla polskich mikrofirm: **KPi
 - Hasła kont demonstracyjnych pochodzą wyłącznie z lokalnego user-secrets lub środowiska. Nie loguj haseł, tokenów, cookie ani connection stringów; nie dodawaj publicznego endpointu obchodzącego uwierzytelnianie na potrzeby demonstratora.
 - Klient Avalonia stosuje ADR-016: HTTPS ze standardową walidacją certyfikatów, cookie i CSRF tylko w pamięci, nowy token CSRF przed logout. Nie utrwalaj hasła ani sesji; po zmianie firmy, odmowie lub wygaśnięciu usuń poprzednie dane. Ukrycie przycisku nie zastępuje serwerowej kontroli ViewContractors. Adres API konfiguruje VATOWIEC_API_URL lub ekran logowania.
 - Kartoteka stosuje ADR-017: POST/PUT wymagają CSRF, ViewContractors i EditContractors; PUT wymaga rowversion. Nie dodawaj fizycznego usuwania, force-update ani automatycznego rozstrzygania konfliktu. Zapis kontrahenta i audit.ContractorChanges jest atomowy w bazie firmy. Audyt zachowuje ActorId, historyczną nazwę i ActorIssuerId z trwałego security.Installation, bez FK do centralnego konta. Listę filtrujemy i stronicujemy po stronie SQL, nie pobieramy całej kartoteki do klienta.
+- ADR-017 opisuje wdrożony demonstrator; docelowy model zmienia ADR-018. Brak zbędnego CompanyId w danych jednej bazy firmy, preferowane klucze danych kontrahentów int IDENTITY. CompanyId w katalogu, uprawnieniach i wyborze firmy pozostaje. ParentId w Contractors służy grupowaniu podmiotów, grup i jednostek, nie określa zależności podatkowej. Żadne dane nie są dziedziczone: każdy rekord ma własne identyfikatory, adresy, rachunki i kontakty. Wybranie grupy bez identyfikatora przy przyszłej fakturze ma wyświetlać wybór powiązanego podmiotu; nie implementuj faktur teraz.
+- TaxId i VatEuId są odrębnymi opcjonalnymi tekstami do 100 znaków; VatEuId zawiera prefiks. Duplikaty są dozwolone po ostrzeżeniu i świadomym zatwierdzeniu. Nie twórz ContractorTaxIdentifiers. Opcjonalne KsefIdWew przechowuje pełny IDWew jednostki KSeF, odrębny od NIP podatnika i int Id kartoteki; format i oficjalne źródła są w ADR-018. Nie implementuj jeszcze walidacji ani integracji KSeF.
+- Zatwierdzone nazwy: core.ContractorAddresses, otwarty ref.AddressTypes (Adres rejestrowy, Adres korespondencyjny i rodzaje użytkownika), core.ContractorContacts, core.ContractorBankAccounts. Pełne kolumny, typy SQL i wymagalność adresów oraz rachunków określa ADR-018 §3.7 i §3.9; nie dodawaj pól ani tabel bez uzasadnionej potrzeby i akceptacji użytkownika. Wiele adresów tego samego rodzaju jest dozwolone, ale najwyżej jeden preferowany na ContractorId i AddressTypeId; oddziały nie dziedziczą adresów. Kontakt ma obowiązkowe Name, pozostałe dane opcjonalne; może łączyć telefon, e-mail i własny adres bez FK do ContractorAddresses. Nie dziel kontaktów na osoby/działy/miejsca i nie buduj CRM.
+- ContractorBankAccounts ma CurrencyCode char(3) NULL i IsDefault bit. Najwyżej jeden domyślny rachunek na ContractorId i grupę waluty, także oddzielną grupę NULL; brak domyślnego jest dozwolony. Zmiana domyślnego atomowo odznacza poprzedni w tej samej grupie, z ochroną unikalności w bazie. Nie wymuszaj unikalności AccountNumber; numery waliduje Application/API z możliwością świadomej, audytowanej akceptacji ostrzeżenia przez uprawnionego użytkownika. Nie twórz ContractorDefaultBankAccounts ani osobnej kartoteki banków na tym etapie.
+- Docelowa walidacja podatkowa jest wersjonowana przez tabelę SQL ref.TaxIdentifierSchemes i wykonywana w Application/API, bez podatkowych CHECK w SQL. „Użytkownik ma zawsze rację”: użytkownik mający prawo akceptowania ostrzeżeń może świadomie zapisać nieprawidłową wartość lub duplikat bez uzasadnienia, z audytem odstępstwa. Nie pozwala to omijać praw, integralności, rowversion ani wymogów zewnętrznych. Konkretne algorytmy walidacji ustalimy przy implementacji walidatorów.
+- Tworzenie kontrahenta ma niewidoczną dla użytkownika idempotencję operacji, niezależną od int Id: trwały wynik powiązany z kluczem żądania, chroniony przed równoległym wykonaniem i zapisany atomowo z kartoteką oraz audytem. Utrata odpowiedzi i ponowienie nie mogą utworzyć drugiego rekordu. Przebieg opisuje ADR-018; nie wymaga GUID jako klucza głównego, map starych GUID ani migracji fikcyjnych danych.
+- Zachowaj rozdzielenie audit.ContractorChanges (zmiany kartoteki) i docelowego audit.ExternalVerifications (niezmienne sprawdzenia z danymi rzeczywiście użytego zapytania). Obie historie należą do bazy firmy. Nowe sprawdzenie nie wymaga zmiany kontrahenta; niedostępność usługi nie jest negatywnym wynikiem weryfikacji.
 - Logika domenowa nie może zależeć od Avalonia, HTTP, EF Core ani T-SQL.
 - Nie dodawaj mikrousług, event sourcingu ani nowego frameworka tylko ze względu na modę. Uzasadnij zmiany architektoniczne w ADR.
 
@@ -116,6 +130,13 @@ Po kodowaniu:
 Nie twórz wszystkich katalogów pustymi szablonami bez potrzeby; szkielet jest mapą docelową.
 
 ## 8. Pierwsze zadanie dla Codexa
+
+Poniżej zapis wcześniejszych etapów i zgody na lokalne operacje testowe.
+Aktualne ograniczenie dokumentacyjne z początku pliku ma pierwszeństwo.
+Po zatwierdzeniu szczegółów nowego modelu przyszła implementacja może odtworzyć
+wyłącznie demonstracyjne bazy VATowca: fikcyjne dane nie wymagają zachowania,
+nie projektujemy ich migracji, map GUID ani zachowania przykładowych kontrahentów.
+Nie rozszerza to zgody na bazy systemowe SQL ani bazy innych aplikacji.
 
 > Przygotuj propozycję i minimalny szkielet repozytorium według M0 w `SPECYFIKACJA.md`: solution .NET 10, ASP.NET Core Web API, Avalonia Desktop, projekt Domain/Application/Infrastructure, integracja z SQL Server, testy xUnit i instrukcja uruchomienia. Zacznij od dokumentu ADR opisującego podział projektów i granice modułów. Nie implementuj podatków, KSeF ani schematów JPK bez osobnych wymagań i testów. Zapewnij możliwość zalogowania dwóch użytkowników oraz podstawowy model dwóch firm z izolacją danych.
 

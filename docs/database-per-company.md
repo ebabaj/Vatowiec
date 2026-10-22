@@ -1,5 +1,20 @@
 # Lokalne wdrożenie database-per-company
 
+**Bieżące ustalenie projektowe — ADR-018, 2026-10-22:** database-per-company
+pozostaje bez zmian. Docelowo nie powielamy CompanyId w tabelach danych jednej
+firmy (zwłaszcza Contractors); zachowujemy tożsamość bazy i CompanyId katalogu
+oraz autoryzacji. Preferowany klucz kontrahenta to int IDENTITY. Szczegóły:
+[docelowy model](adr/ADR-018-docelowy-model-kontrahentow.md).
+
+Wszystkie dotychczasowe dane projektu są fikcyjną demonstracją i nie wymagają
+zachowania. Po zatwierdzeniu szczegółów nowego modelu można odtworzyć od podstaw
+wyłącznie demonstracyjne bazy VATowca, po potwierdzeniu nazwy i przeznaczenia.
+Nie przygotowujemy migracji danych, map dawnych GUID ani zgodności ze starym
+schematem demonstracyjnym. Nie dotyczy to innych aplikacji ani baz systemowych SQL.
+Obecny etap jest tylko dokumentacyjny: nie wykonujemy odtworzenia, migracji
+ani jakichkolwiek zmian w bazach. Poniżej pozostaje opis wdrożonego demonstratora
+i wcześniejszych czynności; nie jest to plan przebudowy jego danych.
+
 Aktualizacja 2026-10-22: dodano security.Installation w bazie systemowej oraz
 audit.ContractorChanges i indeks listy w każdej bazie firmy. Jawne migracje wykonano
 po trzech kopiach COPY_ONLY/CHECKSUM i VERIFYONLY. Instrukcja polecenia
