@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="../Application/Vatowiec.Core.Application.csproj" />
+    <ProjectReference Include="../../../SharedContracts/Vatowiec.SharedContracts.csproj" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

@@ -67,6 +67,17 @@ public partial class MainWindow : Window
         if (model.CanViewContractors) { await model.EditContractor(); ContractorCodeInput.Focus(); }
     }
     private async void SaveContractorClick(object? sender, RoutedEventArgs e) => await model.SaveContractor();
+    private async void ValidateIdentifiersClick(object? sender, RoutedEventArgs e) => await model.CheckIdentifiers();
+    private async void AcceptIdentifiersClick(object? sender, RoutedEventArgs e) => await model.AcceptIdentifierWarning();
+    private async void ViesClick(object? sender, RoutedEventArgs e) => await model.VerifyRegistry("Vies");
+    private async void GusClick(object? sender, RoutedEventArgs e) => await model.VerifyRegistry("Gus");
+    private async void MfTaxpayerClick(object? sender, RoutedEventArgs e) => await model.VerifyRegistry("MfTaxpayer");
+    private async void MfStatusClick(object? sender, RoutedEventArgs e) => await model.VerifyRegistry("MfStatus");
+    private async void MfAccountClick(object? sender, RoutedEventArgs e) => await model.VerifyRegistry("MfAccount");
+    private async void VerificationsClick(object? sender, RoutedEventArgs e) => await model.LoadVerifications();
+    private async void PreviousVerificationsClick(object? sender, RoutedEventArgs e) => await model.PreviousVerifications();
+    private async void NextVerificationsClick(object? sender, RoutedEventArgs e) => await model.NextVerifications();
+    private void ApplyGusClick(object? sender, RoutedEventArgs e) => model.ApplyGusSelection();
     private void CancelContractorClick(object? sender, RoutedEventArgs e) => model.CancelEditor();
     private void ReloadConflictClick(object? sender, RoutedEventArgs e) => model.ResolveConflict(false);
     private void KeepConflictClick(object? sender, RoutedEventArgs e) => model.ResolveConflict(true);
@@ -106,6 +117,7 @@ public partial class MainWindow : Window
         if (model.DiscardPrompt) { if (e.Key == Key.Escape) model.KeepEditing(); e.Handled = true; return; }
         if (model.IsEditing && !model.IsMainTab)
         {
+            if (model.IsVerificationsTab) { if (e.Key == Key.Escape) model.CancelEditor(); return; }
             if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.S) { e.Handled = true; await model.SaveDetail(); }
             else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.N) { e.Handled = true; model.NewDetail(); }
             else if (e.Key == Key.F2) { e.Handled = true; await model.EditDetail(); }

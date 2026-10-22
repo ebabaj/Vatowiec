@@ -5,7 +5,11 @@ Vatowiec_System, a kontrahenci w osobnych Vatowiec_Company_A_Dev/B_Dev.
 Pierwszy etap odczytu opisuje [ADR-016](adr/ADR-016-desktop-logowanie-i-kontekst-firmy.md).
 **Aktualizacja 2026-10-22:** dodawanie, edycję, wyszukiwanie, stronicowanie,
 dezaktywację i konflikt opisuje [kartoteka kontrahentów](contractors.md), ADR-017/018/019/020.
-Cztery zakładki obejmują grupy, adresy, kontakty i rachunki. Szczegóły można otwierać także w B w trybie odczytu. Id kontrahenta jest int; identyfikatory podatkowe są tylko do odczytu bez deklarowania ich poprawności.
+Cztery zakładki obejmują grupy, adresy, kontakty i rachunki. ADR-021 dodaje edycję
+identyfikatorów z normalizacją/ostrzeżeniami oraz piątą zakładkę Weryfikacje
+(MF/WL2, GUS, VIES, domyślnie TEST): [instrukcja](identifiers-and-registries.md).
+Szczegóły i historię można otwierać także w B w trybie odczytu. Id kontrahenta jest
+int; lokalna kontrola nie potwierdza rejestracji, a TEST/MOCK nie potwierdzają produkcji.
 Operator edytuje w A, a w B nadal tylko czyta.
 
 ## Uruchomienie

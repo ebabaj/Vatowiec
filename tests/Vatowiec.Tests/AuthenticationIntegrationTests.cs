@@ -59,7 +59,10 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
             {
                 ["ConnectionStrings:VatowiecSystem"] = SystemConnection,
                 ["CompanyConnections:LocalWindows"] = "Server=localhost\\SQLEXPRESS;Integrated Security=True;Encrypt=True;TrustServerCertificate=True",
-                ["Authentication:SessionMinutes"] = "30"
+                ["Authentication:SessionMinutes"] = "30",
+                ["Registries:MF:Environment"] = "Mock",
+                ["Registries:GUS:Environment"] = "Mock",
+                ["Registries:VIES:Environment"] = "Mock"
             }));
             builder.ConfigureServices(services =>
             {
@@ -116,6 +119,19 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
         foreach (var second in new[] { false, true })
         {
             await using var company = Company(second, second ? companyB : companyA);
+            await company.Database.ExecuteSqlRawAsync("""
+                BEGIN TRANSACTION;
+                BEGIN TRY
+                    DISABLE TRIGGER audit.TR_ExternalVerifications_Immutable ON audit.ExternalVerifications;
+                    DELETE FROM audit.ExternalVerifications;
+                    ENABLE TRIGGER audit.TR_ExternalVerifications_Immutable ON audit.ExternalVerifications;
+                    COMMIT;
+                END TRY
+                BEGIN CATCH
+                    IF @@TRANCOUNT>0 ROLLBACK;
+                    THROW;
+                END CATCH;
+                """);
             await company.ContractorCreateOperations.ExecuteDeleteAsync();
             await company.ContractorChanges.ExecuteDeleteAsync();
             await company.ContractorAddresses.ExecuteDeleteAsync();

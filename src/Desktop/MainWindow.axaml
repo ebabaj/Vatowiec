@@ -124,10 +124,11 @@
       <Grid IsVisible="{Binding IsEditing}" RowDefinitions="Auto,*,Auto" RowSpacing="10">
         <StackPanel Spacing="6">
           <TextBlock Text="{Binding CurrentCompany}" TextWrapping="Wrap" FontWeight="SemiBold"/>
+          <TextBlock Text="{Binding RegistryEnvironmentLabel}" TextWrapping="Wrap" Foreground="#8A5A00" FontWeight="SemiBold" AutomationProperties.AutomationId="RegistryEnvironment"/>
           <TextBlock IsVisible="{Binding !CanEditContractors}" Text="Tryb tylko do odczytu — brak uprawnienia edycji w tej firmie." Foreground="#8A5A00" TextWrapping="Wrap"/>
           <TextBlock Text="{Binding CurrentContractor}" FontSize="21" FontWeight="SemiBold" TextWrapping="Wrap" AutomationProperties.AutomationId="CurrentContractor"/>
           <TabControl SelectedIndex="{Binding SelectedTab, Mode=TwoWay}" Height="48" AutomationProperties.AutomationId="ContractorTabs">
-            <TabItem Header="Dane główne"/><TabItem Header="Adresy"/><TabItem Header="Kontakty"/><TabItem Header="Rachunki bankowe"/>
+            <TabItem Header="Dane główne"/><TabItem Header="Adresy"/><TabItem Header="Kontakty"/><TabItem Header="Rachunki bankowe"/><TabItem Header="Weryfikacje"/>
           </TabControl>
         </StackPanel>
         <ScrollViewer Grid.Row="1" IsVisible="{Binding IsMainTab}" HorizontalScrollBarVisibility="Disabled">
@@ -136,10 +137,13 @@
 <StackPanel Spacing="4"><TextBlock Text="Kod *"/><TextBox Text="{Binding Editor.Code, Mode=TwoWay}" MaxLength="64" IsReadOnly="{Binding !CanEditContractors}" x:Name="ContractorCodeInput" AutomationProperties.AutomationId="ContractorCode"/><TextBlock Text="{Binding Editor.CodeError}" Foreground="#B42318" TextWrapping="Wrap"/></StackPanel>
 <StackPanel Spacing="4"><TextBlock Text="Pełna nazwa *"/><TextBox Text="{Binding Editor.Name, Mode=TwoWay}" MaxLength="256" IsReadOnly="{Binding !CanEditContractors}" AutomationProperties.AutomationId="ContractorName"/><TextBlock Text="{Binding Editor.NameError}" Foreground="#B42318" TextWrapping="Wrap"/></StackPanel>
 <StackPanel Spacing="4"><TextBlock Text="Kraj *"/><TextBox Text="{Binding Editor.CountryCode, Mode=TwoWay}" MaxLength="2" IsReadOnly="{Binding !CanEditContractors}" AutomationProperties.AutomationId="ContractorCountryCode"/><TextBlock Text="{Binding Editor.CountryError}" Foreground="#B42318" TextWrapping="Wrap"/></StackPanel>
-<StackPanel Spacing="4"><TextBlock Text="TaxId — krajowy identyfikator podatkowy · tylko odczyt"/><TextBox Text="{Binding Editor.TaxId}" IsReadOnly="True" Background="#EFEFEF" AutomationProperties.AutomationId="ContractorTaxId"/></StackPanel>
-<StackPanel Spacing="4"><TextBlock Text="VatEuId — numer VAT UE z prefiksem · tylko odczyt"/><TextBox Text="{Binding Editor.VatEuId}" IsReadOnly="True" Background="#EFEFEF" AutomationProperties.AutomationId="ContractorVatEuId"/></StackPanel>
-<StackPanel Spacing="4"><TextBlock Text="KsefIdWew — identyfikator jednostki KSeF · tylko odczyt"/><TextBox Text="{Binding Editor.KsefIdWew}" IsReadOnly="True" Background="#EFEFEF" AutomationProperties.AutomationId="ContractorKsefIdWew"/></StackPanel>
-              <TextBlock Text="Identyfikatory są tylko do odczytu. Program nie potwierdza ich poprawności ani weryfikacji urzędowej." TextWrapping="Wrap" Opacity="0.75"/>
+<StackPanel Spacing="4"><TextBlock Text="TaxId — krajowy identyfikator podatkowy (opcjonalny)"/><TextBox Text="{Binding Editor.TaxId, Mode=TwoWay}" MaxLength="100" IsReadOnly="{Binding !CanEditContractors}" AutomationProperties.AutomationId="ContractorTaxId"/><TextBlock Text="{Binding Editor.TaxIdError}" Foreground="#B42318"/><TextBlock Text="{Binding TaxIdAssessment}" TextWrapping="Wrap"/></StackPanel>
+<StackPanel Spacing="4"><TextBlock Text="VatEuId — pełny numer VAT UE z prefiksem (opcjonalny)"/><TextBox Text="{Binding Editor.VatEuId, Mode=TwoWay}" MaxLength="100" IsReadOnly="{Binding !CanEditContractors}" AutomationProperties.AutomationId="ContractorVatEuId"/><TextBlock Text="{Binding Editor.VatEuIdError}" Foreground="#B42318"/><TextBlock Text="{Binding VatEuIdAssessment}" TextWrapping="Wrap"/></StackPanel>
+<StackPanel Spacing="4"><TextBlock Text="KsefIdWew — pełny IDWew nadany w KSeF (opcjonalny)"/><TextBox Text="{Binding Editor.KsefIdWew, Mode=TwoWay}" MaxLength="100" IsReadOnly="{Binding !CanEditContractors}" AutomationProperties.AutomationId="ContractorKsefIdWew"/><TextBlock Text="{Binding Editor.KsefIdWewError}" Foreground="#B42318"/><TextBlock Text="{Binding KsefIdWewAssessment}" TextWrapping="Wrap"/></StackPanel>
+              <Button Content="Normalizuj i sprawdź identyfikatory" Click="ValidateIdentifiersClick" IsEnabled="{Binding CanEditContractors}" AutomationProperties.AutomationId="ValidateIdentifiers"/>
+              <TextBlock Text="Kontrola lokalna nie potwierdza rejestracji podatnika. Wyniki dotyczą pokazanego sprawdzenia; po zmianie pól sprawdź ponownie." TextWrapping="Wrap" Opacity="0.75"/>
+              <WrapPanel IsEnabled="{Binding CanVerify}"><Button Content="Pobierz dane z GUS" Click="GusClick" AutomationProperties.AutomationId="VerifyGus"/><Button Content="Sprawdź VAT UE" Click="ViesClick" AutomationProperties.AutomationId="VerifyVies"/><Button Content="Sprawdź podatnika VAT" Click="MfTaxpayerClick" AutomationProperties.AutomationId="VerifyMfTaxpayer"/><Button Content="Status VAT (WL2)" Click="MfStatusClick" AutomationProperties.AutomationId="VerifyMfStatus"/></WrapPanel>
+              <TextBlock Text="Data stanu wykazu MF (także rachunku)"/><DatePicker SelectedDate="{Binding VerificationDate, Mode=TwoWay}" AutomationProperties.AutomationId="VerificationDate"/>
               <CheckBox Content="Aktywny" IsChecked="{Binding Editor.IsActive, Mode=TwoWay}" IsEnabled="{Binding CanEditContractors}" AutomationProperties.AutomationId="ContractorActive"/>
             </StackPanel>
             <StackPanel Grid.Column="1" Spacing="10">
@@ -159,9 +163,10 @@
             </StackPanel>
           </Grid>
         </ScrollViewer>
-        <Grid Grid.Row="1" IsVisible="{Binding !IsMainTab}" ColumnDefinitions="340,*" ColumnSpacing="16">
+        <Grid Grid.Row="1" IsVisible="{Binding IsDetailTab}" ColumnDefinitions="340,*" ColumnSpacing="16">
           <ScrollViewer HorizontalScrollBarVisibility="Disabled"><StackPanel Spacing="8">
             <TextBlock Text="{Binding DetailTitle}" FontSize="18" FontWeight="SemiBold"/>
+            <StackPanel IsVisible="{Binding IsBankTab}" Spacing="5"><TextBlock Text="Wybierz zapisany rachunek i datę stanu. NRB lub IBAN PL; wynik nie jest bezterminowym potwierdzeniem." TextWrapping="Wrap"/><DatePicker SelectedDate="{Binding VerificationDate, Mode=TwoWay}"/><Button Content="Sprawdź rachunek w wykazie VAT" Click="MfAccountClick" IsEnabled="{Binding CanVerify}" AutomationProperties.AutomationId="VerifyMfAccount"/></StackPanel>
             <TextBlock IsVisible="{Binding !HasSavedContractor}" Text="Najpierw zapisz dane główne nowego kontrahenta, a następnie otwórz jego kartotekę." TextWrapping="Wrap"/>
             <WrapPanel IsEnabled="{Binding HasSavedContractor}">
               <Button Content="Nowy (Ctrl+N)" Click="NewDetailClick" IsVisible="{Binding CanEditDetails}" AutomationProperties.AutomationId="NewDetail"/>
@@ -213,7 +218,21 @@
             </StackPanel>
           </ScrollViewer>
         </Grid>
+        <Grid Grid.Row="1" IsVisible="{Binding IsVerificationsTab}" ColumnDefinitions="340,*" ColumnSpacing="16">
+          <StackPanel Spacing="8"><TextBlock Text="Historia weryfikacji" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="TEST/MOCK nie potwierdzają rzeczywistej rejestracji. Historia jest niezmienna; kolejne ręczne sprawdzenie dodaje nowe zdarzenie." TextWrapping="Wrap"/><Button Content="Odśwież historię" Click="VerificationsClick" IsEnabled="{Binding HasSavedContractor}" AutomationProperties.AutomationId="RefreshVerifications"/>
+            <ListBox ItemsSource="{Binding VerificationRows}" SelectedItem="{Binding SelectedVerification, Mode=TwoWay}" Height="240" ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.AutomationId="VerificationRows"><ListBox.ItemTemplate><DataTemplate x:DataType="contracts:VerificationResponse"><TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="4"/></DataTemplate></ListBox.ItemTemplate></ListBox>
+            <WrapPanel><Button Content="Poprzednie" Click="PreviousVerificationsClick" IsEnabled="{Binding HasPreviousVerifications}"/><Button Content="Następne" Click="NextVerificationsClick" IsEnabled="{Binding HasNextVerifications}"/></WrapPanel><TextBlock Text="{Binding VerificationPage}"/>
+          </StackPanel>
+          <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled"><StackPanel Spacing="10" Margin="0,0,16,8"><TextBlock Text="{Binding VerificationSummary}" TextWrapping="Wrap" AutomationProperties.AutomationId="VerificationSummary"/>
+            <StackPanel IsVisible="{Binding CanImportGus}" Spacing="7"><TextBlock Text="Porównaj i wybierz dane z GUS" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="{Binding GusComparison}" TextWrapping="Wrap"/>
+              <CheckBox Content="Przenieś nazwę do danych głównych" IsChecked="{Binding UseGusName, Mode=TwoWay}" AutomationProperties.AutomationId="UseGusName"/><TextBlock Text="Wybierz pola nowego adresu (wartości z GUS pokazano wyżej):" TextWrapping="Wrap"/>
+              <WrapPanel><CheckBox Content="Ulica" IsChecked="{Binding UseGusStreet, Mode=TwoWay}"/><CheckBox Content="Budynek" IsChecked="{Binding UseGusBuilding, Mode=TwoWay}"/><CheckBox Content="Lokal" IsChecked="{Binding UseGusApartment, Mode=TwoWay}"/><CheckBox Content="Kod pocztowy" IsChecked="{Binding UseGusPostalCode, Mode=TwoWay}"/><CheckBox Content="Miejscowość" IsChecked="{Binding UseGusCity, Mode=TwoWay}"/><CheckBox Content="Kraj" IsChecked="{Binding UseGusCountry, Mode=TwoWay}"/></WrapPanel>
+              <Button Content="Przenieś wybrane wartości do szkicu" Click="ApplyGusClick" AutomationProperties.AutomationId="ApplyGus"/><TextBlock Text="To nie zapisuje danych. Następnie sprawdź formularz i zapisz zwykłym API." TextWrapping="Wrap"/>
+            </StackPanel>
+          </StackPanel></ScrollViewer>
+        </Grid>
         <StackPanel Grid.Row="2" Spacing="8">
+          <Border IsVisible="{Binding HasIdentifierWarning}" BorderBrush="#B77816" BorderThickness="1" Padding="10"><StackPanel Spacing="6"><ScrollViewer MaxHeight="100"><TextBlock Text="{Binding IdentifierSummary}" TextWrapping="Wrap" AutomationProperties.AutomationId="IdentifierSummary"/></ScrollViewer><Button Content="Zapisz mimo ostrzeżenia identyfikatorów" Click="AcceptIdentifiersClick" IsEnabled="{Binding CanAcceptWarnings}" AutomationProperties.AutomationId="AcceptIdentifierWarning"/></StackPanel></Border>
           <Border IsVisible="{Binding HasConflict}" BorderBrush="#B77816" BorderThickness="1" Padding="10">
             <StackPanel Spacing="6"><TextBlock Text="Konflikt danych głównych — porównaj przed zapisem" FontWeight="SemiBold"/><Grid ColumnDefinitions="*,*"><TextBlock Text="{Binding LocalVersionSummary}" TextWrapping="Wrap"/><TextBlock Grid.Column="1" Text="{Binding ServerVersionSummary}" TextWrapping="Wrap" AutomationProperties.AutomationId="ConflictCurrent"/></Grid><WrapPanel><Button Content="Wczytaj wersję z serwera" Click="ReloadConflictClick" AutomationProperties.AutomationId="ReloadConflict"/><Button Content="Zachowaj moje pola" Click="KeepConflictClick" AutomationProperties.AutomationId="KeepConflict"/></WrapPanel></StackPanel>
           </Border>

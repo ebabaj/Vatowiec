@@ -13,6 +13,10 @@ public interface IVatowiecApiClient : IDisposable
     Task<ContractorResponse[]> Contractors(Guid companyId, string? search = null, string? country = null, bool? active = null, int offset = 0, int limit = 50);
     Task<ContractorResponse> Contractor(Guid companyId, int id);
     Task<ContractorResponse> SaveContractor(Guid companyId, ContractorWriteRequest value, bool isNew);
+    Task<IdentifierPreview> ValidateIdentifiers(Guid companyId, ContractorWriteRequest value) => Task.FromResult(new IdentifierPreview([], [], "", false));
+    Task<RegistryEnvironmentResponse> RegistryEnvironments(Guid companyId) => Task.FromResult(new RegistryEnvironmentResponse("Test", "Test", "Test"));
+    Task<VerificationResponse[]> Verifications(Guid companyId, int id, int offset = 0) => Task.FromResult<VerificationResponse[]>([]);
+    Task<VerificationResponse> Verify(Guid companyId, int id, VerificationRequest value) => throw new NotSupportedException();
     Task<DetailResponse[]> Details(Guid companyId, int contractorId, string kind, int offset = 0, int limit = 50) => Task.FromResult<DetailResponse[]>([]);
     Task<DetailResponse> Detail(Guid companyId, int contractorId, string kind, int id) => throw new NotSupportedException();
     Task<DetailResponse> SaveDetail(Guid companyId, int contractorId, string kind, DetailWriteRequest value, bool isNew) => throw new NotSupportedException();
@@ -80,6 +84,17 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
     }
 
     public Task<CompanyResponse[]> Companies() => Get<CompanyResponse[]>("api/v1/companies");
+    public Task<IdentifierPreview> ValidateIdentifiers(Guid companyId, ContractorWriteRequest value) => Post<IdentifierPreview>($"api/v1/companies/{companyId}/contractors/identifiers/validate", value);
+    public Task<RegistryEnvironmentResponse> RegistryEnvironments(Guid companyId) => Get<RegistryEnvironmentResponse>($"api/v1/companies/{companyId}/registry-environments");
+    public Task<VerificationResponse[]> Verifications(Guid companyId, int id, int offset = 0) => Get<VerificationResponse[]>($"api/v1/companies/{companyId}/contractors/{id}/verifications?offset={offset}&limit=51");
+    public Task<VerificationResponse> Verify(Guid companyId, int id, VerificationRequest value) => Post<VerificationResponse>($"api/v1/companies/{companyId}/contractors/{id}/verifications", value);
+    private async Task<T> Post<T>(string path, object value)
+    {
+        var csrf = await Get<CsrfResponse>("api/v1/auth/csrf");
+        using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = JsonContent.Create(value) };
+        request.Headers.Add("X-CSRF-TOKEN", csrf.Token);
+        return await Send<T>(request);
+    }
     public Task<CompanyProfileResponse> Profile(Guid companyId) => Get<CompanyProfileResponse>($"api/v1/companies/{companyId:D}/profile");
     public Task<ContractorResponse[]> Contractors(Guid companyId, string? search = null, string? country = null, bool? active = null, int offset = 0, int limit = 50)
     {

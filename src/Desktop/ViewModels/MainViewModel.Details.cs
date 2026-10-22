@@ -31,7 +31,8 @@ public sealed partial class MainViewModel
                 DetailRows = [];
                 detailOffset = 0;
                 ChangedAll();
-                if (tab > 0 && HasSavedContractor) _ = LoadDetails();
+                if (tab == 4 && HasSavedContractor) _ = LoadVerifications();
+                else if (tab > 0 && HasSavedContractor) _ = LoadDetails();
             }
             if (detailEditor?.IsDirty == true || !string.IsNullOrEmpty(NewAddressTypeName)) RequestDiscard(Switch);
             else Switch();
@@ -105,6 +106,7 @@ public sealed partial class MainViewModel
         ResetDetails();
         if (api is null || profile is null || editor is null) return;
         AddressTypes = await api.AddressTypes(profile.CompanyId);
+        registryEnvironment = await api.RegistryEnvironments(profile.CompanyId);
         if (editor.ParentId.HasValue)
         {
             var parent = await api.Contractor(profile.CompanyId, editor.ParentId.Value);
@@ -237,6 +239,7 @@ public sealed partial class MainViewModel
     private void ClearDetailDraft() { detailEditor = null; detailConflict = null; warningHash = null; warningMessage = ""; }
     private void ResetDetails()
     {
+        ResetVerifications();
         tab = 0;
         ClearDetailDraft();
         NewAddressTypeName = "";

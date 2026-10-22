@@ -1,11 +1,14 @@
 ﻿# Kompletna kartoteka kontrahentów w Avalonia
 
-Formularz ma cztery zakładki: **Dane główne, Adresy, Kontakty, Rachunki bankowe**.
+Podstawowe zakładki to **Dane główne, Adresy, Kontakty, Rachunki bankowe**;
+ADR-021 dodaje piątą: **Weryfikacje**.
 Korzysta wyłącznie z HTTPS API. Zachowane są logowanie, wybór firmy, uprawnienia,
 rowversion, izolacja fizycznych baz i atomowy audyt.
 Model biznesowy: [ADR-018](adr/ADR-018-docelowy-model-kontrahentow.md).
 Technika modelu: [ADR-019](adr/ADR-019-implementacja-modelu-kontrahentow.md).
 Bieżące API i formularz: [ADR-020](adr/ADR-020-kompletna-kartoteka-avalonia.md).
+Rozszerzenie: [identyfikatory i zakładka Weryfikacje](identifiers-and-registries.md),
+[ADR-021](adr/ADR-021-identyfikatory-i-rejestry-testowe.md).
 
 ## Uruchomienie
 
@@ -48,8 +51,9 @@ Konfiguracja i uprawnienia: [logowanie](authentication.md).
 
 Code, Name, CountryCode, IsActive i wybór nadrzędnego są edytowalne.
 Kod ma do 64 znaków, nazwa do 256, kraj dwie litery ASCII; kod jest unikalny
-w firmie. TaxId, VatEuId i KsefIdWew mają osobne etykiety i są tylko do odczytu.
-Program nie potwierdza poprawności tych numerów ani weryfikacji urzędowej.
+w firmie. TaxId, VatEuId i KsefIdWew mają osobne etykiety; od ADR-021 są edytowalne
+z podglądem normalizacji, regułami i świadomą akceptacją ostrzeżeń. Kontrola
+formatu/sumy nie potwierdza rejestracji. Ręczne rejestry są domyślnie TEST.
 Zmiana grupy nie kopiuje żadnych danych. Wskazanie siebie lub cyklu jest odrzucane.
 
 ## Adresy
@@ -160,7 +164,8 @@ wynik i nie dopisuje rekordu ani audytu. Inna treść zatwierdzonej operacji daj
 Wdrożono jawnie 20261022161054_WarningPermission w System oraz
 20261022161050_ContractorDetailAudit niezależnie w A i B. Poprzedziły je kopie
 COPY_ONLY/CHECKSUM i VERIFYONLY. Nie odtwarzano baz ani tabel biznesowych.
-API nie wykonuje migracji przy starcie. Uprawnienia operatora to A=15, B=3.
+API nie wykonuje migracji przy starcie. W etapie ADR-020 prawa operatora wynosiły
+A=15, B=3; ADR-021 rozszerza A do 31 o VerifyRegistries, B nadal ma 3.
 Nowe szczegóły nie zmieniają zatwierdzonych 14 kolumn adresów i 12 rachunków.
 
 ## Testy i granice
@@ -198,5 +203,6 @@ okno 940×650: widoczność zapisu, błąd przy pustej nazwie kontaktu i potwier
 porzucenia szkicu przy anulowaniu oraz zamykaniu okna. Nie przeprowadzono
 osobnej próby po zmianie skali DPI Windows ani na Linuksie.
 
-Nie wdrożono walidatorów podatkowych, TaxIdentifierSchemes, ExternalVerifications,
-VIES/białej listy, KSeF/GUS, faktur, księgowania ani CRM. M0 pozostaje nieukończone.
+Powyższe wyniki 142/142 i próba BC96C2 dokumentują wcześniejszy etap ADR-020.
+Aktualne reguły, wyniki i próby rejestrów opisuje [ADR-021](identifiers-and-registries.md).
+Nie wdrożono integracji KSeF, faktur, księgowania ani CRM. M0 pozostaje nieukończone.

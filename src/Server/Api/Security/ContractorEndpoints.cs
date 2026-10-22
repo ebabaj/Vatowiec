@@ -21,6 +21,7 @@ public static class ContractorEndpoints
         group.MapGet("/{contractorId:int}", Get);
         group.MapPost("", Create);
         group.MapPut("/{contractorId:int}", Update);
+        group.MapPost("/identifiers/validate", ValidateIdentifiers);
     }
 
     private static Task<AuthorizedCompanyDatabase> Resolve(Guid companyId, HttpContext context,
@@ -61,15 +62,26 @@ public static class ContractorEndpoints
     }
 
     private static Task<IResult> Create(Guid companyId, ContractorWriteRequest value, HttpContext context,
-        CompanyDatabaseResolver resolver, IWebHostEnvironment environment, IAntiforgery csrf, SystemDbContext system, TimeProvider clock) =>
-        Write(companyId, null, value, context, resolver, environment, csrf, system, clock);
+        CompanyDatabaseResolver resolver, IWebHostEnvironment environment, IAntiforgery csrf, SystemDbContext system, TimeProvider clock, IdentifierChecks identifiers) =>
+        Write(companyId, null, value, context, resolver, environment, csrf, system, clock, identifiers);
 
     private static Task<IResult> Update(Guid companyId, int contractorId, ContractorWriteRequest value, HttpContext context,
-        CompanyDatabaseResolver resolver, IWebHostEnvironment environment, IAntiforgery csrf, SystemDbContext system, TimeProvider clock) =>
-        Write(companyId, contractorId, value, context, resolver, environment, csrf, system, clock);
+        CompanyDatabaseResolver resolver, IWebHostEnvironment environment, IAntiforgery csrf, SystemDbContext system, TimeProvider clock, IdentifierChecks identifiers) =>
+        Write(companyId, contractorId, value, context, resolver, environment, csrf, system, clock, identifiers);
+
+    private static async Task<IResult> ValidateIdentifiers(Guid companyId, ContractorWriteRequest value, HttpContext context,
+        CompanyDatabaseResolver resolver, IWebHostEnvironment environment, IAntiforgery csrf, IdentifierChecks identifiers)
+    {
+        await using var db = await Resolve(companyId, context, resolver, environment, edit: true);
+        try { await csrf.ValidateRequestAsync(context); }
+        catch (AntiforgeryValidationException) { return Error(400, "csrf_invalid", "Nie udało się potwierdzić żądania."); }
+        var errors = ContractorValidation.Validate(value);
+        if (errors.Count > 0) return Results.Json(new { code = "validation_failed", errors }, statusCode: 400);
+        return Results.Ok(await identifiers.Check(db.Context, companyId, Guid.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!), value, context.RequestAborted));
+    }
 
     private static async Task<IResult> Write(Guid companyId, int? contractorId, ContractorWriteRequest value, HttpContext context,
-        CompanyDatabaseResolver resolver, IWebHostEnvironment environment, IAntiforgery csrf, SystemDbContext system, TimeProvider clock)
+        CompanyDatabaseResolver resolver, IWebHostEnvironment environment, IAntiforgery csrf, SystemDbContext system, TimeProvider clock, IdentifierChecks identifiers)
     {
         await using var db = await Resolve(companyId, context, resolver, environment, edit: true);
         try { await csrf.ValidateRequestAsync(context); }
@@ -97,8 +109,9 @@ public static class ContractorEndpoints
         if (issuer == Guid.Empty || string.IsNullOrWhiteSpace(actorName))
             return Error(503, "audit_identity_unavailable", "Brak identyfikacji wykonawcy lub instalacji. Zapis jest zablokowany.");
 
-        // Normalizacja wyłącznie strukturalna; nie oceniamy poprawności podatkowej.
-        var normalized = new Contractor(value.Code, value.Name, value.CountryCode, parentId: value.ParentId);
+        var initial = await identifiers.Check(db.Context, companyId, actor, value, context.RequestAborted);
+        var normalized = new Contractor(value.Code, value.Name, value.CountryCode,
+            initial.Checks[0].Normalized, initial.Checks[1].Normalized, initial.Checks[2].Normalized, value.ParentId);
         normalized.Update(value.Code, value.Name, value.CountryCode, value.IsActive);
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Snapshot(normalized))));
         await using var transaction = await db.Context.Database.BeginTransactionAsync(context.RequestAborted);
@@ -125,11 +138,23 @@ public static class ContractorEndpoints
                 before = Snapshot(row);
                 row.Update(value.Code, value.Name, value.CountryCode, value.IsActive);
                 row.SetParent(value.ParentId);
+                row.SetIdentifiers(normalized.TaxId, normalized.VatEuId, normalized.KsefIdWew);
             }
             else
             {
                 row = normalized;
                 db.Context.Contractors.Add(row);
+            }
+            // Pod tą samą blokadą co zapisy hierarchii i identyfikatorów: aktualne duplikaty/reguły.
+            var preview = await identifiers.Check(db.Context, companyId, actor, value, context.RequestAborted);
+            if (preview.Checks.Select(x => x.Normalized).SequenceEqual(initial.Checks.Select(x => x.Normalized)) == false)
+                return Error(409, "identifier_rules_changed", "Reguły zmieniły się podczas zapisu. Sprawdź identyfikatory ponownie.");
+            if (preview.NeedsWarning)
+            {
+                if (!value.AcceptWarning || value.WarningHash != preview.WarningHash)
+                    return Results.Json(new { code = "identifiers_warning", message = preview.ToString(), warningHash = preview.WarningHash, preview }, statusCode: 422);
+                if ((db.Permissions & CompanyPermission.AcceptWarnings) == 0)
+                    return Error(403, "warning_permission_denied", "Brak uprawnienia do świadomego zapisu mimo ostrzeżenia.");
             }
             if (row.ParentId.HasValue && !await db.Context.Contractors.AnyAsync(x => x.Id == row.ParentId, context.RequestAborted))
                 return Error(400, "invalid_parent", "Rekord nadrzędny nie istnieje w tej firmie.");
@@ -137,7 +162,8 @@ public static class ContractorEndpoints
             if (before == after) return Results.Ok(Response(row, companyId));
             await db.Context.SaveChangesAsync(context.RequestAborted); // Uzyskanie int IDENTITY i rowversion.
             db.Context.ContractorChanges.Add(new ContractorChange(row.Id, actor, issuer, actorName,
-                clock.GetUtcNow(), context.TraceIdentifier, before, after));
+                clock.GetUtcNow(), context.TraceIdentifier, before, after,
+                warningJson: preview.NeedsWarning ? JsonSerializer.Serialize(new { accepted = true, preview.WarningHash, preview.Checks, preview.Duplicates }) : null));
             if (!contractorId.HasValue)
                 db.Context.ContractorCreateOperations.Add(new ContractorCreateOperation(value.OperationId!.Value, actor, issuer,
                     hash, row.Id, JsonSerializer.Serialize(Response(row, companyId), new JsonSerializerOptions(JsonSerializerDefaults.Web))));

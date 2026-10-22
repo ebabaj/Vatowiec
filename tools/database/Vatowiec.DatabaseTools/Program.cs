@@ -1,6 +1,6 @@
 using Vatowiec.DatabaseTools;
 
-if (args.Length is < 1 or > 2 || (args.Length == 2 && args[0] != "verify-users") || args[0] is not ("inspect" or "initialize" or "prepare-tests" or "cleanup-tests" or "verify" or "test" or "seed-users" or "backup-system" or "migrate-system" or "migrate-contractors" or "verify-users"))
+if (args.Length is < 1 or > 2 || (args.Length == 2 && args[0] != "verify-users") || args[0] is not ("inspect" or "initialize" or "prepare-tests" or "cleanup-tests" or "verify" or "test" or "seed-users" or "backup-system" or "migrate-system" or "migrate-contractors" or "verify-users" or "probe-registries"))
 {
     Console.Error.WriteLine("Użycie: inspect | initialize | prepare-tests | cleanup-tests | verify | test | seed-users | backup-system | migrate-system | migrate-contractors | verify-users [https://localhost:7243]");
     return 2;
@@ -11,6 +11,7 @@ try
     await LocalDatabases.EnsureLocalServer();
     switch (args[0])
     {
+        case "probe-registries": await RegistryProbe.Run(); break;
         case "inspect": await LocalDatabases.Inspect(); break;
         case "initialize": await LocalDatabases.Initialize(); break;
         case "prepare-tests": await LocalDatabases.PrepareTests(); break;

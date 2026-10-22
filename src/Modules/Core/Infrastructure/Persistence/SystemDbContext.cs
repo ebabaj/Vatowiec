@@ -15,10 +15,25 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
     public DbSet<CompanyAccess> CompanyAccesses => Set<CompanyAccess>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<InstallationIdentity> InstallationIdentities => Set<InstallationIdentity>();
+    public DbSet<TaxIdentifierScheme> TaxIdentifierSchemes => Set<TaxIdentifierScheme>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<TaxIdentifierScheme>(b =>
+        {
+            b.ToTable("TaxIdentifierSchemes", "ref", t => t.HasCheckConstraint("CK_TaxIdentifierSchemes_Dates", "[ValidTo] IS NULL OR [ValidTo]>=[ValidFrom]"));
+            b.HasKey(x => x.Id);
+            b.Property(x => x.CountryCode).HasColumnType("char(2)");
+            b.Property(x => x.IdentifierType).HasMaxLength(16);
+            b.Property(x => x.VatPrefix).HasMaxLength(2);
+            b.Property(x => x.FormatPattern).HasMaxLength(512);
+            b.Property(x => x.AlgorithmKey).HasMaxLength(64);
+            b.Property(x => x.Version).HasMaxLength(32);
+            b.Property(x => x.SourceUrl).HasMaxLength(1024);
+            b.HasIndex(x => new { x.CountryCode, x.IdentifierType, x.Version }).IsUnique();
+            b.HasData(Vatowiec.Core.Application.TaxSchemeSeed.Rules());
+        });
         modelBuilder.Entity<InstallationIdentity>(entity =>
         {
             entity.ToTable("Installation", "security", table =>

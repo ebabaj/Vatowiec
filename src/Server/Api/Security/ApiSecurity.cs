@@ -52,6 +52,9 @@ public static class ApiSecurity
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = (int)HttpStatusCode.TooManyRequests;
+            options.AddPolicy("registries", context => RateLimitPartition.GetFixedWindowLimiter(
+                context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anonymous", _ => new FixedWindowRateLimiterOptions
+                { PermitLimit = 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             options.AddPolicy("login", context => RateLimitPartition.GetFixedWindowLimiter(
                 context.Connection.RemoteIpAddress?.ToString() ?? "local", _ => new FixedWindowRateLimiterOptions
                 {

@@ -43,7 +43,14 @@ public sealed class Contractor : ITrackedEntity
         ParentId = parentId;
     }
 
-    // Podstawowa kartoteka nie edytuje identyfikatorów do czasu wdrożenia ostrzeżeń.
+    public void SetIdentifiers(string? taxId, string? vatEuId, string? ksefIdWew)
+    {
+        var tax = EntityText.Optional(taxId, 100, nameof(taxId));
+        var vat = EntityText.Optional(vatEuId, 100, nameof(vatEuId));
+        var ksef = EntityText.Optional(ksefIdWew, 100, nameof(ksefIdWew));
+        TaxId = tax; VatEuId = vat; KsefIdWew = ksef;
+    }
+
     public void Update(string code, string name, string countryCode, bool isActive)
     {
         // Waliduj całość przed zmianą stanu encji.

@@ -1,13 +1,17 @@
 namespace Vatowiec.SharedContracts;
 
 public sealed record ContractorWriteRequest(int Id, string Code, string Name,
-    string CountryCode, bool IsActive, string? RowVersion = null, Guid? OperationId = null, int? ParentId = null);
+    string CountryCode, bool IsActive, string? RowVersion = null, Guid? OperationId = null, int? ParentId = null,
+    string? TaxId = null, string? VatEuId = null, string? KsefIdWew = null, bool AcceptWarning = false, string? WarningHash = null);
 
 public static class ContractorValidation
 {
     public static Dictionary<string, string[]> Validate(ContractorWriteRequest value)
     {
         var errors = new Dictionary<string, string[]>();
+        if (value.TaxId?.Length > 100) errors["TaxId"] = ["Najwyżej 100 znaków."];
+        if (value.VatEuId?.Length > 100) errors["VatEuId"] = ["Najwyżej 100 znaków."];
+        if (value.KsefIdWew?.Length > 100) errors["KsefIdWew"] = ["Najwyżej 100 znaków."];
         if (value.Id < 0) errors["Id"] = ["Nieprawidłowy identyfikator pozycji."];
         if (value.ParentId is <= 0 || (value.Id > 0 && value.ParentId == value.Id))
             errors["ParentId"] = ["Nieprawidłowy rekord nadrzędny."];

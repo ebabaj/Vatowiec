@@ -269,6 +269,14 @@ public sealed partial class DesktopTests
         public List<ContractorWriteRequest> Writes { get; } = [];
         public List<DetailWriteRequest> DetailWrites { get; } = [];
         public DetailResponse[] DetailData { get; set; } = [];
+        public VerificationResponse[] VerificationData { get; set; } = [];
+        public VerificationResponse? VerificationResult { get; set; }
+        public Task<VerificationResponse[]> Verifications(Guid companyId, int id, int offset = 0) => Task.FromResult(VerificationData);
+        public Task<VerificationResponse> Verify(Guid companyId, int id, VerificationRequest value)
+        {
+            var result = VerificationResult ?? throw new InvalidOperationException();
+            VerificationData = [result, .. VerificationData]; return Task.FromResult(result);
+        }
         public Task<DetailResponse[]> Details(Guid companyId, int contractorId, string kind, int offset = 0, int limit = 50) => Task.FromResult(DetailData);
         public Task<DetailResponse> Detail(Guid companyId, int contractorId, string kind, int id) => Task.FromResult(DetailData.Single(x => x.Id == id));
         public Task<DetailResponse> SaveDetail(Guid companyId, int contractorId, string kind, DetailWriteRequest value, bool isNew)

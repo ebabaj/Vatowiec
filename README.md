@@ -5,16 +5,21 @@ Projekt wielostanowiskowej aplikacji dla polskich mikrofirm. Obecny stan to
 wybór firmy, dodawanie/edycja z audytem i konfliktami oraz wyszukiwanie po stronie serwera.
 Osobne SystemDbContext i CompanyDbContext, trzy bazy SQL
 Server oraz dwie fikcyjne firmy. Działają Identity, sesje API i autoryzowany resolver
-bazy firmy. Pełny zestaw obejmuje 142 testy, w tym 67 z SQL/API.
+bazy firmy. Pełny zestaw obejmuje 180 testów, w tym 76 z SQL/API.
 Nie jest to jeszcze program do prowadzenia księgowości.
 
-**Aktualny etap: kompletna kartoteka kontrahentów w Avalonia.** Jeden formularz
+**Aktualny etap: identyfikatory i rejestry TEST (ADR-021).** Jeden formularz
 ma Dane główne, Adresy, Kontakty i Rachunki bankowe. Można wybierać grupę,
 dodawać rodzaje adresów, edytować szczegóły i atomowo zmieniać preferencje.
-TaxId/VatEuId/KsefIdWew są osobnymi polami tylko do odczytu. Nietypowy zapis
+TaxId/VatEuId/KsefIdWew są edytowalne z normalizacją, wersjonowanymi regułami
+i świadomą akceptacją ostrzeżeń. Zakładka Weryfikacje obejmuje ręczne MF/WL2,
+VIES i GUS, z historią środowiska i bez automatycznego nadpisywania danych.
+Domyślnie Test; TEST/MOCK nie stanowią produkcyjnego potwierdzenia urzędowego.
+[Konfiguracja, algorytmy i instrukcja](docs/identifiers-and-registries.md).
+Nietypowy zapis
 rachunku wymaga świadomej, audytowanej akceptacji przez uprawnioną osobę;
-nie oznacza to weryfikacji numeru. Szczegóły: [ADR-020](docs/adr/ADR-020-kompletna-kartoteka-avalonia.md).
-Bazy i tabele biznesowe zachowano; wykonano tylko jawne migracje techniczne.
+nie oznacza to weryfikacji numeru. Bazy i kartoteki zachowano; jawnie dodano
+słownik reguł w System i historię weryfikacji w każdej bazie firmy, po backupach.
 
 Wymagania produktu: [SPECYFIKACJA.md](SPECYFIKACJA.md).
 Architektura i granice modułów: [ADR-013](docs/adr/ADR-013-architektura-modularnego-monolitu.md).
@@ -195,7 +200,7 @@ Testy offline weryfikują rozłączne modele, lokalny profil/FK, historie i SQL
 migracji, zgodność snapshotów, odmowę bez wyboru bazy, izolację scope,
 politykę połączeń, filtry, kontrolę zapisu i host API.
 
-Powyższy przebieg bez SQL zalicza 75 testów i pomija 67 testów SQL/API. Pełny przebieg:
+Powyższy przebieg bez SQL zalicza 104 testy i pomija 76 testów SQL/API. Pełny przebieg:
 
 ```powershell
 dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- test
@@ -206,7 +211,7 @@ wyłącznie Vatowiec_System i Vatowiec_Company_A_Dev/B_Dev. **Przed testem zatrz
 API i desktop; bieżące fikcyjne dane i sesje zostaną usunięte.** Po pełnym
 przebiegu inicjalizuje konta i dane demonstracyjne z lokalnej konfiguracji.
 Nie odtwarza baz ani tabel, nie tworzy dodatkowych *_Test i nie modyfikuje innych baz. Pełny wynik:
-**142/142**, bez pominięć (67 SQL/API, 75 bez SQL). Raport TRX: TestResults.
+**180/180**, bez pominięć (76 SQL/API, 104 bez SQL). Raport TRX: TestResults.
 Flagi SQL i dodatkową zgodę na przygotowane fixture ustawia runner;
 [instrukcja testów](docs/database-per-company.md#testy). Pominięcie nie jest zaliczeniem.
 

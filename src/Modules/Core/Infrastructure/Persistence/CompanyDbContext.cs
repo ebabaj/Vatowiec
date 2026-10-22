@@ -18,6 +18,7 @@ public sealed class CompanyDbContext(
     public DbSet<ContractorBankAccount> ContractorBankAccounts => Set<ContractorBankAccount>();
     public DbSet<ContractorContact> ContractorContacts => Set<ContractorContact>();
     public DbSet<ContractorCreateOperation> ContractorCreateOperations => Set<ContractorCreateOperation>();
+    public DbSet<ExternalVerification> ExternalVerifications => Set<ExternalVerification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -29,6 +30,9 @@ public sealed class CompanyDbContext(
         modelBuilder.ApplyConfiguration(new ContractorBankAccountConfiguration());
         modelBuilder.ApplyConfiguration(new ContractorContactConfiguration());
         modelBuilder.ApplyConfiguration(new ContractorCreateOperationConfiguration());
+        modelBuilder.ApplyConfiguration(new ExternalVerificationConfiguration());
+        modelBuilder.Entity<ExternalVerification>().HasQueryFilter(x =>
+            CurrentCompanyId != null && CompanyProfiles.Any(p => p.CompanyId == CurrentCompanyId));
         modelBuilder.Entity<ContractorChange>().HasQueryFilter(x =>
             CurrentCompanyId != null && CompanyProfiles.Any(p => p.CompanyId == CurrentCompanyId));
         modelBuilder.Entity<CompanyProfile>().HasQueryFilter(x =>
@@ -65,6 +69,8 @@ public sealed class CompanyDbContext(
     private void PrepareChanges()
     {
         ChangeTracker.DetectChanges();
+        if (ChangeTracker.Entries<ExternalVerification>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Historia weryfikacji zewnętrznych jest niezmienna.");
         if (ChangeTracker.Entries<ContractorChange>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("Historia kontrahenta jest niezmienna.");
         if (ChangeTracker.Entries<ContractorCreateOperation>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))

@@ -14,7 +14,8 @@ public sealed partial class AuthenticationIntegrationTests
     private ContractorWriteRequest NewContractor(string code = "NEW") => new(0, code, "Fikcyjny kontrahent", "pl", true, OperationId: Guid.NewGuid());
     private string ContractorsPath(Guid? company = null) => $"/api/v1/companies/{company ?? companyA}/contractors";
     private static ContractorWriteRequest Edit(ContractorResponse value, string name, bool active = true) =>
-        new(value.Id, value.Code, name, value.CountryCode, active, value.RowVersion, ParentId: value.ParentId);
+        new(value.Id, value.Code, name, value.CountryCode, active, value.RowVersion, ParentId: value.ParentId,
+            TaxId: value.TaxId, VatEuId: value.VatEuId, KsefIdWew: value.KsefIdWew);
     private Task<ContractorResponse?> Read(HttpClient client, int id) => client.GetFromJsonAsync<ContractorResponse>($"{ContractorsPath()}/{id}");
     private async Task GrantReaderEdit()
     {

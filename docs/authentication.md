@@ -10,13 +10,16 @@ Nie ma operacji księgowych ani provisioningu firm.
 
 | Konto | Rola Identity | Firma A | Firma B |
 |---|---|---|---|
-| operator.m0 | Operator | ViewProfile, ViewContractors, EditContractors, AcceptWarnings | ViewProfile, ViewContractors |
+| operator.m0 | Operator | ViewProfile, ViewContractors, EditContractors, AcceptWarnings, VerifyRegistries | ViewProfile, ViewContractors |
 | czytelnik.m0 | Reader | ViewProfile | brak dostępu |
 
 EditContractors od etapu ADR-017 pozwala na dodawanie i edycję z CSRF i rowversion;
 zapis wymaga także ViewContractors. Instrukcja: [kartoteka](contractors.md).
 AcceptWarnings od ADR-020 pozwala świadomie potwierdzić ostrzeżenie podstawowej
 kontroli rachunku, z audytem i zgodnym hashem; samo EditContractors nie wystarcza.
+ADR-021 rozszerza ten sam mechanizm o identyfikatory; VerifyRegistries (16)
+jest osobnym prawem do ręcznego sprawdzania rejestrów z CSRF. W B operator nie
+może ich inicjować. Środowiska i konfiguracja: [rejestry](identifiers-and-registries.md).
 Rola Identity nie daje dostępu do firmy bez przypisania CompanyAccess.
 
 Firma A: aaaaaaaa-0000-4000-8000-000000000001, Vatowiec_Company_A_Dev.
@@ -144,7 +147,9 @@ wyłącznie kontrakty API i cookie sesji, nigdy połączenie SQL.
 Przed wdrożeniem przejrzano obj/identity.sql, wykonano kopię Vatowiec_System
 COPY_ONLY z CHECKSUM i RESTORE VERIFYONLY. Migracja
 20261021114324_IdentityAndCompanyAccess dodaje dziewięć tabel security i nie
-zmienia tabel firmowych. System ma teraz dwa wpisy historii EF; bazy firmowe po jednym.
+zmienia tabel firmowych. W tym historycznym etapie System miał dwa wpisy historii
+EF, bazy firmowe po jednym. Po ADR-021 mają odpowiednio pięć i po trzy wpisy;
+aktualny stan: [bazy](database-per-company.md).
 Down usuwa konta, uprawnienia i sesje, więc nie należy go używać jako rollbacku z danymi.
 
 Powtarzalne polecenia administracyjne:
@@ -173,8 +178,8 @@ Weryfikują sesje, CSRF, role/przypisania, zmianę uprawnień i SecurityStamp, p
 bazę i obcy profil, manipulację CompanyId, wygasły bilet i sesję SQL, replay po
 logout oraz dwóch równoległych użytkowników firmy A. Wygaśnięcie sprawdzane jest
 przez testowy TimeProvider, bez czekania i bez publicznego endpointu zegara.
-Raporty TRX są w ignorowanym TestResults. Bieżący wynik to 142/142 bez pominięć
-(67 SQL/API i 75 bez SQL); szczegóły: [kartoteka](contractors.md).
+Raporty TRX są w ignorowanym TestResults. Bieżący wynik to 180/180 bez pominięć
+(76 SQL/API i 104 bez SQL); szczegóły: [kartoteka](contractors.md).
 Audyt księgowy, backup/restore z aplikacji i pełne M0
 nadal wymagają kolejnych etapów.
 

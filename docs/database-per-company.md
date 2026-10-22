@@ -1,4 +1,4 @@
-# Lokalne bazy database-per-company — ADR-018/019/020
+# Lokalne bazy database-per-company — ADR-018/019/020/021
 
 Wdrożenie używa localhost\SQLEXPRESS, SQL Server 2025 Express i Windows
 Authentication. Wszystkie dane demonstracyjne są fikcyjne i odtwarzalne.
@@ -8,15 +8,16 @@ Decyzje: [ADR-014](adr/ADR-014-database-per-company.md),
 
 ## Bazy i tabele
 
-Vatowiec_System zawiera 13 tabel:
+Vatowiec_System zawiera 14 tabel:
 
 - core.Companies, core.CompanyDatabases;
 - security.Users, security.Roles, security.UserRoles, security.UserClaims,
   security.UserLogins, security.UserTokens, security.RoleClaims;
 - security.CompanyAccess, security.UserSessions, security.Installation;
+- ref.TaxIdentifierSchemes (wersjonowane reguły, bez danych kontrahentów);
 - dbo.__EFMigrationsHistory.
 
-Każda z Vatowiec_Company_A_Dev i Vatowiec_Company_B_Dev zawiera 9 tabel:
+Każda z Vatowiec_Company_A_Dev i Vatowiec_Company_B_Dev zawiera 10 tabel:
 
 - core.CompanyProfile;
 - core.Contractors;
@@ -26,6 +27,7 @@ Każda z Vatowiec_Company_A_Dev i Vatowiec_Company_B_Dev zawiera 9 tabel:
 - core.ContractorCreateOperations;
 - ref.AddressTypes;
 - audit.ContractorChanges;
+- audit.ExternalVerifications (niezmienne wejście/wynik, środowisko i trwały aktor);
 - dbo.__EFMigrationsHistory.
 
 Contractors.Id i klucze szczegółów są int IDENTITY, lokalne dla fizycznej bazy.
@@ -34,7 +36,8 @@ jako tożsamość bazy, a centralny katalog, dostęp i ścieżki API zachowują 
 Resolver sprawdza uprawnienia, rzeczywisty profil i historię migracji przed
 udostępnieniem danych; brak zgodności oznacza odmowę, bez domyślnej bazy.
 AddressTypes jest otwartym lokalnym słownikiem dwóch początkowych rodzajów.
-Nie wdrożono TaxIdentifierSchemes ani ExternalVerifications.
+ADR-021 wdraża TaxIdentifierSchemes w System oraz ExternalVerifications w firmach.
+Słownik centralny nie zawiera kartotek ani wyników sprawdzeń.
 
 ## Migracje i odtworzenie demonstratora
 
@@ -43,9 +46,13 @@ Historia SystemDbContext pozostaje zestawem:
 - 20261021102909_InitialSystem;
 - 20261021114324_IdentityAndCompanyAccess;
 - 20261022055958_InstallationIdentity;
-- 20261022161054_WarningPermission.
+- 20261022161054_WarningPermission;
+- 20261022175431_TaxIdentifierRules.
 
 CompanyDbContext ma migrację inicjalną 20261022143310_CompanyModelV2 i techniczną 20261022161050_ContractorDetailAudit. Ta druga rozszerza istniejący audyt i operacje tworzenia; nie dodaje tabel biznesowych.
+20261022175433_ExternalVerifications dodaje historię z triggerem blokującym UPDATE/DELETE.
+Wszystkie trzy bazy zaktualizowano jawnie po zweryfikowanych backupach, bez ich
+odtwarzania. Down usuwa historię/reguły i nie jest bezpiecznym wycofaniem z danymi.
 Poprzednie migracje firmy i snapshot (.cs.archive) są w LegacyCompanyMigrations, wyłączone
 z kompilacji. Archiwum Vatowiec_Dev pozostaje w LegacyMigrations.
 Nie przenosimy danych, nie mapujemy GUID na int i nie uruchamiamy nowej migracji
@@ -75,7 +82,9 @@ dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- verify
 initialize inicjalizuje aktualny pusty demonstrator i brakujące fikcyjne rekordy;
 seed-users odczytuje hasła z user-secrets API lub środowiska. Nie wpisuj haseł
 w polecenia przechowywane w repozytorium. Szczegóły: [konta](authentication.md).
-Polecenie migrate-contractors aktualizuje model ADR-019 o audyt szczegółów i uprawnienie ostrzeżeń; nie konwertuje dawnego schematu GUID na int:
+Polecenie migrate-contractors aktualizuje model ADR-019 o ADR-020/021: audyt
+szczegółów, prawa ostrzeżeń/rejestrów, słownik reguł i historię weryfikacji.
+Nie konwertuje dawnego schematu GUID na int:
 stara historia jest odrzucana. Czyszczenie danych testowych opisane niżej jest przeznaczone
 wyłącznie dla jawnie dozwolonych baz demonstracyjnych, nigdy produkcyjnych.
 
@@ -103,7 +112,7 @@ technicznie, nie oznaczają tworzenia baz o sufiksie _Test. Nie ustawiaj tych
 flag na używanym demonstratorze bez jawnego przygotowania pustych fixture.
 Bez runnera testy SQL są pomijane, nie zaliczane.
 
-Pełny wynik: **142/142**, bez pominięć (67 SQL/API, 75 bez SQL). Testy sprawdzają
+Pełny wynik: **180/180**, bez pominięć (76 SQL/API, 104 bez SQL). Testy sprawdzają
 również wszystkie kolumny/typy adresów i rachunków, klucze i zaufane FK,
 trigger hierarchii, domyślność PLN/EUR/NULL, niezależne historie migracji,
 odmowę obcego profilu, rowversion, atomowy audyt oraz trwałe ponowienia.

@@ -42,6 +42,7 @@ public sealed partial class MainViewModel
     {
         if (busy || !CanEditContractors || IsEditing) return;
         editor = new ContractorEditor();
+        ObserveIdentifierEdits();
         conflictCurrent = null;
         message = "";
         ChangedAll();
@@ -54,11 +55,14 @@ public sealed partial class MainViewModel
         var row = await api.Contractor(profile.CompanyId, selectedContractor.Id);
         CheckContractorCompany(row);
         editor = new ContractorEditor(row);
+        ObserveIdentifierEdits();
         conflictCurrent = null;
         await LoadFormContext();
     });
 
-    public Task SaveContractor() => Run(async () =>
+    public Task SaveContractor() => SaveContractorWithWarning(false);
+    public Task AcceptIdentifierWarning() => SaveContractorWithWarning(true);
+    private Task SaveContractorWithWarning(bool accept) => Run(async () =>
     {
         if (!CanSaveContractor || api is null || profile is null || editor is null) return;
         var value = editor.Request();
@@ -67,6 +71,16 @@ public sealed partial class MainViewModel
         if (errors.Count != 0) throw new ArgumentException(string.Join(Environment.NewLine, errors.Values.SelectMany(x => x)));
         try
         {
+            var previousHash = identifierPreview?.WarningHash;
+            identifierPreview = await api.ValidateIdentifiers(profile.CompanyId, value);
+            var changed = ApplyIdentifierPreview(identifierPreview);
+            if (identifierPreview.NeedsWarning && (!accept || previousHash != identifierPreview.WarningHash))
+            {
+                message = "Sprawdź ostrzeżenia przy identyfikatorach. Świadomy zapis wymaga osobnego potwierdzenia.";
+                return;
+            }
+            if (changed && !accept) { message = "Pokazano znormalizowane identyfikatory. Sprawdź postać i ponownie wybierz Zapisz."; return; }
+            value = editor.Request() with { AcceptWarning = accept, WarningHash = accept ? previousHash : null };
             var saved = await api.SaveContractor(profile.CompanyId, value, editor.IsNew);
             CheckContractorCompany(saved);
             editor = null;
@@ -102,13 +116,19 @@ public sealed partial class MainViewModel
             editor?.SetErrors(ex.Errors);
             message = ex.Message;
         }
+        catch (ApiException ex) when (ex.Code == "identifiers_warning" && editor is not null)
+        {
+            identifierPreview = await api.ValidateIdentifiers(profile.CompanyId, editor.Request());
+            ApplyIdentifierPreview(identifierPreview);
+            message = "Ostrzeżenia lub duplikaty zmieniły się. Przejrzyj je przed potwierdzeniem.";
+        }
     });
 
     public void ResolveConflict(bool keepLocal)
     {
         if (busy || editor is null || conflictCurrent is null) return;
         if (keepLocal) editor.RowVersion = conflictCurrent.RowVersion;
-        else { editor = new ContractorEditor(conflictCurrent); ParentLabel = conflictParentLabel; }
+        else { editor = new ContractorEditor(conflictCurrent); ObserveIdentifierEdits(); ParentLabel = conflictParentLabel; }
         conflictCurrent = null;
         message = keepLocal ? "Zachowano Twoje pola. Sprawdź je i ponownie kliknij Zapisz, aby zastąpić porównaną wersję."
             : "Wczytano wersję z serwera. Twoje poprzednie zmiany zostały odrzucone.";
@@ -175,30 +195,42 @@ public sealed class ContractorEditor : System.ComponentModel.INotifyPropertyChan
     public int? ParentId { get; set; }
     public string Code { get; set; } = "";
     public string Name { get; set; } = "";
-    public string TaxId { get; } = "";
-    public string VatEuId { get; } = "";
-    public string KsefIdWew { get; } = "";
-    public string CountryCode { get; set; } = "PL";
+    private string taxId = "", vatEuId = "", ksefIdWew = "";
+    public string TaxId { get => taxId; set { taxId = value; PropertyChanged?.Invoke(this, new(nameof(TaxId))); } }
+    public string VatEuId { get => vatEuId; set { vatEuId = value; PropertyChanged?.Invoke(this, new(nameof(VatEuId))); } }
+    public string KsefIdWew { get => ksefIdWew; set { ksefIdWew = value; PropertyChanged?.Invoke(this, new(nameof(KsefIdWew))); } }
+    private string countryCode = "PL";
+    public string CountryCode { get => countryCode; set { countryCode = value; PropertyChanged?.Invoke(this, new(nameof(CountryCode))); } }
     public bool IsActive { get; set; } = true;
     public bool IsNew { get; } = true;
     public string? RowVersion { get; set; }
     private string? original;
-    public bool IsDirty => original is null ? Code.Length != 0 || Name.Length != 0 || ParentId.HasValue || CountryCode != "PL" || !IsActive
+    public bool IsDirty => original is null ? Code.Length != 0 || Name.Length != 0 || TaxId.Length != 0 || VatEuId.Length != 0 || KsefIdWew.Length != 0 || ParentId.HasValue || CountryCode != "PL" || !IsActive
         : original != System.Text.Json.JsonSerializer.Serialize(Request());
     public string CodeError { get; private set; } = "";
     public string NameError { get; private set; } = "";
     public string CountryError { get; private set; } = "";
     public string ParentError { get; private set; } = "";
+    public string TaxIdError { get; private set; } = "";
+    public string VatEuIdError { get; private set; } = "";
+    public string KsefIdWewError { get; private set; } = "";
     public void SetErrors(Dictionary<string, string[]> errors)
     {
         CodeError = errors.TryGetValue("Code", out var code) ? string.Join(" ", code) : "";
         NameError = errors.TryGetValue("Name", out var name) ? string.Join(" ", name) : "";
         CountryError = errors.TryGetValue("CountryCode", out var country) ? string.Join(" ", country) : "";
         ParentError = errors.TryGetValue("ParentId", out var parent) ? string.Join(" ", parent) : "";
+        TaxIdError = errors.TryGetValue("TaxId", out var tax) ? string.Join(" ", tax) : "";
+        VatEuIdError = errors.TryGetValue("VatEuId", out var vat) ? string.Join(" ", vat) : "";
+        KsefIdWewError = errors.TryGetValue("KsefIdWew", out var ksef) ? string.Join(" ", ksef) : "";
+        PropertyChanged?.Invoke(this, new(nameof(TaxIdError)));
+        PropertyChanged?.Invoke(this, new(nameof(VatEuIdError)));
+        PropertyChanged?.Invoke(this, new(nameof(KsefIdWewError)));
         PropertyChanged?.Invoke(this, new(nameof(CodeError)));
         PropertyChanged?.Invoke(this, new(nameof(NameError)));
         PropertyChanged?.Invoke(this, new(nameof(CountryError)));
         PropertyChanged?.Invoke(this, new(nameof(ParentError)));
     }
-    public ContractorWriteRequest Request() => new(Id, Code, Name, CountryCode, IsActive, RowVersion, IsNew ? OperationId : null, ParentId);
+    public void SetImportedName(string name) { Name = name; PropertyChanged?.Invoke(this, new(nameof(Name))); }
+    public ContractorWriteRequest Request() => new(Id, Code, Name, CountryCode, IsActive, RowVersion, IsNew ? OperationId : null, ParentId, TaxId, VatEuId, KsefIdWew);
 }

@@ -189,12 +189,15 @@ public sealed partial class AuthenticationIntegrationTests
         Assert.Equal(2, await db.Contractors.CountAsync(x => x.TaxId == "TEST-TAX" && x.VatEuId == "TEST-VAT"));
         using var op = await Login("operator.test");
         await Csrf(op);
-        // Nowe identyfikatory nie są polami zapisu podstawowej kartoteki.
+        // Nieznane pola starego modelu są nadal odrzucane.
         using var write = await op.PostAsJsonAsync(ContractorsPath(), new
-        { id = 0, code = "DENIED", name = "Fikcyjny", countryCode = "PL", isActive = true, operationId = Guid.NewGuid(), taxId = "TEST" });
+        { id = 0, code = "DENIED", name = "Fikcyjny", countryCode = "PL", isActive = true, operationId = Guid.NewGuid(), taxIdentifier = "TEST" });
         Assert.Equal(HttpStatusCode.BadRequest, write.StatusCode);
         var current = (await Read(op, parent.Id))!;
-        Assert.Equal(HttpStatusCode.OK, (await op.PutAsJsonAsync($"{ContractorsPath()}/{parent.Id}", Edit(current, "Fikcyjna edycja bez podatków"))).StatusCode);
+        await GrantRegistryRights();
+        var edit = Edit(current, "Fikcyjna edycja z zachowaniem identyfikatorów");
+        var preview = await Preview(op, edit);
+        Assert.Equal(HttpStatusCode.OK, (await op.PutAsJsonAsync($"{ContractorsPath()}/{parent.Id}", edit with { AcceptWarning = true, WarningHash = preview.WarningHash })).StatusCode);
         Assert.Equal("TEST-TAX", (await Read(op, parent.Id))!.TaxId);
     }
 
@@ -306,7 +309,7 @@ public sealed partial class AuthenticationIntegrationTests
         }, columns["core.ContractorBankAccounts"]);
         foreach (var table in columns.Where(x => x.Key != "core.CompanyProfile")) Assert.DoesNotContain(table.Value, x => x.Name == "CompanyId");
         Assert.DoesNotContain("ref.TaxIdentifierSchemes", columns.Keys);
-        Assert.DoesNotContain("audit.ExternalVerifications", columns.Keys);
+        Assert.Contains("audit.ExternalVerifications", columns.Keys);
         command.CommandText = "SELECT COUNT(*) FROM sys.triggers WHERE name='TR_Contractors_Hierarchy' AND is_disabled=0;";
         Assert.Equal(1, Convert.ToInt32(await command.ExecuteScalarAsync()));
         command.CommandText = "SELECT filter_definition FROM sys.indexes WHERE object_id=OBJECT_ID('core.ContractorBankAccounts') AND is_unique=1 AND has_filter=1;";

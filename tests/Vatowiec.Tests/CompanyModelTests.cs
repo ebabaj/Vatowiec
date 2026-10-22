@@ -39,8 +39,11 @@ public sealed class CompanyModelTests
         Assert.Null(system.Model.FindEntityType(typeof(Contractor)));
         Assert.Null(system.Model.FindEntityType(typeof(CompanyProfile)));
         Assert.Null(system.Model.FindEntityType(typeof(ContractorChange)));
+        Assert.NotNull(system.Model.FindEntityType(typeof(TaxIdentifierScheme)));
+        Assert.Null(system.Model.FindEntityType(typeof(ExternalVerification)));
+        Assert.Null(company.Model.FindEntityType(typeof(TaxIdentifierScheme)));
         Assert.Equal(new[] { typeof(AddressType), typeof(CompanyProfile), typeof(Contractor), typeof(ContractorAddress),
-                typeof(ContractorBankAccount), typeof(ContractorChange), typeof(ContractorContact), typeof(ContractorCreateOperation) },
+                typeof(ContractorBankAccount), typeof(ContractorChange), typeof(ContractorContact), typeof(ContractorCreateOperation), typeof(ExternalVerification) },
             company.Model.GetEntityTypes().Select(x => x.ClrType).OrderBy(x => x.Name));
         var contractor = company.Model.FindEntityType(typeof(Contractor))!;
         Assert.Equal(typeof(Contractor), Assert.Single(contractor.GetForeignKeys()).PrincipalEntityType.ClrType);
@@ -92,10 +95,10 @@ public sealed class CompanyModelTests
     {
         using var system = new SystemDbContextFactory().CreateDbContext([]);
         using var company = new CompanyDbContextFactory().CreateDbContext([]);
-        Assert.Equal(4, system.Database.GetMigrations().Count());
-        Assert.EndsWith("_WarningPermission", system.Database.GetMigrations().Last());
-        Assert.Equal(2, company.Database.GetMigrations().Count());
-        Assert.EndsWith("_ContractorDetailAudit", company.Database.GetMigrations().Last());
+        Assert.Equal(5, system.Database.GetMigrations().Count());
+        Assert.EndsWith("_TaxIdentifierRules", system.Database.GetMigrations().Last());
+        Assert.Equal(3, company.Database.GetMigrations().Count());
+        Assert.EndsWith("_ExternalVerifications", company.Database.GetMigrations().Last());
         Assert.False(system.Database.HasPendingModelChanges());
         Assert.False(company.Database.HasPendingModelChanges());
         Assert.NotEqual(system.GetService<IMigrationsAssembly>().ModelSnapshot!.GetType(),

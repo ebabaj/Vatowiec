@@ -223,7 +223,7 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
 
                     b.ToTable("CompanyAccess", "security", t =>
                         {
-                            t.HasCheckConstraint("CK_CompanyAccess_Permissions", "[Permissions] > 0 AND [Permissions] <= 15");
+                            t.HasCheckConstraint("CK_CompanyAccess_Permissions", "[Permissions] > 0 AND [Permissions] <= 31");
                         });
                 });
 
@@ -288,6 +288,445 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                     b.ToTable("Installation", "security", t =>
                         {
                             t.HasCheckConstraint("CK_Installation_Singleton", "[SingletonKey] = 1 AND [Id] <> '00000000-0000-0000-0000-000000000000'");
+                        });
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.TaxIdentifierScheme", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AlgorithmKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("CountryCode")
+                        .IsRequired()
+                        .HasColumnType("char(2)");
+
+                    b.Property<string>("FormatPattern")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<string>("IdentifierType")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("SourceUrl")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
+
+                    b.Property<DateOnly>("ValidFrom")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("ValidTo")
+                        .HasColumnType("date");
+
+                    b.Property<string>("VatPrefix")
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CountryCode", "IdentifierType", "Version")
+                        .IsUnique();
+
+                    b.ToTable("TaxIdentifierSchemes", "ref", t =>
+                        {
+                            t.HasCheckConstraint("CK_TaxIdentifierSchemes_Dates", "[ValidTo] IS NULL OR [ValidTo]>=[ValidFrom]");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "AT",
+                            FormatPattern = "^ATU[0-9]{8}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "AT",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "BE",
+                            FormatPattern = "^BE[0-9]{10}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "BE",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "BG",
+                            FormatPattern = "^BG[0-9]{9,10}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "BG",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "HR",
+                            FormatPattern = "^HR[0-9]{11}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "HR",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "CY",
+                            FormatPattern = "^CY[0-9]{8}[A-Z]$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "CY",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "CZ",
+                            FormatPattern = "^CZ[0-9]{8,10}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "CZ",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "DK",
+                            FormatPattern = "^DK[0-9]{8}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "DK",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 8,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "EE",
+                            FormatPattern = "^EE[0-9]{9}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "EE",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 9,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "FI",
+                            FormatPattern = "^FI[0-9]{8}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "FI",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 10,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "FR",
+                            FormatPattern = "^FR[A-Z0-9]{2}[0-9]{9}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "FR",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 11,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "DE",
+                            FormatPattern = "^DE[0-9]{9}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "DE",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 12,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "GR",
+                            FormatPattern = "^EL[0-9]{9}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "EL",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 13,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "HU",
+                            FormatPattern = "^HU[0-9]{8}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "HU",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 14,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "IE",
+                            FormatPattern = "^IE([0-9][A-Z0-9+*][0-9]{5}[A-Z]|[0-9]{7}[A-Z]{1,2})$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "IE",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 15,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "IT",
+                            FormatPattern = "^IT[0-9]{11}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "IT",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 16,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "LV",
+                            FormatPattern = "^LV[0-9]{11}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "LV",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 17,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "LT",
+                            FormatPattern = "^LT([0-9]{9}|[0-9]{12})$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "LT",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 18,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "LU",
+                            FormatPattern = "^LU[0-9]{8}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "LU",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 19,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "MT",
+                            FormatPattern = "^MT[0-9]{8}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "MT",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 20,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "NL",
+                            FormatPattern = "^NL[0-9]{9}B[0-9]{2}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "NL",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 21,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "PT",
+                            FormatPattern = "^PT[0-9]{9}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "PT",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 22,
+                            AlgorithmKey = "pl-nip-mod11-v1",
+                            CountryCode = "PL",
+                            FormatPattern = "^PL[0-9]{10}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "PL",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 23,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "RO",
+                            FormatPattern = "^RO[0-9]{2,10}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "RO",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 24,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "SE",
+                            FormatPattern = "^SE[0-9]{10}01$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "SE",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 25,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "SK",
+                            FormatPattern = "^SK[0-9]{10}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "SK",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 26,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "SI",
+                            FormatPattern = "^SI[0-9]{8}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "SI",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 27,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "ES",
+                            FormatPattern = "^ES([A-Z][0-9]{7}[A-Z0-9]|[0-9]{8}[A-Z])$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "ES",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 28,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "GB",
+                            FormatPattern = "^XI([0-9]{9}|[0-9]{12}|(GD|HA)[0-9]{3})$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            VatPrefix = "XI",
+                            Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 29,
+                            AlgorithmKey = "pl-nip-mod11-v1",
+                            CountryCode = "PL",
+                            FormatPattern = "^[0-9]{10}$",
+                            IdentifierType = "TaxId",
+                            IsActive = true,
+                            SourceUrl = "https://github.com/CIRFMF/ksef-client-csharp/blob/main/KSeF.Client.Tests.Utils/MiscellaneousUtils.cs",
+                            ValidFrom = new DateOnly(2026, 10, 22),
+                            Version = "2026-10-22.1"
                         });
                 });
 

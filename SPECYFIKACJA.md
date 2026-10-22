@@ -1,6 +1,6 @@
 # Otwarty następca VATowca — specyfikacja produktu i architektury
 
-**Wersja dokumentu:** 0.9.0 (kompletna kartoteka Avalonia, ADR-020)
+**Wersja dokumentu:** 0.10.0 (identyfikatory i rejestry TEST, ADR-021)
 **Data:** 2026-10-22
 **Status:** projekt założeń; nie jest potwierdzeniem zgodności podatkowej gotowego oprogramowania  
 **Nazwa projektu:** robocza „Otwarty następca VATowca”; docelowa nazwa i użycie nazwy „VATowiec” wymagają odrębnej decyzji i sprawdzenia praw  
@@ -188,6 +188,30 @@ rachunków, edycję/ponowny odczyt, domyślności PLN/EUR/NULL, akceptację ostr
 oraz izolację i odczyt w B. Osobno sprawdzono trzy identyfikatory tylko do odczytu,
 błędy przy polach i ochronę szkicu. Szczegóły oraz zakres próby ergonomii opisuje
 docs/contractors.md. M0 nadal nie jest ukończone.
+
+### 3.10. Identyfikatory i rejestry zewnętrzne TEST (ADR-021)
+
+Wdrożono edycję trzech opcjonalnych identyfikatorów, podgląd normalizacji,
+wersjonowane reguły i duplikaty w firmie. AcceptWarnings/WarningHash z ADR-020
+wiążą potwierdzenie z danymi, rowversion, wersją reguły i duplikatami. Zapis
+i audyt ostrzeżenia są atomowe. NIP ma format/sumę mod 11; dla VAT UE 27 państw
+i XI wdrożono formaty, ale poza PL brak sum kontrolnych jest jawnie Unknown.
+IDWew ma kontrolę formatu, bez nadawania i potwierdzania istnienia w KSeF.
+
+ref.TaxIdentifierSchemes jest wspólnym słownikiem w Vatowiec_System, bez kartotek
+i wyników firm. audit.ExternalVerifications znajduje się w każdej bazie firmy;
+przechowuje niezmienny snapshot wejścia, środowisko Test/Production/Mock, status
+usługi i wynik, wersje, referencję oraz trwałą tożsamość wykonawcy bez centralnego FK.
+Osobne VerifyRegistries=16 i CSRF chronią ręczne MF/WL2, GUS BIR1.2 i VIES.
+Nie ma automatycznego pobierania przy edycji ani nadpisywania danych GUS.
+
+Demonstrator używa wyłącznie TEST/MOCK. Serwer ogranicza adresy do oficjalnych
+endpointów odpowiedniego środowiska; nie ma przekierowań ani fallbacku do produkcji.
+Produkcja wymaga późniejszej świadomej konfiguracji i AllowProduction. TEST/MOCK
+nie stanowią potwierdzeń produkcyjnych; historia nie jest konwertowana między
+środowiskami. Timeout, awaria i brak obsługi nie oznaczają wyniku negatywnego.
+Szczegóły, ograniczenia algorytmów i konfiguracja: [instrukcja](docs/identifiers-and-registries.md),
+[ADR-021](docs/adr/ADR-021-identyfikatory-i-rejestry-testowe.md).
 
 ## 4. Decyzje technologiczne
 
@@ -487,21 +511,22 @@ W `Vatowiec_System`: `Company` (katalog, nazwa wyświetlana, status), `CompanyDa
 
 W bazie jednej firmy: `CompanyProfile`, kontrahenci i wszystkie encje księgowe poniżej. Centralne `Company.Name` jest etykietą katalogową; źródłem nazwy prawnej i NIP/REGON jest lokalny profil. Wdrożony profil ma PK `SingletonKey` z CHECK `= 1` i unikalny `CompanyId`, a tożsamość firmy weryfikuje resolver i dodatkowo kontekst przy zapisie. Contractors i pozostałe lokalne dane nie zawierają CompanyId; relacje wskazują lokalne int Id. ADR-019 opisuje wykonanie modelu ADR-018. Nie ma relacji SQL między bazami; zarejestrowane połączenie nadal trzeba zweryfikować względem rzeczywistego profilu i wersji schematu przed dopuszczeniem operacji.
 
-AddressTypes wdrożono w każdej bazie firmowej. Umiejscowienie przyszłego TaxIdentifierSchemes pozostaje do doprecyzowania.
+AddressTypes wdrożono w każdej bazie firmowej. ADR-021 umieszcza wspólne TaxIdentifierSchemes w bazie systemowej, bez kartotek i historii konkretnych firm.
 Nie oznacza to przenoszenia firmowych adresów lub kontaktów do bazy systemowej.
 
 | Encja | Minimalne istotne pola / relacje |
 |---|---|
 | `CompanyProfile` | `SingletonKey = 1`, `CompanyId`, NIP, REGON, nazwa prawna; dokładnie jeden po inicjalizacji bazy firmy |
 | `TaxProfile` | typ podatnika, forma PIT, VAT, `ValidFrom`, `ValidTo`; kontekst bazy firmy |
-| `core.Contractors` — wdrożona podstawa | `Id int IDENTITY`, `ParentId` grupujący podmioty/grupy/jednostki bez dziedziczenia i cykli, opcjonalne `TaxId` i `VatEuId` do 100 znaków oraz `KsefIdWew`; bez zbędnego `CompanyId`; identyfikatory tylko do odczytu w podstawowym API/UI |
+| `core.Contractors` — wdrożona podstawa | `Id int IDENTITY`, `ParentId` grupujący podmioty/grupy/jednostki bez dziedziczenia i cykli, opcjonalne `TaxId` i `VatEuId` do 100 znaków oraz `KsefIdWew`; bez zbędnego `CompanyId`; edycja identyfikatorów z normalizacją/ostrzeżeniami ADR-021 |
 | `core.ContractorAddresses` — wdrożony schemat | wiele własnych adresów kontrahenta, także tego samego rodzaju z ref.AddressTypes; najwyżej jeden preferowany na ContractorId i AddressTypeId; pełne kolumny i typy w ADR-018 §3.7 |
 | `ref.AddressTypes` — wdrożony schemat | lokalny, otwarty słownik: Adres rejestrowy, Adres korespondencyjny i możliwość dodawania własnych rodzajów w zakładce Adresy (ADR-020) |
 | `core.ContractorContacts` — wdrożony schemat | jeden uniwersalny model kontaktu: obowiązkowe Name, opcjonalna funkcja/telefon/e-mail/adres/uwagi, bez FK do ContractorAddresses; techniczne typy określa ADR-019 |
 | `core.ContractorBankAccounts` — wdrożony schemat | wiele rachunków bez unikalności numeru, CurrencyCode char(3) NULL, IsDefault bit, najwyżej jeden domyślny w grupie ContractorId/waluta, także NULL; brak obowiązku domyślnego; pełne kolumny i typy w ADR-018 §3.9 |
 | `core.ContractorCreateOperations` — wdrożone | techniczny trwały wynik tworzenia w zakresie aktora, instalacji, OperationKind i operacji; atomowy z rekordem i audytem, szczegóły ADR-019 |
-| `audit.ContractorChanges` | wdrożony audyt SnapshotVersion=2 z RecordType, RecordId i opcjonalnym WarningJson; atomowe wartości przed/po i trwały wykonawca; świadoma akceptacja podstawowego ostrzeżenia rachunku jest wdrożona; pozostałe walidatory są odroczone |
-| `audit.ExternalVerifications` — docelowo | niezmienne sprawdzenia zewnętrzne w bazie firmy, niezależne od edycji kartoteki; zakres informacji w §8.3 |
+| `audit.ContractorChanges` | wdrożony audyt SnapshotVersion=2 z RecordType, RecordId i WarningJson; atomowe wartości przed/po i trwały wykonawca; świadome odstępstwa rachunków i identyfikatorów ADR-021 |
+| `audit.ExternalVerifications` — wdrożone | niezmienne sprawdzenia zewnętrzne w bazie firmy, niezależne od edycji, snapshot wejścia, środowisko i trwały aktor; zakres informacji w §8.3 i ADR-021 |
+| `ref.TaxIdentifierSchemes` — wdrożone w System | państwo/typ/prefiks, regex, klucz algorytmu, wersja, okres, aktywność i URL źródła, bez danych kontrahentów |
 | `Document` | `Id`, typ, numer/seria, kontrahent, daty, waluta, status, wersja, `SourceSystem`, `ExternalId`, `RowVersion`; kontekst bazy firmy |
 | `DocumentLine` | dokument, rodzaj towar/usługa, ilość, cena, podatki, kategorie, kwoty |
 | `DocumentCorrection` | dokument oryginalny / korygujący, powód i rodzaj korekty |
@@ -520,7 +545,7 @@ Nie oznacza to przenoszenia firmowych adresów lub kontaktów do bazy systemowej
 | `ExtensionSettings` | firma/użytkownik, ustawienia i referencje do sekretów |
 | `OutboxEvent` | typ, identyfikator zdarzenia, payload, próby, status, następne uruchomienie |
 
-Osobno projektujemy tabelę SQL `ref.TaxIdentifierSchemes` z wersjonowanymi regułami dla co najmniej wszystkich państw UE. AddressTypes jest lokalny dla bazy firmy. Lokalizację i dystrybucję przyszłego TaxIdentifierSchemes trzeba doprecyzować; fizyczna tabela nie powstaje w tym etapie. Dane kontrahentów, adresów, kontaktów, rachunków i historii należą do bazy firmy.
+ADR-021 wdraża SQL `ref.TaxIdentifierSchemes` w bazie systemowej: wspólne wersjonowane reguły bez kartotek i historii firm. Formaty VAT UE obejmują wszystkie 27 państw i XI; lista zaimplementowanych algorytmów oraz ograniczeń jest jawna. AddressTypes, dane kontrahentów, adresy, kontakty, rachunki i obie historie pozostają w bazie firmy.
 
 **Uwaga o projektowaniu:** kwot historycznych i złożonych deklaracji nie obliczamy ponownie po aktualizacji reguł „w miejscu”. `TaxCalculation` i `JpkPackage` powinny mieć zamrożony zestaw danych wejściowych / identyfikator obliczeń, wersję reguł i wersję schematu. Każda korekta tworzy nową rewizję z odsyłaczem do poprzedniej. Audyt i dane potrzebne do odtworzenia muszą być odporne na usunięcie z UI.
 
@@ -546,9 +571,9 @@ Załączniki mogą być przechowywane w katalogu kontrolowanym przez serwer lub 
 
 **Hierarchia i własne dane:** Contractors przechowuje samodzielne podmioty, grupy i jednostki organizacyjne. ParentId służy przede wszystkim grupowaniu i nie wyznacza automatycznie zależności podatkowej. Nie ma dziedziczenia żadnych danych: każdy rekord ma własną nazwę, identyfikatory, adresy, rachunki i kontakty. W przyszłej fakturze wybranie grupy bez identyfikatora podatkowego wyświetla powiązane podmioty do wyboru. Samodzielny podmiot z odpowiednim identyfikatorem może być nabywcą; jednostka niebędąca samodzielnym nabywcą może wystąpić jako Podmiot3 według roli i kontraktu KSeF. Faktur ani integracji teraz nie implementujemy.
 
-**Identyfikatory:** TaxId i VatEuId są dwoma opcjonalnymi polami tekstowymi, każde do 100 znaków; VatEuId zawiera cały numer VAT UE wraz z prefiksem. Dopuszczamy duplikaty: aplikacja ostrzega, a użytkownik z prawem akceptowania ostrzeżeń może świadomie zapisać wartość. Nie tworzymy ContractorTaxIdentifiers. ref.TaxIdentifierSchemes będzie tabelą SQL z wersjonowaniem reguł, docelowo dla co najmniej wszystkich państw UE. Application/API normalizuje i waliduje numery przed propozycją zapisu; konkretne algorytmy krajowe i VAT UE ustalimy przy implementacji walidatorów na podstawie źródeł i testów.
+**Identyfikatory:** TaxId i VatEuId są dwoma opcjonalnymi polami tekstowymi, każde do 100 znaków; VatEuId zawiera cały numer VAT UE wraz z prefiksem. Dopuszczamy duplikaty po ostrzeżeniu i świadomym zatwierdzeniu z AcceptWarnings. Nie tworzymy ContractorTaxIdentifiers. ADR-021 wdraża ref.TaxIdentifierSchemes, normalizację i kontrolę w Application/API: formaty VAT UE wszystkich 27 państw i XI oraz NIP mod 11 dla PL. Brak pozostałych algorytmów lub krajowej reguły TaxId jest jawnie Unknown, nie poprawnością. Źródła, wersje i zakresy dat są identyfikowalne.
 
-**KsefIdWew:** odrębny, opcjonalny pełny identyfikator jednostki wewnętrznej KSeF (IDWew/InternalId), nie NIP samodzielnego podatnika ani int Id kartoteki. Oficjalny format to dziesięć cyfr NIP podatnika, łącznik i pięć dodatkowych cyfr, razem 16 znaków. Przeznaczenie, źródła MF i rozróżnienie Podmiot3 od nabywcy są w ADR-018 §3.3.1; nie wdrażamy walidatora, generowania identyfikatorów ani integracji. [Źródło formatu: oficjalne OpenAPI KSeF PR v2](https://api.ksef.mf.gov.pl/docs/v2/openapi.json).
+**KsefIdWew:** odrębny, opcjonalny pełny identyfikator jednostki wewnętrznej KSeF (IDWew/InternalId), nie NIP samodzielnego podatnika ani int Id kartoteki. Oficjalny format to dziesięć cyfr NIP podatnika, łącznik i pięć dodatkowych cyfr, razem 16 znaków. Przeznaczenie, źródła MF i rozróżnienie Podmiot3 od nabywcy są w ADR-018 §3.3.1. ADR-021 kontroluje format i usuwa odstępy; nie generuje identyfikatora, nie potwierdza nadania ani zgodności z własnym TaxId jednostki i nie integruje KSeF. [Źródło formatu: oficjalne OpenAPI KSeF PR v2](https://api.ksef.mf.gov.pl/docs/v2/openapi.json).
 
 **Adresy:** core.ContractorAddresses przechowuje wiele własnych adresów kontrahenta, również kilka tego samego rodzaju. W ramach ContractorId i AddressTypeId najwyżej jeden może mieć IsDefault. ref.AddressTypes jest otwartym słownikiem, początkowo z Adresem rejestrowym i Adresem korespondencyjnym, rozszerzanym przez użytkownika. Zatwierdzona definicja obejmuje Id int IDENTITY, ContractorId, AddressTypeId, Name, Street, BuildingNo, ApartmentNo, PostalCode, City, Region, CountryCode, IsDefault, IsActive i RowVersion. Pełne typy SQL, długości i wymagalność określa [ADR-018 §3.7](docs/adr/ADR-018-docelowy-model-kontrahentow.md#37-adresy-i-otwarty-słownik-ich-rodzajów). Oddziały nie dziedziczą adresów.
 
@@ -556,15 +581,15 @@ Załączniki mogą być przechowywane w katalogu kontrolowanym przez serwer lub 
 
 **Rachunki:** jedna core.ContractorBankAccounts obejmuje Id int IDENTITY, ContractorId, AccountNumber, BankName, Bic, CurrencyCode char(3) NULL, AccountHolderName, Name, IsDefault bit, IsActive, Notes i RowVersion. Pełne typy SQL, długości i wymagalność określa [ADR-018 §3.9](docs/adr/ADR-018-docelowy-model-kontrahentow.md#39-rachunki-bankowe-i-domyślność-według-waluty); AccountNumber to wymagany nvarchar(100), a Bic to varchar(11) NULL. Kontrahent może mieć wiele rachunków. Najwyżej jeden domyślny na każdą walutę; NULL jest osobną grupą z takim samym limitem. Brak domyślnego jest dozwolony. Wybranie nowego automatycznie odznacza poprzedni z tej samej grupy w atomowej, audytowanej operacji, a unikalność domyślności zabezpiecza baza. Numery rachunków nie muszą być unikalne. Ich walidacja odbywa się w Application/API, ze świadomą akceptacją ostrzeżenia przez uprawnionego użytkownika i audytem odstępstwa. Nie tworzymy ContractorDefaultBankAccounts ani osobnej kartoteki banków na tym etapie.
 
-**„Użytkownik ma zawsze rację”:** po wyjaśnieniu ostrzeżenia użytkownik z prawem akceptacji ostrzeżeń może świadomie zapisać błędną wartość lub duplikat **bez podawania uzasadnienia**. Odstępstwo jest audytowane wraz ze zmianą, wykonawcą, czasem i kontekstem ostrzeżenia/reguły. Nie jest to uznanie numeru za poprawny ani obejście praw, spójności, rowversion, CSRF czy wymagań zewnętrznych. ADR-020 wdraża AcceptWarnings=8 oraz potwierdzenie związane z hashem dla podstawowej kontroli zapisu rachunku. Szczegóły ostrzeżeń i kontraktów przyszłych walidatorów podatkowych pozostają do opracowania; nie wymagamy uzasadnienia.
+**„Użytkownik ma zawsze rację”:** po wyjaśnieniu ostrzeżenia użytkownik z prawem akceptacji ostrzeżeń może świadomie zapisać błędną wartość lub duplikat **bez podawania uzasadnienia**. Odstępstwo jest audytowane wraz ze zmianą, wykonawcą, czasem i kontekstem ostrzeżenia/reguły. Nie jest to uznanie numeru za poprawny ani obejście praw, spójności, rowversion, CSRF czy wymagań zewnętrznych. ADR-020 wdraża AcceptWarnings=8 oraz potwierdzenie związane z hashem dla podstawowej kontroli zapisu rachunku. ADR-021 rozszerza ten mechanizm na identyfikatory; kolejne krajowe algorytmy pozostają do opracowania. Nie wymagamy uzasadnienia.
 
 **Idempotencja:** preferowane int IDENTITY nie wymaga GUID jako głównego klucza. Niewidoczny klucz tej samej operacji utworzenia i jej utrwalony wynik pozwalają po utracie odpowiedzi zwrócić ten sam int Id bez nowego rekordu ani audytu. Zapisy kartoteki, audytu i wyniku operacji są atomowe w bazie firmy, z ochroną przed równoległym wykonaniem. ADR-018 §3.1 opisuje przebieg bez narzucania dodatkowej tabeli; ADR-019 wybiera core.ContractorCreateOperations z trwałym wynikiem i bez automatycznego usuwania operacji. Przyszłą retencję trzeba zaprojektować z zachowaniem gwarancji ponowień.
 
 **Dwie historie w bazie firmy:** zachowujemy `audit.ContractorChanges` jako atomowo zapisywaną historię edycji kartoteki, z możliwością dostosowania implementacji. Osobne `audit.ExternalVerifications` przechowuje niezmienne zdarzenia sprawdzeń, w tym białej listy VAT i VIES. Zakres informacji obejmuje źródło, rodzaj sprawdzenia, identyfikator kontrahenta, opcjonalny rachunek, dane rzeczywiście użyte w zapytaniu, datę stanu sprawdzanego, odrębny czas wykonania zapytania, wynik, referencję urzędu, ewentualny błąd i użytkownika. Dane zapytania są historycznym zapisem, a nie tylko odsyłaczem do później zmienionej kartoteki. Trwałość identyfikacji wykonawcy po usunięciu konta obowiązuje obie historie.
 
-Wynik negatywny jest odrębny od niedostępności usługi, timeoutu lub braku odpowiedzi. Ponowne sprawdzenie dopisuje zdarzenie bez wymogu zmiany kontrahenta, jego rowversion ani pozornej edycji w ContractorChanges. Późniejsza zmiana danych nie przepisuje dawnego sprawdzenia. Dokładne nazwy kolumn, statusy i odwzorowania odpowiedzi urzędowych pozostają do ustalenia.
+Wynik negatywny jest odrębny od niedostępności usługi, timeoutu lub braku odpowiedzi. Ponowne sprawdzenie dopisuje zdarzenie bez wymogu zmiany kontrahenta, jego rowversion ani pozornej edycji w ContractorChanges. Późniejsza zmiana danych nie przepisuje dawnego sprawdzenia. Fizyczny kontrakt, środowiska, statusy i odwzorowania MF/GUS/VIES opisuje ADR-021; kolejne adaptery i zmiany kontraktów wymagają osobnego wersjonowania.
 
-**Pozostałe doprecyzowania:** konkretne algorytmy walidacji numerów rachunków i identyfikatorów, dobór schematu walidacji, umiejscowienie i dystrybucja słowników oraz techniczne kontrakty audytu, ostrzeżeń, idempotencji i adapterów. ADR-018 §4 pokazuje, jak rozstrzygnięto wcześniejsze K-01–K-09. Kolumny i typy adresów oraz rachunków, preferencja adresu według rodzaju i brak unikalności numerów rachunków są zatwierdzone. Nie dodajemy pól ani tabel bez uzasadnionej potrzeby i akceptacji użytkownika. Nie projektujemy migracji danych demonstracyjnych ani map dawnych GUID. Wdrożony zakres opisuje ADR-019. Fizyczne TaxIdentifierSchemes/ExternalVerifications, walidatory i integracje pozostają poza bieżącym etapem. Ekrany szczegółów i lokalny zapis wdraża ADR-020. Podstawowe API/UI nie edytują identyfikatorów podatkowych/KSeF; brak walidacji nie oznacza poprawności numerów.
+**Pozostałe doprecyzowania:** dalsze krajowe algorytmy i sumy rachunków, dystrybucja kolejnych wersji reguł oraz wspólne budżety żądań dla wielu serwerów przed uruchomieniem produkcji. ADR-018 §4 rozstrzyga wcześniejsze K-01–K-09. Kolumny adresów/rachunków, preferencje i brak unikalności numerów pozostają zatwierdzone. Nie projektujemy migracji fikcyjnych danych ani map GUID. Model wdrożył ADR-019, szczegóły kartoteki ADR-020, a identyfikatory, słownik reguł i testowe rejestry z osobną historią ADR-021. Brak pełnego algorytmu nie oznacza poprawności numeru.
 
 ---
 
@@ -703,7 +728,9 @@ Health check API/SQL/magazynu plików, diagnostyka błędów integracji, kolejka
 
 ### M0 — Repozytorium i architektura
 
-**Bieżący etap implementacyjny (2026-10-22, ADR-020):** pełna kartoteka z czterema zakładkami, wybór grupy, API szczegółów, typowany audyt i trwała idempotencja, atomowa zmiana preferencji i świadoma akceptacja ostrzeżenia rachunku. Pełny przebieg **142/142** (67 SQL/API i 75 bez SQL), bez pominięć; kompilacja bez błędów/ostrzeżeń i poprawne formatowanie. Przeprowadzono pełną próbę w prawdziwym oknie Avalonia. Bazy zaktualizowano jawnymi migracjami technicznymi bez odtwarzania tabel biznesowych. Wyniki i instrukcja: §3.9 i docs/contractors.md. M0 pozostaje nieukończone.
+**Bieżący etap implementacyjny (2026-10-22, ADR-021):** edycja identyfikatorów, wersjonowane reguły, świadome odstępstwa i duplikaty, ręczne rejestry TEST i niezmienna historia w firmie. Pełny przebieg **180/180** (76 SQL/API, 104 bez SQL), bez pominięć; kompilacja bez błędów/ostrzeżeń i poprawne formatowanie. Przeprowadzono próbę w rzeczywistym oknie Avalonia i rzeczywiste testowe wywołania MF/WL2, GUS oraz VIES. Bazy zaktualizowano jawnie po backupach, bez odtwarzania. Wyniki, algorytmy i granice: §3.10 i docs/identifiers-and-registries.md. M0 pozostaje nieukończone.
+
+**Poprzedni etap (2026-10-22, ADR-020):** pełna kartoteka z czterema zakładkami, wybór grupy, API szczegółów, typowany audyt i trwała idempotencja, atomowa zmiana preferencji i świadoma akceptacja ostrzeżenia rachunku. Pełny przebieg **142/142** (67 SQL/API i 75 bez SQL), bez pominięć; kompilacja bez błędów/ostrzeżeń i poprawne formatowanie. Przeprowadzono pełną próbę w prawdziwym oknie Avalonia. Bazy zaktualizowano jawnymi migracjami technicznymi bez odtwarzania tabel biznesowych. Wyniki tego etapu: §3.9 i docs/contractors.md.
 
 **Poprzedni etap (2026-10-22, ADR-018/019):** nowe klucze i relacje, 14 kolumn adresów, 12 rachunków, 14 kontaktów, lokalny AddressTypes oraz trwała idempotencja i atomowy audyt. Pełny przebieg 128/128 testów (57 SQL/API i 71 bez SQL), bez pominięć. Sprawdzono fizyczne typy/klucze/ograniczenia, cykle, izolację, konflikty, ponowienia i klienta z prawdziwym API/SQL. W tym wcześniejszym etapie bazy demonstracyjne odtworzono bez przenoszenia dawnych GUID/danych. Wyniki poniżej i w §3.7 są historią poprzednich etapów.
 
@@ -822,6 +849,7 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | [ADR-015](docs/adr/ADR-015-identity-i-autoryzowany-wybor-bazy.md) | Identity, sesje i autoryzowany wybór bazy | Wdrożone API logowania, uprawnienia do firm, resolver i sprawdzanie rzeczywistego profilu; bez UI Avalonia |
 | [ADR-016](docs/adr/ADR-016-desktop-logowanie-i-kontekst-firmy.md) | Avalonia: logowanie i kontekst firmy | Wdrożony scenariusz desktopowy, odczyt kontrahentów, zmiana firmy i wylogowanie |
 | [ADR-017](docs/adr/ADR-017-kartoteka-kontrahentow-i-audyt.md) | Edycja kontrahentów, filtry, rowversion i atomowy audyt | Wdrożony formularz, serwerowe filtrowanie/strony i autoryzowany zapis; jawne migracje systemowa i firmowa |
+| [ADR-021](docs/adr/ADR-021-identyfikatory-i-rejestry-testowe.md) | Identyfikatory i rejestry TEST | Wersjonowane reguły, ostrzeżenia, osobna niezmienna historia i środowiska Test/Production/Mock; ręczne oficjalne MF/WL2, GUS BIR1.2 i VIES |
 | [ADR-020](docs/adr/ADR-020-kompletna-kartoteka-avalonia.md) | Kompletna kartoteka Avalonia | Cztery zakładki, grupy, CRUD szczegółów, typowany audyt, idempotencja, atomowe preferencje i osobne uprawnienie do ostrzeżeń rachunków; bez walidatorów podatkowych/integracji |
 | [ADR-019](docs/adr/ADR-019-implementacja-modelu-kontrahentow.md) | Implementacja podstawy kartoteki | int IDENTITY, zabezpieczona hierarchia, lokalne szczegóły, trwała idempotencja, audyt i odtworzenie trzech demonstracyjnych baz; bez walidatorów i nowych ekranów |
 | [ADR-018](docs/adr/ADR-018-docelowy-model-kontrahentow.md) | Docelowy model kontrahentów i niezależne weryfikacje | Uzupełniony o ParentId bez dziedziczenia, nazwy tabel, reguły identyfikatorów i domyślność walutową; ślad rozstrzygnięć K-01–K-09, pozostałe doprecyzowania w §4; podstawa implementacji ADR-019, bez migracji danych demonstracyjnych |
