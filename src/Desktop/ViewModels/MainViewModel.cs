@@ -180,6 +180,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         contractors = [];
         contractorsLoaded = false;
         ClearContractorState();
+        ResetDataPortSettings();
     }
     private void ResetSession()
     {

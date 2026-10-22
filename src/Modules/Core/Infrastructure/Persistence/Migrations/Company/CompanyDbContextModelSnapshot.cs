@@ -495,6 +495,28 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
                     b.ToTable("ContractorCreateOperations", "core");
                 });
 
+            modelBuilder.Entity("Vatowiec.Core.Domain.DataPortConfiguration", b =>
+                {
+                    b.Property<int>("SingletonKey")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProtectedApiKey")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("SingletonKey");
+
+                    b.ToTable("DataPortConfiguration", "security", t =>
+                        {
+                            t.HasCheckConstraint("CK_DataPort_Singleton", "[SingletonKey] = 1");
+                        });
+                });
+
             modelBuilder.Entity("Vatowiec.Core.Domain.ExternalVerification", b =>
                 {
                     b.Property<Guid>("Id")

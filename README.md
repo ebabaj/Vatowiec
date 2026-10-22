@@ -5,10 +5,10 @@ Projekt wielostanowiskowej aplikacji dla polskich mikrofirm. Obecny stan to
 wybór firmy, dodawanie/edycja z audytem i konfliktami oraz wyszukiwanie po stronie serwera.
 Osobne SystemDbContext i CompanyDbContext, trzy bazy SQL
 Server oraz dwie fikcyjne firmy. Działają Identity, sesje API i autoryzowany resolver
-bazy firmy. Pełny zestaw obejmuje 180 testów, w tym 76 z SQL/API.
+bazy firmy. Pełny zestaw obejmuje 210 testów, w tym 83 z SQL/API (127 bez SQL), bez pominięć.
 Nie jest to jeszcze program do prowadzenia księgowości.
 
-**Aktualny etap: identyfikatory i rejestry TEST (ADR-021).** Jeden formularz
+**Aktualny etap: DataPort i konfiguracja firmy (ADR-022).** Jeden formularz
 ma Dane główne, Adresy, Kontakty i Rachunki bankowe. Można wybierać grupę,
 dodawać rodzaje adresów, edytować szczegóły i atomowo zmieniać preferencje.
 TaxId/VatEuId/KsefIdWew są edytowalne z normalizacją, wersjonowanymi regułami
@@ -16,10 +16,16 @@ i świadomą akceptacją ostrzeżeń. Zakładka Weryfikacje obejmuje ręczne MF/
 VIES i GUS, z historią środowiska i bez automatycznego nadpisywania danych.
 Domyślnie Test; TEST/MOCK nie stanowią produkcyjnego potwierdzenia urzędowego.
 [Konfiguracja, algorytmy i instrukcja](docs/identifiers-and-registries.md).
+Działa osobny [DataPort](docs/dataport.md): szyfrowany klucz firmy, ręczne pobranie
+danych pośrednika i selektywny import do szkicu. Rzeczywista usługa DataPort jest
+oddzielna od oficjalnych rejestrów TEST; automatyczne próby wyłącznie na atrapach.
 Nietypowy zapis
 rachunku wymaga świadomej, audytowanej akceptacji przez uprawnioną osobę;
-nie oznacza to weryfikacji numeru. Bazy i kartoteki zachowano; jawnie dodano
+nie oznacza to weryfikacji numeru. W etapie ADR-021 bazy i kartoteki zachowano; jawnie dodano
 słownik reguł w System i historię weryfikacji w każdej bazie firmy, po backupach.
+W ADR-022 dodano konfigurację DataPort po kolejnych zweryfikowanych kopiach;
+za zgodą właściciela pełny runner ponownie zainicjalizował demonstracyjne dane
+i konta. Nie odtwarzano samych baz ani historycznych identyfikatorów.
 
 Wymagania produktu: [SPECYFIKACJA.md](SPECYFIKACJA.md).
 Architektura i granice modułów: [ADR-013](docs/adr/ADR-013-architektura-modularnego-monolitu.md).

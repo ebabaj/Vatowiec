@@ -8,7 +8,8 @@ public enum CompanyPermission
     ViewContractors = 2,
     EditContractors = 4,
     AcceptWarnings = 8,
-    VerifyRegistries = 16
+    VerifyRegistries = 16,
+    ManageCompanyIntegrations = 32
 }
 
 public sealed class CompanyAccess : ITrackedEntity
@@ -24,7 +25,7 @@ public sealed class CompanyAccess : ITrackedEntity
 
     public void ChangePermissions(CompanyPermission permissions)
     {
-        if (permissions == CompanyPermission.None || (permissions & ~(CompanyPermission)31) != 0)
+        if (permissions == CompanyPermission.None || (permissions & ~(CompanyPermission)63) != 0)
             throw new ArgumentException("Nieprawidłowe uprawnienia firmy.", nameof(permissions));
         Permissions = permissions;
     }

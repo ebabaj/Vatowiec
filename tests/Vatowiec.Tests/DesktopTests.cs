@@ -255,6 +255,15 @@ public sealed partial class DesktopTests
     }
     private sealed class FakeApi : IVatowiecApiClient
     {
+        private bool keyConfigured;
+        private int keyVersion;
+        public int KeySaves { get; private set; }
+        public int KeyDeletes { get; private set; }
+        public Task<DataPortConfigurationResponse> DataPortConfiguration(Guid companyId) => Task.FromResult(new DataPortConfigurationResponse(companyId, keyConfigured, keyVersion.ToString()));
+        public Task<DataPortConfigurationResponse> SaveDataPortKey(Guid companyId, SaveDataPortKeyRequest value)
+        { KeySaves++; keyVersion++; keyConfigured = true; return DataPortConfiguration(companyId); }
+        public Task<DataPortConfigurationResponse> DeleteDataPortKey(Guid companyId, DeleteDataPortKeyRequest value)
+        { KeyDeletes++; keyVersion++; keyConfigured = false; return DataPortConfiguration(companyId); }
         public string[] Permissions { get; set; } = ["ViewProfile", "ViewContractors"];
         public DateTimeOffset Expires { get; set; } = DateTimeOffset.UtcNow.AddMinutes(30);
         public Exception? ContractorError { get; set; }

@@ -25,6 +25,9 @@ public interface IVatowiecApiClient : IDisposable
     Task<ContractorResponse[]> ParentCandidates(Guid companyId, string search, int excludeId, int offset = 0) => Task.FromResult<ContractorResponse[]>([]);
     Task<ContractorResponse[]> Children(Guid companyId, int parentId, int offset = 0) => Task.FromResult<ContractorResponse[]>([]);
     Task Logout();
+    Task<DataPortConfigurationResponse> DataPortConfiguration(Guid companyId) => throw new NotSupportedException();
+    Task<DataPortConfigurationResponse> SaveDataPortKey(Guid companyId, SaveDataPortKeyRequest value) => throw new NotSupportedException();
+    Task<DataPortConfigurationResponse> DeleteDataPortKey(Guid companyId, DeleteDataPortKeyRequest value) => throw new NotSupportedException();
 }
 
 public sealed class ApiException(int statusCode, string message) : Exception(message)
@@ -84,6 +87,16 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
     }
 
     public Task<CompanyResponse[]> Companies() => Get<CompanyResponse[]>("api/v1/companies");
+    public Task<DataPortConfigurationResponse> DataPortConfiguration(Guid companyId) => Get<DataPortConfigurationResponse>($"api/v1/companies/{companyId}/integrations/dataport");
+    public Task<DataPortConfigurationResponse> SaveDataPortKey(Guid companyId, SaveDataPortKeyRequest value) => DataPortWrite(companyId, value, HttpMethod.Put);
+    public Task<DataPortConfigurationResponse> DeleteDataPortKey(Guid companyId, DeleteDataPortKeyRequest value) => DataPortWrite(companyId, value, HttpMethod.Delete);
+    private async Task<DataPortConfigurationResponse> DataPortWrite(Guid companyId, object value, HttpMethod method)
+    {
+        var csrf = await Get<CsrfResponse>("api/v1/auth/csrf");
+        using var request = new HttpRequestMessage(method, $"api/v1/companies/{companyId}/integrations/dataport") { Content = JsonContent.Create(value) };
+        request.Headers.Add("X-CSRF-TOKEN", csrf.Token);
+        return await Send<DataPortConfigurationResponse>(request);
+    }
     public Task<IdentifierPreview> ValidateIdentifiers(Guid companyId, ContractorWriteRequest value) => Post<IdentifierPreview>($"api/v1/companies/{companyId}/contractors/identifiers/validate", value);
     public Task<RegistryEnvironmentResponse> RegistryEnvironments(Guid companyId) => Get<RegistryEnvironmentResponse>($"api/v1/companies/{companyId}/registry-environments");
     public Task<VerificationResponse[]> Verifications(Guid companyId, int id, int offset = 0) => Get<VerificationResponse[]>($"api/v1/companies/{companyId}/contractors/{id}/verifications?offset={offset}&limit=51");
@@ -178,12 +191,19 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         catch (JsonException) { }
         var message = response.StatusCode switch
         {
+            HttpStatusCode.Conflict when error?.Code == "configuration_stale" => "Ustawienia zmieniły się. Odśwież stan DataPort i ponownie wpisz klucz.",
+            HttpStatusCode.BadRequest when error?.Code is "dataport_key_invalid" or "confirmation_required" => error.Message ?? "Sprawdź konfigurację DataPort.",
+            HttpStatusCode.BadRequest when error?.Code is "verification_unsupported" or "verification_invalid" or "verification_date" => error.Message ?? "Sprawdź dane wejściowe weryfikacji.",
+            HttpStatusCode.Conflict when error?.Code == "verification_stale" => "Dane zmieniły się. Otwórz aktualną wersję przed sprawdzeniem rejestru.",
+            HttpStatusCode.ServiceUnavailable when error?.Code == "verification_history_failed" => "Nie zapisano historii odpowiedzi. Wynik nie został potwierdzony w VATowcu.",
+            HttpStatusCode.ServiceUnavailable when error?.Code == "key_protection_unavailable" => "Serwer nie może trwale zabezpieczyć klucza. Sprawdź konfigurację kryptograficzną serwera.",
             HttpStatusCode.Unauthorized when login => "Nieprawidłowy login lub hasło albo konto jest zablokowane.",
             HttpStatusCode.Unauthorized => "Sesja wygasła lub została unieważniona. Zaloguj się ponownie.",
             HttpStatusCode.Forbidden => "Brak uprawnień do firmy lub kartoteki kontrahentów.",
             HttpStatusCode.BadRequest when error?.Code is "hierarchy_cycle" or "invalid_parent" or "invalid_address_type" => error.Message ?? "Sprawdź wybrane powiązanie.",
             HttpStatusCode.BadRequest => "API odrzuciło żądanie. Spróbuj ponownie; sprawdź wersję aplikacji i API.",
-            HttpStatusCode.TooManyRequests => "Zbyt wiele prób logowania. Odczekaj minutę i spróbuj ponownie.",
+            HttpStatusCode.TooManyRequests when login => "Zbyt wiele prób logowania. Odczekaj minutę i spróbuj ponownie.",
+            HttpStatusCode.TooManyRequests => "Zbyt wiele żądań do API. Odczekaj minutę przed kolejną próbą; to ograniczenie API VATowca, a nie saldo konta DataPort.",
             HttpStatusCode.ServiceUnavailable => "Baza firmy jest niedostępna lub niezgodna. Spróbuj później lub skontaktuj się z administratorem.",
             HttpStatusCode.NotFound when error?.Code == "detail_not_found" => "Nie znaleziono pozycji u tego kontrahenta. Odśwież listę.",
             HttpStatusCode.NotFound => "Nie znaleziono kontrahenta w tej firmie. Odśwież listę.",

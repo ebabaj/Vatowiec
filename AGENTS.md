@@ -2,7 +2,7 @@
 
 Projekt: **Otwarty następca VATowca** (nazwa robocza).  
 Główne źródło wymagań: [`SPECYFIKACJA.md`](./SPECYFIKACJA.md).  
-Status: identyfikatory i testowe rejestry zewnętrzne, 2026-10-22; ADR-021.
+Status: DataPort i szyfrowana konfiguracja firmy, 2026-10-22; ADR-022.
 
 **Aktualny etap obejmuje implementację zatwierdzonego modelu ADR-018.**
 Użytkownik zakończył etap dokumentacyjny. Można odtwarzać wyłącznie lokalne
@@ -15,7 +15,16 @@ techniczne; [ADR-018](docs/adr/ADR-018-docelowy-model-kontrahentow.md) pozostaje
 ADR-021 dodaje edycję identyfikatorów, wersjonowane reguły SQL i zakładkę Weryfikacje.
 MF/GUS/VIES domyślnie Test; bieżące próby wyłącznie Test/Mock. Nie włączaj produkcji
 ani nie pytaj produkcyjnych rejestrów w testach. KSeF pozostaje poza zakresem
-poza lokalną kontrolą formatu IDWew. Nie wykonuj Commit ani Push.
+poza lokalną kontrolą formatu IDWew. ADR-022 dodaje osobny rzeczywisty DataPort,
+z kluczem każdej firmy szyfrowanym DPAPI/Data Protection poza repozytorium/bazą.
+Nie zmienia trybu oficjalnych adapterów. DataPort odpytuj tylko ręcznie po wpisaniu
+klucza przez użytkownika; automatyczne testy wyłącznie na atrapach HTTP.
+ManageCompanyIntegrations=32 chroni zapis konfiguracji razem z CSRF i rowversion;
+API zwraca tylko stan, nigdy klucz/szyfrogram. X-API-Key tylko na jednym żądaniu,
+stały HTTPS dataport.pl, bez logowania treści/nagłówka i ponowień. Dane pośrednika
+mogą pochodzić z cache, nie są bezpośrednim potwierdzeniem urzędu. Używamy obecnego
+audit.ExternalVerifications i selektywnego importu do szkicu. Szczegóły: docs/dataport.md.
+Nie wykonuj Commit ani Push.
 
 ## 1. Co budujemy
 

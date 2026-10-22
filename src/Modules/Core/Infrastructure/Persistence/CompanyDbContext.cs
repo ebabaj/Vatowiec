@@ -20,8 +20,13 @@ public sealed class CompanyDbContext(
     public DbSet<ContractorCreateOperation> ContractorCreateOperations => Set<ContractorCreateOperation>();
     public DbSet<ExternalVerification> ExternalVerifications => Set<ExternalVerification>();
 
+    public DbSet<DataPortConfiguration> DataPortConfigurations => Set<DataPortConfiguration>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.ApplyConfiguration(new DataPortConfigurationMapping());
+        modelBuilder.Entity<DataPortConfiguration>().HasQueryFilter(x =>
+            CurrentCompanyId != null && CompanyProfiles.Any(p => p.CompanyId == CurrentCompanyId));
         modelBuilder.ApplyConfiguration(new CompanyProfileConfiguration());
         modelBuilder.ApplyConfiguration(new ContractorConfiguration());
         modelBuilder.ApplyConfiguration(new ContractorChangeConfiguration());

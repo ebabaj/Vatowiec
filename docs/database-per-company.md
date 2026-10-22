@@ -1,4 +1,4 @@
-# Lokalne bazy database-per-company — ADR-018/019/020/021
+# Lokalne bazy database-per-company — ADR-018/019/020/021/022
 
 Wdrożenie używa localhost\SQLEXPRESS, SQL Server 2025 Express i Windows
 Authentication. Wszystkie dane demonstracyjne są fikcyjne i odtwarzalne.
@@ -17,7 +17,7 @@ Vatowiec_System zawiera 14 tabel:
 - ref.TaxIdentifierSchemes (wersjonowane reguły, bez danych kontrahentów);
 - dbo.__EFMigrationsHistory.
 
-Każda z Vatowiec_Company_A_Dev i Vatowiec_Company_B_Dev zawiera 10 tabel:
+Każda z Vatowiec_Company_A_Dev i Vatowiec_Company_B_Dev zawiera 11 tabel:
 
 - core.CompanyProfile;
 - core.Contractors;
@@ -28,6 +28,7 @@ Każda z Vatowiec_Company_A_Dev i Vatowiec_Company_B_Dev zawiera 10 tabel:
 - ref.AddressTypes;
 - audit.ContractorChanges;
 - audit.ExternalVerifications (niezmienne wejście/wynik, środowisko i trwały aktor);
+- security.DataPortConfiguration (trzy kolumny: singleton, zaszyfrowany klucz, rowversion);
 - dbo.__EFMigrationsHistory.
 
 Contractors.Id i klucze szczegółów są int IDENTITY, lokalne dla fizycznej bazy.
@@ -47,10 +48,15 @@ Historia SystemDbContext pozostaje zestawem:
 - 20261021114324_IdentityAndCompanyAccess;
 - 20261022055958_InstallationIdentity;
 - 20261022161054_WarningPermission;
-- 20261022175431_TaxIdentifierRules.
+- 20261022175431_TaxIdentifierRules;
+- 20261022194948_CompanyIntegrationPermission (firmowe prawo 32, maska do 63).
 
 CompanyDbContext ma migrację inicjalną 20261022143310_CompanyModelV2 i techniczną 20261022161050_ContractorDetailAudit. Ta druga rozszerza istniejący audyt i operacje tworzenia; nie dodaje tabel biznesowych.
 20261022175433_ExternalVerifications dodaje historię z triggerem blokującym UPDATE/DELETE.
+20261022194946_DataPortConfiguration dodaje konfigurację DataPort bez zmiany kartoteki
+i historii. Sekret jest chroniony niezależnym trwałym key ring poza SQL i repozytorium,
+DPAPI konta API. Po przeniesieniu bez dostępnej ochrony wpisz klucz ponownie.
+[Wdrożenie, migracje, kopie, ograniczenie runnera i konfiguracja](dataport.md).
 Wszystkie trzy bazy zaktualizowano jawnie po zweryfikowanych backupach, bez ich
 odtwarzania. Down usuwa historię/reguły i nie jest bezpiecznym wycofaniem z danymi.
 Poprzednie migracje firmy i snapshot (.cs.archive) są w LegacyCompanyMigrations, wyłączone
@@ -112,7 +118,7 @@ technicznie, nie oznaczają tworzenia baz o sufiksie _Test. Nie ustawiaj tych
 flag na używanym demonstratorze bez jawnego przygotowania pustych fixture.
 Bez runnera testy SQL są pomijane, nie zaliczane.
 
-Pełny wynik: **180/180**, bez pominięć (76 SQL/API, 104 bez SQL). Testy sprawdzają
+Wynik wcześniejszego etapu ADR-021: **180/180**, bez pominięć (76 SQL/API, 104 bez SQL). Testy sprawdzają
 również wszystkie kolumny/typy adresów i rachunków, klucze i zaufane FK,
 trigger hierarchii, domyślność PLN/EUR/NULL, niezależne historie migracji,
 odmowę obcego profilu, rowversion, atomowy audyt oraz trwałe ponowienia.
@@ -132,3 +138,13 @@ kolejnymi zadaniami ADR-014. Nie ma automatycznych migracji przy starcie API.
 Czyszczenie fixture usuwa wyłącznie fikcyjne rekordy demonstratora; nie jest planem migracji
 ani procedurą odtworzenia produkcji. Historyczne etapy, wyniki i kopie przed
 wcześniejszymi migracjami opisują ADR-014–017.
+
+## Weryfikacja ADR-022
+
+210/210 bez pominięć (83 SQL/API, 127 bez SQL). Obecnie System ma sześć migracji
+i 14 tabel, A/B po cztery migracje i 11 tabel. Zmiany wdrożono jawnie po trzech
+backupach COPY_ONLY/CHECKSUM/VERIFYONLY. Właściciel potwierdził demonstracyjne
+przeznaczenie zastanych rekordów przed czyszczeniem; odtworzono fikcyjne fixture
+i konta, bez DROP/CREATE baz. Nie zapisano rzeczywistego klucza DataPort.
+Runner odmawia czyszczenia zastanej konfiguracji z niepustym chronionym kluczem;
+usuń go świadomie w ustawieniach przed testami. [Szczegóły](dataport.md).

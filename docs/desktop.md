@@ -110,3 +110,12 @@ HTTPS, dwie firmy, odczyt odrębnych nazw kontrahentów A/B, zmianę firmy i log
 w tym samym procesie Avalonia. Drugie konto czytelnik.m0 widziało wyłącznie A,
 bez przycisku pobierania i danych kontrahentów. Nie jest to sprawdzenie aplikacji na Linux/macOS
 ani pełny audyt dostępności UI.
+
+## Ustawienia firmy i DataPort (ADR-022)
+
+Kartoteka ma przycisk Ustawienia firmy, sekcję Integracje zewnętrzne → DataPort
+z maskowanym nowym kluczem, stanem i potwierdzanym usunięciem. Operator A może
+zarządzać kluczem; B i czytelnik widzą tylko stan. Zakładka Weryfikacje ma
+osobny przycisk DataPort obok zachowanego oficjalnego GUS. Dane pośrednika
+mogą pochodzić z cache, nie są bezpośrednim potwierdzeniem GUS TEST.
+[Instrukcja i granice prób](dataport.md).

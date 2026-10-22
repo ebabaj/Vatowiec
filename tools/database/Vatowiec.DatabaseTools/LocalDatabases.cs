@@ -119,17 +119,20 @@ internal static class LocalDatabases
         // Odczyt bez EF: obsługuje zatwierdzony stary demonstrator oraz nowy model.
         // Nie wystarcza nazwa bazy. Nieznany schemat lub nieoznaczone dane blokują DROP.
         var company = database != SystemDatabase;
+        // Explicit, process-local confirmation by the owner of the demo data.
+        // This never bypasses server/name/ownership/schema/migration checks.
+        var confirmedDemo = Environment.GetEnvironmentVariable("VATOWIEC_CONFIRMED_DEMO_DATA") == "1";
         var expectedOld = company ? 4 : 13;
         var expectedNew = company ? 9 : 13;
         var tableCount = Convert.ToInt32(await Scalar(database, "SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0;"));
-        if (tableCount != expectedOld && tableCount != expectedNew && tableCount != (company ? 10 : 14))
+        if (tableCount != expectedOld && tableCount != expectedNew && tableCount != (company ? 10 : 14) && tableCount != (company ? 11 : 14))
             throw new InvalidOperationException($"Nieznany schemat {database}; odmowa odtworzenia.");
         var unknownTables = await Scalar(database, """
             SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id
             WHERE t.is_ms_shipped=0 AND s.name+'.'+t.name NOT IN (
                 'core.Companies','core.CompanyDatabases','core.CompanyProfile','core.Contractors',
                 'core.ContractorAddresses','core.ContractorContacts','core.ContractorBankAccounts',
-                'core.ContractorCreateOperations','ref.AddressTypes','audit.ContractorChanges','ref.TaxIdentifierSchemes','audit.ExternalVerifications',
+                'core.ContractorCreateOperations','ref.AddressTypes','audit.ContractorChanges','ref.TaxIdentifierSchemes','audit.ExternalVerifications','security.DataPortConfiguration',
                 'dbo.__EFMigrationsHistory','security.Users','security.Roles','security.UserRoles',
                 'security.UserClaims','security.UserLogins','security.UserTokens','security.RoleClaims',
                 'security.CompanyAccess','security.UserSessions','security.Installation');
@@ -137,7 +140,7 @@ internal static class LocalDatabases
         if (Convert.ToInt32(unknownTables) != 0) throw new InvalidOperationException($"Obce tabele w {database}.");
         var unknownHistory = await Scalar(database, """
             SELECT COUNT(*) FROM dbo.__EFMigrationsHistory WHERE MigrationId NOT IN (
-                '20261021102912_InitialCompany','20261022060000_ContractorAudit','20261022143310_CompanyModelV2','20261022161050_ContractorDetailAudit','20261022175433_ExternalVerifications',
+                '20261021102912_InitialCompany','20261022060000_ContractorAudit','20261022143310_CompanyModelV2','20261022161050_ContractorDetailAudit','20261022175433_ExternalVerifications','20261022194946_DataPortConfiguration',
                 '20261021102909_InitialSystem','20261021114324_IdentityAndCompanyAccess','20261022055958_InstallationIdentity');
             """);
         // Rzeczywiste identyfikatory migracji systemowych weryfikuje niżej kontekst.
@@ -157,14 +160,14 @@ internal static class LocalDatabases
                     AND [{taxColumn}] NOT LIKE N'DEMO%' AND [{taxColumn}] NOT LIKE N'TEST%'
                     AND [{taxColumn}] NOT LIKE N'FIKCYJN%' AND [{taxColumn}] NOT IN (N'3245174504',N'5261040828');
                 """);
-            if (Convert.ToInt32(unknownTax) != 0) throw new InvalidOperationException($"Niepotwierdzone identyfikatory podatkowe w {database}.");
+            if (Convert.ToInt32(unknownTax) != 0 && !confirmedDemo) throw new InvalidOperationException($"Niepotwierdzone identyfikatory podatkowe w {database}.");
             var unknownNames = await Scalar(database, """
                 SELECT COUNT(*) FROM core.Contractors WHERE Name NOT LIKE N'%fikcyjn%'
                     AND Name NOT LIKE N'%demonstracyjn%' AND Name NOT LIKE N'Kontrahent [AB]'
                     AND Name NOT LIKE N'%UIAUTO%' AND Name NOT LIKE N'%UI-AUTO%'
                     AND Name NOT LIKE N'%test%' AND Name NOT LIKE N'%automatyzac%';
                 """);
-            if (Convert.ToInt32(unknownNames) != 0) throw new InvalidOperationException($"Niepotwierdzone nazwy demonstracyjne w {database}; odmowa odtworzenia.");
+            if (Convert.ToInt32(unknownNames) != 0 && !confirmedDemo) throw new InvalidOperationException($"Niepotwierdzone nazwy demonstracyjne w {database}; odmowa odtworzenia.");
             if (tableCount >= expectedNew)
             {
                 var unknownAccounts = await Scalar(database, """
@@ -174,7 +177,7 @@ internal static class LocalDatabases
                             N'00000000000000000000000002',N'00000000000000000000000003',N'00000000000000000000000004',
                             N'70506405335016096312945164',N'PL70506405335016096312945164');
                     """);
-                if (Convert.ToInt32(unknownAccounts) != 0) throw new InvalidOperationException($"Niepotwierdzone numery rachunków w {database}.");
+                if (Convert.ToInt32(unknownAccounts) != 0 && !confirmedDemo) throw new InvalidOperationException($"Niepotwierdzone numery rachunków w {database}.");
             }
         }
         else
@@ -188,7 +191,8 @@ internal static class LocalDatabases
             if (Convert.ToInt32(unknownCompanies) != 0 || Convert.ToInt32(unknownUsers) != 0)
                 throw new InvalidOperationException($"Niepotwierdzone dane demonstracyjne w {database}.");
         }
-        Console.WriteLine($"Preflight {database}: dokładna nazwa, znacznik demonstratora, {tableCount} znanych tabel; brak nieoznaczonych danych w kontrolowanych kartotekach.");
+        Console.WriteLine($"Preflight {database}: dokładna nazwa, znacznik demonstratora, {tableCount} znanych tabel; " +
+            (confirmedDemo ? "właściciel jawnie potwierdził demonstracyjne przeznaczenie danych w tym przebiegu." : "brak nieoznaczonych danych w kontrolowanych kartotekach."));
     }
 
     private static async Task CreateOrCheck(string database)
@@ -293,6 +297,8 @@ internal static class LocalDatabases
         {
             await using var company = CompanyContext(database, id);
             if ((await company.Database.GetPendingMigrationsAsync()).Any()) throw new InvalidOperationException("Najpierw wykonaj migrate-contractors.");
+            if (await company.DataPortConfigurations.AnyAsync(x => x.ProtectedApiKey != null))
+                throw new InvalidOperationException("Zapisano klucz DataPort. Przed czyszczeniem fixture usuń go świadomie w ustawieniach firmy; runner nie usuwa zastanych sekretów.");
         }
         foreach (var (_, _, database) in DemoCompanies)
             await Execute(database, """
@@ -307,6 +313,7 @@ internal static class LocalDatabases
                     IF @@TRANCOUNT>0 ROLLBACK;
                     THROW;
                 END CATCH;
+                DELETE FROM security.DataPortConfiguration;
                 DELETE FROM core.ContractorCreateOperations;
                 DELETE FROM audit.ContractorChanges;
                 DELETE FROM core.ContractorAddresses;
@@ -398,6 +405,7 @@ internal static class LocalDatabases
                 await company.Contractors.IgnoreQueryFilters().AnyAsync() ||
                 await company.ContractorChanges.IgnoreQueryFilters().AnyAsync() ||
                 await company.ExternalVerifications.IgnoreQueryFilters().AnyAsync() ||
+                await company.DataPortConfigurations.IgnoreQueryFilters().AnyAsync() ||
                 !(await company.Database.GetAppliedMigrationsAsync()).SequenceEqual(company.Database.GetMigrations()))
                 throw new InvalidOperationException($"Testy nie wycofały danych lub historii w {database}.");
         }
@@ -430,7 +438,7 @@ internal static class LocalDatabases
         await using var system = SystemContext(SystemDatabase);
         await ShowSchema(system, SystemDatabase, ["core.Companies", "core.CompanyDatabases", "dbo.__EFMigrationsHistory",
             "security.Users", "security.Roles", "security.UserRoles", "security.UserClaims", "security.UserLogins",
-            "security.UserTokens", "security.RoleClaims", "security.CompanyAccess", "security.UserSessions", "security.Installation", "ref.TaxIdentifierSchemes"], "_TaxIdentifierRules");
+            "security.UserTokens", "security.RoleClaims", "security.CompanyAccess", "security.UserSessions", "security.Installation", "ref.TaxIdentifierSchemes"], "_CompanyIntegrationPermission");
         if (await system.InstallationIdentities.CountAsync() != 1 || (await system.InstallationIdentities.SingleAsync()).Id == Guid.Empty)
             throw new InvalidOperationException("Brak trwałej identyfikacji instalacji.");
         if (await system.Companies.CountAsync() != 2 || await system.CompanyDatabases.CountAsync() != 2)
@@ -443,7 +451,7 @@ internal static class LocalDatabases
             if (registration.ServerName != Server || registration.DatabaseName != database)
                 throw new InvalidOperationException("Błędna lokalizacja firmy.");
             await using var company = CompanyContext(database, id);
-            await ShowSchema(company, database, ["core.CompanyProfile", "core.Contractors", "core.ContractorAddresses", "core.ContractorContacts", "core.ContractorBankAccounts", "core.ContractorCreateOperations", "ref.AddressTypes", "audit.ContractorChanges", "audit.ExternalVerifications", "dbo.__EFMigrationsHistory"], "_ExternalVerifications");
+            await ShowSchema(company, database, ["core.CompanyProfile", "core.Contractors", "core.ContractorAddresses", "core.ContractorContacts", "core.ContractorBankAccounts", "core.ContractorCreateOperations", "ref.AddressTypes", "audit.ContractorChanges", "audit.ExternalVerifications", "security.DataPortConfiguration", "dbo.__EFMigrationsHistory"], "_DataPortConfiguration");
             var profile = await company.CompanyProfiles.IgnoreQueryFilters().SingleAsync();
             if (profile.CompanyId != id)
                 throw new InvalidOperationException("Niezgodna tożsamość danych firmy.");
@@ -489,7 +497,7 @@ internal static class LocalDatabases
             foreach (var (id, _, _) in DemoCompanies)
             {
                 var permissions = role == "Operator"
-                    ? (id == DemoCompanies[0].Id ? (CompanyPermission)31 : (CompanyPermission)3)
+                    ? (id == DemoCompanies[0].Id ? (CompanyPermission)63 : (CompanyPermission)3)
                     : (id == DemoCompanies[0].Id ? CompanyPermission.ViewProfile : CompanyPermission.None);
                 var access = await system.CompanyAccesses.SingleOrDefaultAsync(x => x.UserId == user.Id && x.CompanyId == id);
                 if (permissions == CompanyPermission.None)

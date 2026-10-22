@@ -41,13 +41,14 @@ public static class VerificationEndpoints
     }
     private static async Task<IResult> Verify(Guid companyId, int contractorId, VerificationRequest value, HttpContext http,
         CompanyDatabaseResolver resolver, IWebHostEnvironment host, IAntiforgery csrf, SystemDbContext system,
-        IRegistryAdapters adapters, TimeProvider clock)
+        IRegistryAdapters adapters, TimeProvider clock, IDataPortClient dataPort, IDataPortKeyProtector protector,
+        Vatowiec.Core.Application.TaxIdentifierValidator validator)
     {
         await using var access = await resolver.Resolve(Actor(http), companyId, CompanyPermission.ViewContractors | CompanyPermission.VerifyRegistries,
             host.IsDevelopment(), http.RequestAborted);
         try { await csrf.ValidateRequestAsync(http); }
         catch (AntiforgeryValidationException) { return Error(400, "csrf_invalid", "Nie udało się potwierdzić żądania."); }
-        if (value.OperationId == Guid.Empty || value.Operation is not ("Gus" or "Vies" or "MfTaxpayer" or "MfAccount" or "MfStatus"))
+        if (value.OperationId == Guid.Empty || value.Operation is not ("DataPort" or "Gus" or "Vies" or "MfTaxpayer" or "MfAccount" or "MfStatus"))
             return Error(400, "verification_invalid", "Nieprawidłowy rodzaj lub identyfikator sprawdzenia.");
         var db = access.Context; var actor = Actor(http);
         var issuer = await system.InstallationIdentities.Select(x => x.Id).SingleAsync(http.RequestAborted);
@@ -62,12 +63,22 @@ public static class VerificationEndpoints
         var date = value.StateDate ?? DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
         if (date > DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime)) return Error(400, "verification_date", "Nie sprawdzamy przyszłego stanu rejestru.");
         string? nip = null, vat = null, account = null;
+        string? dataPortRule = null;
         if (value.Operation == "Vies")
         {
             vat = row.VatEuId;
             var prefixes = Vatowiec.Core.Application.TaxSchemeSeed.Rules().Where(x => x.VatPrefix != null).Select(x => x.VatPrefix!);
             if (vat is null || !Regex.IsMatch(vat, "^[A-Z]{2}[A-Z0-9+*.]{2,12}$") || !prefixes.Contains(vat[..2]))
                 return Error(400, "verification_unsupported", "Nie wykonano zapytania: VAT UE nie spełnia wejścia VIES (w tym EL/XI).");
+        }
+        else if (value.Operation == "DataPort")
+        {
+            var assessment = validator.Assess("TaxId", row.TaxId, row.CountryCode,
+                await system.TaxIdentifierSchemes.AsNoTracking().ToArrayAsync(http.RequestAborted), date);
+            if (row.CountryCode != "PL" || assessment.Status != "Valid")
+                return Error(400, "verification_unsupported", "Nie wykonano zapytania DataPort: wymagany poprawny polski NIP (format i suma kontrolna).");
+            nip = assessment.Normalized;
+            dataPortRule = assessment.RuleVersion;
         }
         else
         {
@@ -88,11 +99,27 @@ public static class VerificationEndpoints
             return Error(400, "verification_invalid", "Rachunek nie dotyczy tego rodzaju sprawdzenia.");
         var started = clock.GetUtcNow();
         // Nie trzymamy transakcji SQL podczas oczekiwania na rejestr. Dane wejściowe są już snapshotem.
-        var result = await adapters.Execute(value.Operation, nip, vat, account, date, http.RequestAborted);
+        RegistryReply result;
+        if (value.Operation == "DataPort")
+        {
+            var configuration = await db.DataPortConfigurations.AsNoTracking().SingleOrDefaultAsync(http.RequestAborted);
+            if (configuration?.ProtectedApiKey == null)
+                result = new("Production", "Unknown", "NotConfigured", "dataport_key_missing", "Wprowadź klucz w ustawieniach firmy → Integracje zewnętrzne → DataPort.", null, new(), "dataport-rest-full-v1", false);
+            else
+            {
+                string? key = null;
+                try { key = protector.Unprotect(companyId, configuration.ProtectedApiKey); }
+                catch (Exception e) when (e is System.Security.Cryptography.CryptographicException or InvalidOperationException or IOException or UnauthorizedAccessException) { }
+                result = key == null
+                    ? new("Production", "Unknown", "NotConfigured", "dataport_key_unavailable", "Nie można odczytać chronionego klucza. Wpisz go ponownie w ustawieniach firmy.", null, new(), "dataport-rest-full-v1", false)
+                    : await dataPort.Lookup(nip!, key, http.RequestAborted);
+            }
+        }
+        else result = await adapters.Execute(value.Operation, nip, vat, account, date, http.RequestAborted);
         var entry = new ExternalVerification(value.OperationId, row.Id, value.BankAccountId, RegistryAdapters.Source(value.Operation),
             value.Operation, result.Environment, nip, vat, account, value.Operation.StartsWith("Mf", StringComparison.Ordinal) ? date : null,
             started, clock.GetUtcNow(), result.Outcome, result.ServiceStatus, result.ErrorCode, result.Message, result.Reference,
-            JsonSerializer.Serialize(result.Data, Json), result.AdapterVersion, "registry-input-v1/" + (value.Operation == "Vies" ? "vies-wsdl" : "pl-nip-nrb"), result.Executed,
+            JsonSerializer.Serialize(result.Data, Json), result.AdapterVersion, dataPortRule ?? ("registry-input-v1/" + (value.Operation == "Vies" ? "vies-wsdl" : "pl-nip-nrb")), result.Executed,
             actor, issuer, name, fingerprint);
         db.ExternalVerifications.Add(entry);
         try { await db.SaveChangesAsync(CancellationToken.None); }

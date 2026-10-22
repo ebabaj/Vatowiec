@@ -57,7 +57,7 @@
         <TextBlock Text="{Binding CurrentCompany}" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap"
                    AutomationProperties.AutomationId="CurrentCompany" />
         <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10">
-          <Button Content="Zmień firmę" Click="ChangeCompanyClick" AutomationProperties.AutomationId="ChangeCompany" />
+          <Button Content="Ustawienia firmy" Click="DataPortSettingsClick" AutomationProperties.AutomationId="CompanySettings"/><Button Content="Zmień firmę" Click="ChangeCompanyClick" AutomationProperties.AutomationId="ChangeCompany" />
           <Button Content="Wyloguj" Click="LogoutClick" AutomationProperties.AutomationId="LogoutWorkspace" />
           <Button Content="Nowy (Ctrl+N)" Click="NewContractorClick" IsVisible="{Binding CanEditContractors}" AutomationProperties.AutomationId="NewContractor" />
           <Button Content="Otwórz (F2)" Click="EditContractorClick" IsVisible="{Binding CanViewContractors}" AutomationProperties.AutomationId="EditContractor" />
@@ -121,6 +121,28 @@
         </Grid>
       </Grid>
 
+      <ScrollViewer IsVisible="{Binding IsDataPortSettings}">
+        <StackPanel Spacing="12" MaxWidth="740" HorizontalAlignment="Left">
+          <TextBlock Text="Ustawienia firmy → Integracje zewnętrzne → DataPort" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>
+          <TextBlock Text="{Binding CurrentCompany}" TextWrapping="Wrap"/>
+          <TextBlock Text="DataPort to komercyjny pośrednik danych GUS. Samodzielnie załóż konto i uzyskaj klucz. Zapytania są ręczne, a limit dzienny wspólny dla całego konta (reset 00:00 UTC). Dane mogą pochodzić z cache." TextWrapping="Wrap"/>
+          <Button Content="https://dataport.pl/api — dokumentacja i konto" Click="DataPortWebsiteClick"/>
+          <TextBlock Text="{Binding DataPortStatus}" FontSize="20" AutomationProperties.AutomationId="DataPortStatus"/>
+          <TextBlock Text="{Binding DataPortPermission}" TextWrapping="Wrap"/>
+          <TextBlock Text="Nowy klucz API (zapisana wartość nigdy nie jest odczytywana do programu)" TextWrapping="Wrap"/>
+          <TextBox x:Name="DataPortKeyInput" PasswordChar="●" MaxLength="4096" IsEnabled="{Binding CanManageCompanyIntegrations}" AutomationProperties.AutomationId="DataPortKey"/>
+          <WrapPanel>
+            <Button Content="Zapisz / zastąp klucz" Click="SaveDataPortKeyClick" IsEnabled="{Binding CanManageCompanyIntegrations}" AutomationProperties.AutomationId="SaveDataPortKey"/>
+            <Button Content="Usuń klucz…" Click="RequestDataPortDeleteClick" IsEnabled="{Binding CanDeleteDataPortKey}" AutomationProperties.AutomationId="DeleteDataPortKey"/>
+            <Button Content="Odśwież stan" Click="RefreshDataPortStatusClick" AutomationProperties.AutomationId="RefreshDataPortStatus"/>
+          </WrapPanel>
+          <StackPanel IsVisible="{Binding ConfirmDataPortDelete}" Spacing="8">
+            <TextBlock Text="Czy usunąć klucz DataPort tej firmy? Kolejne zapytania będą wymagały ponownego wpisania klucza." TextWrapping="Wrap"/>
+            <WrapPanel><Button Content="Potwierdzam usunięcie" Click="DeleteDataPortKeyClick" AutomationProperties.AutomationId="ConfirmDeleteDataPortKey"/><Button Content="Anuluj" Click="CancelDataPortDeleteClick"/></WrapPanel>
+          </StackPanel>
+          <Button Content="Wróć do kartoteki" Click="CloseDataPortSettingsClick" AutomationProperties.AutomationId="CloseCompanySettings"/>
+        </StackPanel>
+      </ScrollViewer>
       <Grid IsVisible="{Binding IsEditing}" RowDefinitions="Auto,*,Auto" RowSpacing="10">
         <StackPanel Spacing="6">
           <TextBlock Text="{Binding CurrentCompany}" TextWrapping="Wrap" FontWeight="SemiBold"/>
@@ -219,13 +241,15 @@
           </ScrollViewer>
         </Grid>
         <Grid Grid.Row="1" IsVisible="{Binding IsVerificationsTab}" ColumnDefinitions="340,*" ColumnSpacing="16">
-          <StackPanel Spacing="8"><TextBlock Text="Historia weryfikacji" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="TEST/MOCK nie potwierdzają rzeczywistej rejestracji. Historia jest niezmienna; kolejne ręczne sprawdzenie dodaje nowe zdarzenie." TextWrapping="Wrap"/><Button Content="Odśwież historię" Click="VerificationsClick" IsEnabled="{Binding HasSavedContractor}" AutomationProperties.AutomationId="RefreshVerifications"/>
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Spacing="8"><Button Content="Pobierz dane z DataPort" Click="DataPortClick" IsEnabled="{Binding CanVerify}" AutomationProperties.AutomationId="VerifyDataPort"/><TextBlock Text="DataPort (dane GUS) — rzeczywista usługa pośrednika, możliwy cache. Wymaga klucza w ustawieniach firmy. Nie jest bezpośrednią odpowiedzią GUS." TextWrapping="Wrap"/><TextBlock Text="Historia weryfikacji" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="TEST/MOCK nie potwierdzają rzeczywistej rejestracji. Historia jest niezmienna; kolejne ręczne sprawdzenie dodaje nowe zdarzenie." TextWrapping="Wrap"/><Button Content="Odśwież historię" Click="VerificationsClick" IsEnabled="{Binding HasSavedContractor}" AutomationProperties.AutomationId="RefreshVerifications"/>
             <ListBox ItemsSource="{Binding VerificationRows}" SelectedItem="{Binding SelectedVerification, Mode=TwoWay}" Height="240" ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.AutomationId="VerificationRows"><ListBox.ItemTemplate><DataTemplate x:DataType="contracts:VerificationResponse"><TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="4"/></DataTemplate></ListBox.ItemTemplate></ListBox>
             <WrapPanel><Button Content="Poprzednie" Click="PreviousVerificationsClick" IsEnabled="{Binding HasPreviousVerifications}"/><Button Content="Następne" Click="NextVerificationsClick" IsEnabled="{Binding HasNextVerifications}"/></WrapPanel><TextBlock Text="{Binding VerificationPage}"/>
           </StackPanel>
+          </ScrollViewer>
           <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled"><StackPanel Spacing="10" Margin="0,0,16,8"><TextBlock Text="{Binding VerificationSummary}" TextWrapping="Wrap" AutomationProperties.AutomationId="VerificationSummary"/>
-            <StackPanel IsVisible="{Binding CanImportGus}" Spacing="7"><TextBlock Text="Porównaj i wybierz dane z GUS" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="{Binding GusComparison}" TextWrapping="Wrap"/>
-              <CheckBox Content="Przenieś nazwę do danych głównych" IsChecked="{Binding UseGusName, Mode=TwoWay}" AutomationProperties.AutomationId="UseGusName"/><TextBlock Text="Wybierz pola nowego adresu (wartości z GUS pokazano wyżej):" TextWrapping="Wrap"/>
+            <StackPanel IsVisible="{Binding CanImportGus}" Spacing="7"><TextBlock Text="Porównaj i wybierz pobrane dane" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="{Binding GusComparison}" TextWrapping="Wrap"/>
+              <CheckBox Content="Przenieś nazwę do danych głównych" IsChecked="{Binding UseGusName, Mode=TwoWay}" AutomationProperties.AutomationId="UseGusName"/><TextBlock Text="Wybierz pola nowego adresu (wartości ze źródła pokazano wyżej):" TextWrapping="Wrap"/>
               <WrapPanel><CheckBox Content="Ulica" IsChecked="{Binding UseGusStreet, Mode=TwoWay}"/><CheckBox Content="Budynek" IsChecked="{Binding UseGusBuilding, Mode=TwoWay}"/><CheckBox Content="Lokal" IsChecked="{Binding UseGusApartment, Mode=TwoWay}"/><CheckBox Content="Kod pocztowy" IsChecked="{Binding UseGusPostalCode, Mode=TwoWay}"/><CheckBox Content="Miejscowość" IsChecked="{Binding UseGusCity, Mode=TwoWay}"/><CheckBox Content="Kraj" IsChecked="{Binding UseGusCountry, Mode=TwoWay}"/></WrapPanel>
               <Button Content="Przenieś wybrane wartości do szkicu" Click="ApplyGusClick" AutomationProperties.AutomationId="ApplyGus"/><TextBlock Text="To nie zapisuje danych. Następnie sprawdź formularz i zapisz zwykłym API." TextWrapping="Wrap"/>
             </StackPanel>

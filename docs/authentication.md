@@ -10,7 +10,7 @@ Nie ma operacji księgowych ani provisioningu firm.
 
 | Konto | Rola Identity | Firma A | Firma B |
 |---|---|---|---|
-| operator.m0 | Operator | ViewProfile, ViewContractors, EditContractors, AcceptWarnings, VerifyRegistries | ViewProfile, ViewContractors |
+| operator.m0 | Operator | ViewProfile, ViewContractors, EditContractors, AcceptWarnings, VerifyRegistries, ManageCompanyIntegrations | ViewProfile, ViewContractors |
 | czytelnik.m0 | Reader | ViewProfile | brak dostępu |
 
 EditContractors od etapu ADR-017 pozwala na dodawanie i edycję z CSRF i rowversion;

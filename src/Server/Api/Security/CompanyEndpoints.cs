@@ -33,6 +33,7 @@ public static class CompanyEndpoints
         group.MapContractors();
         group.MapContractorDetails();
         group.MapVerifications();
+        group.MapDataPort();
     }
 
     private static Guid UserId(HttpContext context) => Guid.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);

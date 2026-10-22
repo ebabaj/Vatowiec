@@ -81,7 +81,7 @@ public sealed class RegistryThrottle
 public sealed class RegistryAdapters(IHttpClientFactory clients, RegistrySettings settings, RegistryThrottle throttle) : IRegistryAdapters
 {
     public static string Source(string operation) => operation switch
-    { "Vies" => "VIES", "Gus" => "GUS", "MfTaxpayer" or "MfAccount" or "MfStatus" => "MF", _ => throw new ArgumentException("Nieznana operacja.") };
+    { "DataPort" => "DataPort", "Vies" => "VIES", "Gus" => "GUS", "MfTaxpayer" or "MfAccount" or "MfStatus" => "MF", _ => throw new ArgumentException("Nieznana operacja.") };
     public string EnvironmentFor(string operation) => settings.Mode(Source(operation));
     public async Task<RegistryReply> Execute(string operation, string? nip, string? vat, string? account, DateOnly date, CancellationToken cancellationToken)
     {
@@ -213,6 +213,11 @@ public static class RegistryRegistration
 {
     public static IServiceCollection AddRegistryAdapters(this IServiceCollection services)
     {
+        services.AddSingleton<IDataPortKeyProtector, PersistentDataPortKeyProtector>();
+        services.AddScoped<IDataPortClient, DataPortClient>();
+        services.AddHttpClient("dataport", http => { http.Timeout = TimeSpan.FromSeconds(12); http.MaxResponseContentBufferSize = 2_000_000; })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })
+            .RemoveAllLoggers();
         services.AddSingleton<RegistrySettings>(); services.AddSingleton<RegistryThrottle>();
         services.AddScoped<IRegistryAdapters, RegistryAdapters>();
         services.AddHttpClient("registries", http => { http.Timeout = TimeSpan.FromSeconds(12); http.MaxResponseContentBufferSize = 2_000_000; })

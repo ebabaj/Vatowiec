@@ -68,6 +68,9 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
             {
                 services.AddSingleton<TimeProvider>(clock);
                 services.AddDataProtection().UseEphemeralDataProtectionProvider();
+                services.AddSingleton<Vatowiec.Core.Infrastructure.Registries.IDataPortKeyProtector>(
+                    new Vatowiec.Core.Infrastructure.Registries.DataPortKeyProtector(new EphemeralDataProtectionProvider()));
+                services.AddScoped<Vatowiec.Core.Infrastructure.Registries.IDataPortClient>(_ => new MockDataPort(dataPortRequests));
             });
         });
         using var scope = application.Services.CreateScope();
@@ -133,6 +136,7 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
                 END CATCH;
                 """);
             await company.ContractorCreateOperations.ExecuteDeleteAsync();
+            await company.DataPortConfigurations.ExecuteDeleteAsync();
             await company.ContractorChanges.ExecuteDeleteAsync();
             await company.ContractorAddresses.ExecuteDeleteAsync();
             await company.ContractorBankAccounts.ExecuteDeleteAsync();

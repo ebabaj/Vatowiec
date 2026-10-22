@@ -15,6 +15,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = model;
+        model.PropertyChanged += (_, _) => { if (!model.IsDataPortSettings) DataPortKeyInput.Text = ""; };
         expiryTimer.Tick += (_, _) => model.CheckExpiry();
         expiryTimer.Start();
         Closed += (_, _) => { expiryTimer.Stop(); model.Dispose(); };
@@ -71,6 +72,24 @@ public partial class MainWindow : Window
     private async void AcceptIdentifiersClick(object? sender, RoutedEventArgs e) => await model.AcceptIdentifierWarning();
     private async void ViesClick(object? sender, RoutedEventArgs e) => await model.VerifyRegistry("Vies");
     private async void GusClick(object? sender, RoutedEventArgs e) => await model.VerifyRegistry("Gus");
+    private async void DataPortClick(object? sender, RoutedEventArgs e) => await model.VerifyRegistry("DataPort");
+    private async void DataPortSettingsClick(object? sender, RoutedEventArgs e) => await model.OpenDataPortSettings();
+    private async void SaveDataPortKeyClick(object? sender, RoutedEventArgs e)
+    {
+        var key = DataPortKeyInput.Text ?? "";
+        DataPortKeyInput.Text = "";
+        await model.SaveDataPortKey(key);
+    }
+    private async void RefreshDataPortStatusClick(object? sender, RoutedEventArgs e) { DataPortKeyInput.Text = ""; await model.RefreshDataPortStatus(); }
+    private void RequestDataPortDeleteClick(object? sender, RoutedEventArgs e) { DataPortKeyInput.Text = ""; model.RequestDataPortDelete(); }
+    private async void DeleteDataPortKeyClick(object? sender, RoutedEventArgs e) => await model.DeleteDataPortKey();
+    private void CancelDataPortDeleteClick(object? sender, RoutedEventArgs e) => model.CancelDataPortDelete();
+    private void CloseDataPortSettingsClick(object? sender, RoutedEventArgs e) => model.CloseDataPortSettings();
+    private void DataPortWebsiteClick(object? sender, RoutedEventArgs e)
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://dataport.pl/api") { UseShellExecute = true }); }
+        catch (System.ComponentModel.Win32Exception) { /* URL remains visible for manual navigation. */ }
+    }
     private async void MfTaxpayerClick(object? sender, RoutedEventArgs e) => await model.VerifyRegistry("MfTaxpayer");
     private async void MfStatusClick(object? sender, RoutedEventArgs e) => await model.VerifyRegistry("MfStatus");
     private async void MfAccountClick(object? sender, RoutedEventArgs e) => await model.VerifyRegistry("MfAccount");

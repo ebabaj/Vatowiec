@@ -1,6 +1,6 @@
 # Otwarty następca VATowca — specyfikacja produktu i architektury
 
-**Wersja dokumentu:** 0.10.0 (identyfikatory i rejestry TEST, ADR-021)
+**Wersja dokumentu:** 0.11.0 (DataPort i konfiguracja firmy, ADR-022)
 **Data:** 2026-10-22
 **Status:** projekt założeń; nie jest potwierdzeniem zgodności podatkowej gotowego oprogramowania  
 **Nazwa projektu:** robocza „Otwarty następca VATowca”; docelowa nazwa i użycie nazwy „VATowiec” wymagają odrębnej decyzji i sprawdzenia praw  
@@ -212,6 +212,28 @@ nie stanowią potwierdzeń produkcyjnych; historia nie jest konwertowana między
 środowiskami. Timeout, awaria i brak obsługi nie oznaczają wyniku negatywnego.
 Szczegóły, ograniczenia algorytmów i konfiguracja: [instrukcja](docs/identifiers-and-registries.md),
 [ADR-021](docs/adr/ADR-021-identyfikatory-i-rejestry-testowe.md).
+
+### 3.11. DataPort i konfiguracja integracji firmy (ADR-022)
+
+Osobny adapter komercyjnego pośrednika DataPort, obok oficjalnego GUS BIR.
+Ustawienia firmy mają zapis/zastąpienie/usunięcie klucza z potwierdzeniem i odczyt
+wyłącznie stanu. ManageCompanyIntegrations=32 jest prawem konkretnej firmy,
+nie globalną rolą; zapisy wymagają CSRF i rowversion. Operator A ma maskę 63,
+operator B 3, czytelnik A 1. Sekret pozostaje zaszyfrowany w lokalnej
+security.DataPortConfiguration (SingletonKey, ProtectedApiKey, RowVersion),
+z trwałą ochroną DPAPI/key ring poza repozytorium i bazą. Po przeniesieniu
+bez dostępnej ochrony konieczne jest ponowne wpisanie klucza.
+
+Tylko ręczny GET po poprawnym znormalizowanym NIP, stały HTTPS dataport.pl,
+X-API-Key na konkretnym żądaniu; brak ponowień, batch i tła. Wynik to
+„DataPort (dane GUS)”, rzeczywisty pośrednik/cache, nie bezpośrednia odpowiedź
+GUS TEST ani urzędu. Oficjalne MF/GUS/VIES nadal domyślnie Test. W istniejącym
+audit.ExternalVerifications zapisujemy Source=DataPort, Production dla rzeczywistej
+usługi lub Mock dla atrap, snapshot wejścia, wynik i trwałego aktora, bez sekretu.
+Brak nowych kolumn kartoteki/REGON ani oddzielnej historii. Selektywny import
+wyłącznie do szkicu; zwykły zapis zachowuje ostrzeżenia, prawa, rowversion i audyt.
+Limit dzienny należy do konta, także kilku kluczy; reset 00:00 UTC, brak fikcyjnego
+salda. Niedostępność nie jest wynikiem negatywnym. [Konfiguracja i próby](docs/dataport.md).
 
 ## 4. Decyzje technologiczne
 

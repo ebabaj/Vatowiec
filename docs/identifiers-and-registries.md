@@ -208,3 +208,12 @@ historia zachowała pierwotne NIP i rachunek. SQL potwierdził cztery audytowane
 odstępstwa, włączony trigger niezmienności, 29 reguł w System i brak historii/
 kontrahenta w B. Po ponownym wykonaniu pełnego runnera dane przykładu zostaną
 usunięte jako fikcyjne fixture. Zrzut okna: TestResults/avalonia-registries-final.png.
+
+## Rozszerzenie DataPort (ADR-022)
+
+Osobny DataPort jest rzeczywistym pośrednikiem, z kluczem konkretnej firmy,
+nie środowiskiem TEST GUS. Oficjalne trzy adaptery powyżej pozostają bez zmian.
+Nowy adapter korzysta z istniejącej historii i selektywnego importu do szkicu.
+[Konfiguracja i ręczny scenariusz](dataport.md). Pełny runner etapu ADR-022
+ponownie inicjalizuje fikcyjne dane, więc opisany wyżej przykład GUI-ID-DEB122
+stanowi historyczny wynik etapu ADR-021, a nie gwarancję jego obecności po testach.

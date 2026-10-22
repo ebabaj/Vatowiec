@@ -14,7 +14,7 @@ public sealed record VerificationRequest(Guid OperationId, string Operation, str
     int? BankAccountId = null, string? BankRowVersion = null, DateOnly? StateDate = null);
 public sealed record RegistryData(string? Name = null, string? Address = null, string? Regon = null,
     string? VatStatus = null, string? Street = null, string? BuildingNo = null, string? ApartmentNo = null,
-    string? PostalCode = null, string? City = null, string? CountryCode = null);
+    string? PostalCode = null, string? City = null, string? CountryCode = null, DateOnly? ActivityEndDate = null);
 public sealed record VerificationResponse(Guid Id, Guid CompanyId, int ContractorId, int? BankAccountId,
     string Source, string Operation, string Environment, string? TaxId, string? VatEuId, string? AccountNumber,
     DateOnly? StateDate, DateTimeOffset StartedAtUtc, DateTimeOffset CompletedAtUtc, string Outcome,
