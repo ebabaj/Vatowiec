@@ -16,16 +16,15 @@ internal static class LocalDatabases
 {
     private const string Server = @"localhost\SQLEXPRESS";
     private const string Marker = "Vatowiec.LocalTestPurpose";
-    private const string Legacy = "Vatowiec_Dev";
     private const string SystemDatabase = "Vatowiec_System";
     private static readonly string[] TestDatabases =
-        ["Vatowiec_System_Test", "Vatowiec_Company_A_Test", "Vatowiec_Company_B_Test"];
+        ["Vatowiec_System", "Vatowiec_Company_A_Dev", "Vatowiec_Company_B_Dev"];
     private static readonly (Guid Id, string Name, string Database)[] DemoCompanies =
     [
         (Guid.Parse("aaaaaaaa-0000-4000-8000-000000000001"), "Firma demonstracyjna A — dane fikcyjne", "Vatowiec_Company_A_Dev"),
         (Guid.Parse("bbbbbbbb-0000-4000-8000-000000000002"), "Firma demonstracyjna B — dane fikcyjne", "Vatowiec_Company_B_Dev")
     ];
-    private static readonly Guid DemoContractor = Guid.Parse("cccccccc-0000-4000-8000-000000000001");
+
 
     private static string Connection(string database) => new SqlConnectionStringBuilder
     {
@@ -38,12 +37,11 @@ internal static class LocalDatabases
         Pooling = false
     }.ConnectionString;
 
-    private static string Purpose(string database) => TestDatabases.Contains(database, StringComparer.Ordinal)
-        ? "VATowiec M0 disposable integration fixture v1" : "VATowiec M0 fictional company demonstration v1";
+    private static string Purpose(string database) => "VATowiec M0 fictional company demonstration v1";
 
     private static void CheckName(string database)
     {
-        if (database != SystemDatabase && database != Legacy &&
+        if (database != SystemDatabase &&
             !DemoCompanies.Any(x => x.Database == database) && !TestDatabases.Contains(database, StringComparer.Ordinal))
             throw new InvalidOperationException("Baza spoza jawnej listy lokalnych baz testowych VATowca.");
     }
@@ -103,28 +101,6 @@ internal static class LocalDatabases
             throw new InvalidOperationException($"Niepotwierdzone przeznaczenie {database}; nie będzie zmieniana ani usuwana.");
     }
 
-    private static async Task CheckLegacy()
-    {
-        if (!await Exists(Legacy)) return;
-        // Wyjątek tylko dla jawnie wskazanej przez użytkownika starej bazy.
-        // Nie wystarcza prefiks nazwy: dokładny schemat i archiwalna migracja.
-        var known = await Scalar(Legacy, """
-            SELECT CASE WHEN (SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped = 0) = 3
-                AND OBJECT_ID(N'core.Companies', N'U') IS NOT NULL
-                AND OBJECT_ID(N'core.Contractors', N'U') IS NOT NULL
-                AND OBJECT_ID(N'dbo.__EFMigrationsHistory', N'U') IS NOT NULL
-                THEN 1 ELSE 0 END;
-            """);
-        if (!Equals(known, 1)) throw new InvalidOperationException("Vatowiec_Dev nie odpowiada staremu schematowi projektu; odmowa usunięcia.");
-        var migration = await Scalar(Legacy, """
-            SELECT CASE WHEN COUNT(*) = 1 AND MIN(MigrationId) = N'20261021092204_InitialCompaniesAndContractors'
-                THEN 1 ELSE 0 END FROM dbo.__EFMigrationsHistory;
-            """);
-        if (!Equals(migration, 1)) throw new InvalidOperationException("Nieznana historia Vatowiec_Dev; odmowa usunięcia.");
-        var count = await Scalar(Legacy, "SELECT (SELECT COUNT_BIG(*) FROM core.Companies) + (SELECT COUNT_BIG(*) FROM core.Contractors);");
-        Console.WriteLine($"Potwierdzono {Legacy}: archiwalna migracja VATowca, Companies/Contractors; rekordów: {count}. Baza testowa wskazana do usunięcia przez użytkownika.");
-    }
-
     public static async Task Inspect()
     {
         await using var connection = new SqlConnection(Connection("master"));
@@ -132,13 +108,89 @@ internal static class LocalDatabases
         await using var command = new SqlCommand("SELECT name, state_desc FROM sys.databases ORDER BY database_id;", connection);
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync()) Console.WriteLine($"{reader.GetString(0)} | {reader.GetString(1)}");
-        await CheckLegacy();
+        foreach (var database in TestDatabases)
+            if (await Exists(database)) await CheckDemoData(database);
+    }
+
+    private static async Task CheckDemoData(string database)
+    {
+        await EnsureLocalServer();
+        await CheckOwnership(database);
+        // Odczyt bez EF: obsługuje zatwierdzony stary demonstrator oraz nowy model.
+        // Nie wystarcza nazwa bazy. Nieznany schemat lub nieoznaczone dane blokują DROP.
+        var company = database != SystemDatabase;
+        var expectedOld = company ? 4 : 13;
+        var expectedNew = company ? 9 : 13;
+        var tableCount = Convert.ToInt32(await Scalar(database, "SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0;"));
+        if (tableCount != expectedOld && tableCount != expectedNew)
+            throw new InvalidOperationException($"Nieznany schemat {database}; odmowa odtworzenia.");
+        var unknownTables = await Scalar(database, """
+            SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id
+            WHERE t.is_ms_shipped=0 AND s.name+'.'+t.name NOT IN (
+                'core.Companies','core.CompanyDatabases','core.CompanyProfile','core.Contractors',
+                'core.ContractorAddresses','core.ContractorContacts','core.ContractorBankAccounts',
+                'core.ContractorCreateOperations','ref.AddressTypes','audit.ContractorChanges',
+                'dbo.__EFMigrationsHistory','security.Users','security.Roles','security.UserRoles',
+                'security.UserClaims','security.UserLogins','security.UserTokens','security.RoleClaims',
+                'security.CompanyAccess','security.UserSessions','security.Installation');
+            """);
+        if (Convert.ToInt32(unknownTables) != 0) throw new InvalidOperationException($"Obce tabele w {database}.");
+        var unknownHistory = await Scalar(database, """
+            SELECT COUNT(*) FROM dbo.__EFMigrationsHistory WHERE MigrationId NOT IN (
+                '20261021102912_InitialCompany','20261022060000_ContractorAudit','20261022143310_CompanyModelV2',
+                '20261021102909_InitialSystem','20261021114324_IdentityAndCompanyAccess','20261022055958_InstallationIdentity');
+            """);
+        // Rzeczywiste identyfikatory migracji systemowych weryfikuje niżej kontekst.
+        if (company && Convert.ToInt32(unknownHistory) != 0) throw new InvalidOperationException($"Obca historia migracji w {database}.");
+        if (!company) await using (var system = SystemContext(database)) await CheckKnownHistory(system);
+        if (company)
+        {
+            var profileOk = await Scalar(database, """
+                SELECT COUNT(*) FROM core.CompanyProfile WHERE Nip IS NOT NULL OR Regon IS NOT NULL
+                    OR (Name NOT LIKE N'%fikcyjn%' AND Name NOT LIKE N'%demonstracyjn%' AND Name NOT LIKE N'Testowa firma%');
+                """);
+            if (Convert.ToInt32(profileOk) != 0) throw new InvalidOperationException($"Niepotwierdzone fikcyjne dane profilu w {database}.");
+            var taxColumn = Equals(await Scalar(database, "SELECT COUNT(*) FROM sys.columns WHERE object_id=OBJECT_ID('core.Contractors') AND name='TaxIdentifier';"), 1)
+                ? "TaxIdentifier" : "TaxId";
+            var unknownTax = await Scalar(database, $"""
+                SELECT COUNT(*) FROM core.Contractors WHERE [{taxColumn}] IS NOT NULL
+                    AND [{taxColumn}] NOT LIKE N'DEMO%' AND [{taxColumn}] NOT LIKE N'TEST%'
+                    AND [{taxColumn}] NOT LIKE N'FIKCYJN%';
+                """);
+            if (Convert.ToInt32(unknownTax) != 0) throw new InvalidOperationException($"Niepotwierdzone identyfikatory podatkowe w {database}.");
+            var unknownNames = await Scalar(database, """
+                SELECT COUNT(*) FROM core.Contractors WHERE Name NOT LIKE N'%fikcyjn%'
+                    AND Name NOT LIKE N'%demonstracyjn%' AND Name NOT LIKE N'Kontrahent [AB]'
+                    AND Name NOT LIKE N'%UIAUTO%' AND Name NOT LIKE N'%UI-AUTO%'
+                    AND Name NOT LIKE N'%test%' AND Name NOT LIKE N'%automatyzac%';
+                """);
+            if (Convert.ToInt32(unknownNames) != 0) throw new InvalidOperationException($"Niepotwierdzone nazwy demonstracyjne w {database}; odmowa odtworzenia.");
+            if (tableCount == expectedNew)
+            {
+                var unknownAccounts = await Scalar(database, """
+                    SELECT COUNT(*) FROM core.ContractorBankAccounts WHERE AccountNumber NOT LIKE N'DEMO%'
+                        AND AccountNumber NOT LIKE N'TEST%' AND AccountNumber NOT LIKE N'FIKCYJN%';
+                    """);
+                if (Convert.ToInt32(unknownAccounts) != 0) throw new InvalidOperationException($"Niepotwierdzone numery rachunków w {database}.");
+            }
+        }
+        else
+        {
+            var unknownCompanies = await Scalar(database, """
+                SELECT COUNT(*) FROM core.Companies WHERE Name NOT LIKE N'%demonstracyjn%' AND Name NOT LIKE N'%test%' AND Name NOT LIKE N'%fikcyjn%';
+                """);
+            var unknownUsers = await Scalar(database, """
+                SELECT COUNT(*) FROM security.Users WHERE UserName NOT IN (N'operator.m0',N'czytelnik.m0',N'operator.test',N'reader.test');
+                """);
+            if (Convert.ToInt32(unknownCompanies) != 0 || Convert.ToInt32(unknownUsers) != 0)
+                throw new InvalidOperationException($"Niepotwierdzone dane demonstracyjne w {database}.");
+        }
+        Console.WriteLine($"Preflight {database}: dokładna nazwa, znacznik demonstratora, {tableCount} znanych tabel; brak nieoznaczonych danych w kontrolowanych kartotekach.");
     }
 
     private static async Task CreateOrCheck(string database)
     {
         CheckName(database);
-        if (database == Legacy) throw new InvalidOperationException("Nie tworzymy starej bazy.");
         if (await Exists(database))
         {
             await CheckOwnership(database);
@@ -156,8 +208,7 @@ internal static class LocalDatabases
     {
         CheckName(database);
         if (!await Exists(database)) return;
-        if (database == Legacy) await CheckLegacy();
-        else await CheckOwnership(database);
+        await CheckDemoData(database);
         Console.WriteLine($"Usuwanie potwierdzonej bazy testowej: {database}.");
         await Execute("master", $"ALTER DATABASE {Identifier(database)} SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE {Identifier(database)};");
     }
@@ -177,11 +228,9 @@ internal static class LocalDatabases
 
     public static async Task Initialize()
     {
-        await CheckLegacy();
         // Sprawdź wszystkie zastane cele przed pierwszą operacją zmieniającą dane.
         foreach (var database in new[] { SystemDatabase }.Concat(DemoCompanies.Select(x => x.Database)))
             if (await Exists(database)) await CheckOwnership(database);
-        await Drop(Legacy);
         await CreateOrCheck(SystemDatabase);
         await using var system = SystemContext(SystemDatabase);
         await system.Database.MigrateAsync();
@@ -194,8 +243,19 @@ internal static class LocalDatabases
             var profile = await company.CompanyProfiles.IgnoreQueryFilters().SingleOrDefaultAsync();
             if (profile is null) company.CompanyProfiles.Add(new CompanyProfile(id, name));
             else if (profile.CompanyId != id) throw new InvalidOperationException($"Obcy profil w {database}.");
-            if (!await company.Contractors.AnyAsync(x => x.Id == DemoContractor))
-                company.Contractors.Add(new Contractor(id, DemoContractor, "DEMO", $"Kontrahent {name} — fikcyjny", "PL"));
+            if (!await company.Contractors.AnyAsync(x => x.Code == "DEMO"))
+                company.Contractors.Add(new Contractor("DEMO", $"Kontrahent {name} — fikcyjny", "PL"));
+            await company.SaveChangesAsync();
+            var demoId = await company.Contractors.Where(x => x.Code == "DEMO").Select(x => x.Id).SingleAsync();
+            if (!await company.ContractorAddresses.AnyAsync(x => x.ContractorId == demoId))
+                company.ContractorAddresses.Add(new ContractorAddress(demoId, 1)
+                    { Name = "Adres demonstracyjny", Street = "Fikcyjna", City = "Miejscowość testowa", CountryCode = "PL", IsDefault = true });
+            if (!await company.ContractorBankAccounts.AnyAsync(x => x.ContractorId == demoId))
+                company.ContractorBankAccounts.Add(new ContractorBankAccount(demoId, "DEMO-RACHUNEK-NIE-DO-PLATNOSCI", "PLN")
+                    { Name = "Fikcyjny rachunek", IsDefault = true });
+            if (!await company.ContractorContacts.AnyAsync(x => x.ContractorId == demoId))
+                company.ContractorContacts.Add(new ContractorContact(demoId, "Fikcyjny kontakt")
+                    { Email = "demo@example.invalid", Street = "Fikcyjna" });
             await company.SaveChangesAsync();
             await transaction.CommitAsync();
         }
@@ -220,12 +280,12 @@ internal static class LocalDatabases
     public static async Task PrepareTests()
     {
         foreach (var database in TestDatabases)
-            if (await Exists(database)) await CheckOwnership(database);
+            if (await Exists(database)) await CheckDemoData(database);
         foreach (var database in TestDatabases)
         {
             await Drop(database);
             await CreateOrCheck(database);
-            if (database == "Vatowiec_System_Test")
+            if (database == SystemDatabase)
             {
                 await using var system = SystemContext(database);
                 await system.Database.MigrateAsync();
@@ -236,7 +296,7 @@ internal static class LocalDatabases
                 await company.Database.MigrateAsync();
             }
         }
-        Console.WriteLine("Trzy puste bazy *_Test są gotowe do testów transakcyjnych.");
+        Console.WriteLine("Trzy jawnie dozwolone bazy demonstracyjne są odtworzone i gotowe do testów. Po teście nastąpi inicjalizacja demonstratora.");
     }
 
     public static async Task CleanupTests()
@@ -269,6 +329,7 @@ internal static class LocalDatabases
                 start.ArgumentList.Add(argument);
             start.Environment["DOTNET_ENVIRONMENT"] = "Development";
             start.Environment["VATOWIEC_DATABASE_PER_COMPANY_SQL"] = "1";
+            start.Environment["VATOWIEC_DEMO_RESET_AUTHORIZED"] = "1";
             start.Environment["ConnectionStrings__VatowiecSystemTest"] = Connection(TestDatabases[0]);
             start.Environment["ConnectionStrings__VatowiecCompanyATest"] = Connection(TestDatabases[1]);
             start.Environment["ConnectionStrings__VatowiecCompanyBTest"] = Connection(TestDatabases[2]);
@@ -287,7 +348,8 @@ internal static class LocalDatabases
         }
         finally
         {
-            await CleanupTests();
+            await Initialize();
+            await SeedUsers();
         }
     }
 
@@ -297,7 +359,7 @@ internal static class LocalDatabases
         if (await system.Companies.AnyAsync() || await system.CompanyDatabases.AnyAsync() ||
             await system.Users.AnyAsync() || await system.Roles.AnyAsync() || await system.CompanyAccesses.AnyAsync() ||
             await system.UserSessions.AnyAsync())
-            throw new InvalidOperationException("Testy pozostawiły rekordy w katalogu *_Test.");
+            throw new InvalidOperationException("Testy pozostawiły rekordy w katalogu demonstracyjnym.");
         if (!(await system.Database.GetAppliedMigrationsAsync()).SequenceEqual(system.Database.GetMigrations()))
             throw new InvalidOperationException("Testy zmieniły historię bazy systemowej.");
         foreach (var database in TestDatabases.Skip(1))
@@ -309,7 +371,7 @@ internal static class LocalDatabases
                 !(await company.Database.GetAppliedMigrationsAsync()).SequenceEqual(company.Database.GetMigrations()))
                 throw new InvalidOperationException($"Testy nie wycofały danych lub historii w {database}.");
         }
-        Console.WriteLine("Potwierdzono rollback: wszystkie bazy *_Test puste, historie migracji zachowane.");
+        Console.WriteLine("Potwierdzono sprzątanie fixture w trzech bazach demonstracyjnych; historie migracji zachowane.");
     }
 
     private static async Task ShowSchema(DbContext context, string database, string[] expectedTables, string migrationSuffix)
@@ -351,9 +413,9 @@ internal static class LocalDatabases
             if (registration.ServerName != Server || registration.DatabaseName != database)
                 throw new InvalidOperationException("Błędna lokalizacja firmy.");
             await using var company = CompanyContext(database, id);
-            await ShowSchema(company, database, ["core.CompanyProfile", "core.Contractors", "audit.ContractorChanges", "dbo.__EFMigrationsHistory"], "_ContractorAudit");
+            await ShowSchema(company, database, ["core.CompanyProfile", "core.Contractors", "core.ContractorAddresses", "core.ContractorContacts", "core.ContractorBankAccounts", "core.ContractorCreateOperations", "ref.AddressTypes", "audit.ContractorChanges", "dbo.__EFMigrationsHistory"], "_CompanyModelV2");
             var profile = await company.CompanyProfiles.IgnoreQueryFilters().SingleAsync();
-            if (profile.CompanyId != id || await company.Contractors.IgnoreQueryFilters().AnyAsync(x => x.CompanyId != id))
+            if (profile.CompanyId != id)
                 throw new InvalidOperationException("Niezgodna tożsamość danych firmy.");
             Console.WriteLine($"  CompanyId={id}; profil=1; kontrahenci={await company.Contractors.CountAsync()}; NIP/REGON puste, dane fikcyjne.");
         }

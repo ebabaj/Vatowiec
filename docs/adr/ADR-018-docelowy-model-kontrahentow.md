@@ -13,7 +13,9 @@ z 2026-10-22 i ich doprecyzowanie. Pierwszy zapis wskazywał pytania K-01–K-09
 §4 zachowuje ślad ich rozstrzygnięcia. Opis KsefIdWew zweryfikowano w oficjalnych
 materiałach MF (§6); nie implementujemy reguł podatkowych ani integracji.
 
-## 1. Kontekst i granice obecnego zadania
+**Aktualizacja etapu:** użytkownik zakończył prace wyłącznie dokumentacyjne i zlecił implementację podstawy modelu. [ADR-019](ADR-019-implementacja-modelu-kontrahentow.md) opisuje wykonany zakres i rozstrzygnięcia techniczne. Ograniczenia dokumentacyjne poniżej zachowują kontekst powstania ADR-018; zatwierdzone decyzje biznesowe pozostają bez zmian.
+
+## 1. Kontekst i granice pierwotnego zadania dokumentacyjnego
 
 Wstrzymujemy implementację nowych funkcji na czas wspólnego projektowania
 docelowego modelu kontrahentów. Bieżący kod, schemat SQL, migracje EF Core

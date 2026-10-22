@@ -156,7 +156,9 @@ dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- verify
 
 Nie ma migracji ani seedowania kont przy starcie API. Nie wdrażamy hasła z repozytorium.
 
-Pełne testy (dedykowane, tymczasowe bazy *_Test):
+Pełne testy aktualnego modelu ADR-018/019 używają wyłącznie trzech lokalnych baz
+demonstracyjnych. **Zatrzymaj API i desktop: runner usuwa ich fikcyjne dane
+i sesje, a po teście inicjalizuje ponownie demonstrator i konta.** Nie tworzy *_Test.
 
 ```powershell
 dotnet build Vatowiec.slnx --no-restore
@@ -169,8 +171,9 @@ Weryfikują sesje, CSRF, role/przypisania, zmianę uprawnień i SecurityStamp, p
 bazę i obcy profil, manipulację CompanyId, wygasły bilet i sesję SQL, replay po
 logout oraz dwóch równoległych użytkowników firmy A. Wygaśnięcie sprawdzane jest
 przez testowy TimeProvider, bez czekania i bez publicznego endpointu zegara.
-Raporty TRX są w ignorowanym TestResults. Bazy *_Test są sprzątane, a dane
-demonstracyjne pozostają. Audyt księgowy, backup/restore z aplikacji i pełne M0
+Raporty TRX są w ignorowanym TestResults. Bieżący wynik to 128/128 bez pominięć
+(57 SQL/API i 71 bez SQL); szczegóły: [kartoteka](contractors.md).
+Audyt księgowy, backup/restore z aplikacji i pełne M0
 nadal wymagają kolejnych etapów.
 
 Wynik końcowy (2026-10-21): **70/70 testów zaliczonych**, w tym 38 bez SQL i 32

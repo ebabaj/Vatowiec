@@ -24,7 +24,7 @@ public sealed partial class MainViewModel
     public ContractorEditor? Editor => editor;
     public string EditorTitle => editor?.IsNew == true ? "Nowy kontrahent" : "Edycja kontrahenta";
     public string ServerVersionSummary => conflictCurrent is null ? "" : Summary(conflictCurrent);
-    public string LocalVersionSummary => editor is null ? "" : $"Kod: {editor.Code}\nNazwa: {editor.Name}\nIdentyfikator: {editor.TaxIdentifier}\nKraj: {editor.CountryCode}\nStatus: {(editor.IsActive ? "Aktywny" : "Nieaktywny")}";
+    public string LocalVersionSummary => editor is null ? "" : $"Kod: {editor.Code}\nNazwa: {editor.Name}\nIdentyfikator: {editor.TaxId}\nKraj: {editor.CountryCode}\nStatus: {(editor.IsActive ? "Aktywny" : "Nieaktywny")}";
     public bool HasPreviousPage => pageOffset > 0;
     public bool HasNextPage => hasNextPage;
     public string PageLabel => $"Strona {pageOffset / 50 + 1} · do 50 pozycji";
@@ -108,7 +108,7 @@ public sealed partial class MainViewModel
         if (profile is null || row.CompanyId != profile.CompanyId)
             throw new ApiException(502, "API zwróciło dane innej firmy. Odmowa wyświetlenia danych.");
     }
-    private static string Summary(ContractorResponse row) => $"Kod: {row.Code}\nNazwa: {row.Name}\nIdentyfikator: {row.TaxIdentifier}\nKraj: {row.CountryCode}\nStatus: {row.ActivityLabel}";
+    private static string Summary(ContractorResponse row) => $"Kod: {row.Code}\nNazwa: {row.Name}\nIdentyfikator: {row.TaxId}\nKraj: {row.CountryCode}\nStatus: {row.ActivityLabel}";
     private void ClearContractorState()
     {
         editor = null;
@@ -129,21 +129,24 @@ public sealed class ContractorEditor
     public ContractorEditor(ContractorResponse row)
     {
         Id = row.Id;
+        ParentId = row.ParentId;
         Code = row.Code;
         Name = row.Name;
-        TaxIdentifier = row.TaxIdentifier ?? "";
+        TaxId = row.TaxId ?? "";
         CountryCode = row.CountryCode;
         IsActive = row.IsActive;
         RowVersion = row.RowVersion;
         IsNew = false;
     }
-    public Guid Id { get; } = Guid.NewGuid();
+    public int Id { get; }
+    public Guid OperationId { get; } = Guid.NewGuid();
+    public int? ParentId { get; }
     public string Code { get; set; } = "";
     public string Name { get; set; } = "";
-    public string TaxIdentifier { get; set; } = "";
+    public string TaxId { get; } = "";
     public string CountryCode { get; set; } = "PL";
     public bool IsActive { get; set; } = true;
     public bool IsNew { get; } = true;
     public string? RowVersion { get; set; }
-    public ContractorWriteRequest Request() => new(Id, Code, Name, TaxIdentifier, CountryCode, IsActive, RowVersion);
+    public ContractorWriteRequest Request() => new(Id, Code, Name, CountryCode, IsActive, RowVersion, IsNew ? OperationId : null, ParentId);
 }

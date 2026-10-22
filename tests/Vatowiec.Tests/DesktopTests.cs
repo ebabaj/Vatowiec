@@ -202,7 +202,7 @@ public sealed partial class DesktopTests
         await model.ChangeCompany();
         Assert.True(model.IsWorkspace);
         clock.Now += TimeSpan.FromMinutes(2);
-        pending.SetResult([new(Guid.NewGuid(), A, "x", "old", "PL")]);
+        pending.SetResult([new(1, A, "x", "old", "PL")]);
         await load;
         Assert.True(model.IsLogin);
         Assert.Empty(model.Contractors);
@@ -272,19 +272,19 @@ public sealed partial class DesktopTests
         public Task<CompanyResponse[]> Companies() => CompanyListError ? throw new HttpRequestException() : Task.FromResult<CompanyResponse[]>(
             [new(A, "Firma A", Permissions), new(B, "Firma B", Permissions)]);
         public Task<CompanyProfileResponse> Profile(Guid id) => Task.FromResult(new CompanyProfileResponse(WrongCompany ? B : id, $"Firma {id}", null, null));
-        public Task<ContractorResponse> Contractor(Guid companyId, Guid id) => Task.FromResult(new ContractorResponse(id, companyId, "DEMO", "Kontrahent", "PL", RowVersion: "AAAAAAAAAAE="));
+        public Task<ContractorResponse> Contractor(Guid companyId, int id) => Task.FromResult(new ContractorResponse(id, companyId, "DEMO", "Kontrahent", "PL", RowVersion: "AAAAAAAAAAE="));
         public Task<ContractorResponse> SaveContractor(Guid companyId, ContractorWriteRequest value, bool isNew)
         {
             Writes.Add(value);
             if (SaveError is not null) throw SaveError;
-            return Task.FromResult(new ContractorResponse(value.Id, companyId, value.Code, value.Name, value.CountryCode, value.TaxIdentifier, value.IsActive, "AAAAAAAAAAI="));
+            return Task.FromResult(new ContractorResponse(value.Id, companyId, value.Code, value.Name, value.CountryCode, null, value.IsActive, "AAAAAAAAAAI="));
         }
         public Task<ContractorResponse[]> Contractors(Guid id, string? search = null, string? country = null, bool? active = null, int offset = 0, int limit = 50)
         {
             ContractorCalls++;
             LastQuery = (search, country, active, offset, limit);
             if (ContractorError is not null) return Task.FromException<ContractorResponse[]>(ContractorError);
-            return Pending ?? Task.FromResult<ContractorResponse[]>([new(Guid.NewGuid(), WrongCompany ? B : id, "DEMO", "Kontrahent", "PL")]);
+            return Pending ?? Task.FromResult<ContractorResponse[]>([new(1, WrongCompany ? B : id, "DEMO", "Kontrahent", "PL")]);
         }
         public Task Logout()
         {

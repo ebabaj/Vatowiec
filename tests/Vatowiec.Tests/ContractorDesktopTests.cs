@@ -16,14 +16,14 @@ public sealed partial class DesktopTests
         model.NewContractor();
         model.Editor!.Code = "RETRY";
         model.Editor.Name = "Fikcyjna pozycja";
-        var id = model.Editor.Id;
+        var id = model.Editor.OperationId;
         await model.SaveContractor();
         Assert.True(model.IsEditing);
-        Assert.Equal(id, model.Editor.Id);
+        Assert.Equal(id, model.Editor.OperationId);
         Assert.Equal("RETRY", model.Editor.Code);
         api.SaveError = null;
         await model.SaveContractor();
-        Assert.Equal(new[] { id, id }, api.Writes.Select(x => x.Id));
+        Assert.Equal(new[] { id, id }, api.Writes.Select(x => x.OperationId!.Value));
         Assert.False(model.IsEditing);
     }
 
@@ -39,7 +39,7 @@ public sealed partial class DesktopTests
         Assert.Contains("Kod", model.Message);
         model.Editor!.Code = "FICTIONAL";
         model.Editor.Name = "Fikcyjny kontrahent";
-        model.Editor.TaxIdentifier = "DEMO-IDENTIFIER";
+        Assert.Empty(model.Editor.TaxId);
         model.Editor.IsActive = false;
         await model.SaveContractor();
         Assert.False(model.IsEditing);
@@ -61,7 +61,7 @@ public sealed partial class DesktopTests
     [Fact]
     public async Task Conflict_PreservesLocalFieldsAndRequiresExplicitDecisionBeforeRetry()
     {
-        var current = new ContractorResponse(Guid.NewGuid(), A, "DEMO", "Zmiana na serwerze", "DE", "TEST", false, "AAAAAAAAAAI=");
+        var current = new ContractorResponse(1, A, "DEMO", "Zmiana na serwerze", "DE", "TEST", false, "AAAAAAAAAAI=");
         var api = new FakeApi { Permissions = ["ViewProfile", "ViewContractors", "EditContractors"] };
         using var model = await Open(api);
         model.SelectedContractor = current;
@@ -91,7 +91,7 @@ public sealed partial class DesktopTests
     {
         var api = new FakeApi { Permissions = ["ViewProfile", "ViewContractors", "EditContractors"] };
         using var model = await Open(api);
-        var row = new ContractorResponse(Guid.NewGuid(), A, "NEW", "Aktualne dane", "DE", IsActive: false, RowVersion: "AAAAAAAAAAI=");
+        var row = new ContractorResponse(1, A, "NEW", "Aktualne dane", "DE", IsActive: false, RowVersion: "AAAAAAAAAAI=");
         model.SelectedContractor = row;
         await model.EditContractor();
         api.SaveError = new ApiException(409, "Konflikt") { Code = "contractor_conflict", Current = row };
@@ -126,7 +126,7 @@ public sealed partial class DesktopTests
         var api = new FakeApi
         {
             Pending = Task.FromResult(Enumerable.Range(0, 51)
-            .Select(i => new ContractorResponse(Guid.NewGuid(), A, $"T{i}", "Fikcyjny", "PL")).ToArray())
+            .Select(i => new ContractorResponse(1, A, $"T{i}", "Fikcyjny", "PL")).ToArray())
         };
         using var model = await Open(api);
         model.SearchText = "demo & test";
@@ -158,22 +158,22 @@ public sealed partial class DesktopTests
             return Json(new ContractorResponse(value.Id, A, value.Code, value.Name, value.CountryCode, RowVersion: "AAAAAAAAAAE="));
         }))
         { BaseAddress = new Uri("https://localhost") });
-        var request = new ContractorWriteRequest(Guid.NewGuid(), "TEST", "Fikcyjny", null, "PL", true);
+        var request = new ContractorWriteRequest(0, "TEST", "Fikcyjny", "PL", true, OperationId: Guid.NewGuid());
         await client.SaveContractor(A, request, true);
-        await client.SaveContractor(A, request with { RowVersion = "AAAAAAAAAAE=" }, false);
+        await client.SaveContractor(A, request with { Id = 1, RowVersion = "AAAAAAAAAAE=", OperationId = null }, false);
         Assert.Equal(2, calls);
     }
 
     [Fact]
     public void DomainUpdate_ValidatesAllFieldsBeforeChangingState()
     {
-        var row = new Contractor(A, Guid.NewGuid(), "OLD", "Fikcyjny", "PL");
-        Assert.Throws<ArgumentException>(() => row.Update("NEW", "Zmieniony", null, "P1", false));
+        var row = new Contractor("OLD", "Fikcyjny", "PL", "TEST");
+        Assert.Throws<ArgumentException>(() => row.Update("NEW", "Zmieniony", "P1", false));
         Assert.Equal("OLD", row.Code);
         Assert.True(row.IsActive);
-        row.Update(" new ", " Zmieniony ", " TEST ", "de", false);
+        row.Update(" new ", " Zmieniony ", "de", false);
         Assert.Equal("NEW", row.Code);
-        Assert.Equal("TEST", row.TaxIdentifier);
+        Assert.Equal("TEST", row.TaxId);
         Assert.Equal("DE", row.CountryCode);
         Assert.False(row.IsActive);
     }

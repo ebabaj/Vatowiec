@@ -12,5 +12,6 @@
   <ItemGroup>
     <!-- Zastosowana historia Vatowiec_Dev jest archiwum, nie migracją nowych kontekstów. -->
     <Compile Remove="Persistence/LegacyMigrations/**/*.cs" />
+    <Compile Remove="Persistence/LegacyCompanyMigrations/**/*.cs" />
   </ItemGroup>
 </Project>

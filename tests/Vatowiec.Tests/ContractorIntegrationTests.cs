@@ -11,11 +11,11 @@ namespace Vatowiec.Tests;
 
 public sealed partial class AuthenticationIntegrationTests
 {
-    private ContractorWriteRequest NewContractor(string code = "NEW") => new(Guid.NewGuid(), code, "Fikcyjny kontrahent", "DEMO-TAX", "pl", true);
+    private ContractorWriteRequest NewContractor(string code = "NEW") => new(0, code, "Fikcyjny kontrahent", "pl", true, OperationId: Guid.NewGuid());
     private string ContractorsPath(Guid? company = null) => $"/api/v1/companies/{company ?? companyA}/contractors";
     private static ContractorWriteRequest Edit(ContractorResponse value, string name, bool active = true) =>
-        new(value.Id, value.Code, name, value.TaxIdentifier, value.CountryCode, active, value.RowVersion);
-    private Task<ContractorResponse?> Read(HttpClient client, Guid id) => client.GetFromJsonAsync<ContractorResponse>($"{ContractorsPath()}/{id}");
+        new(value.Id, value.Code, name, value.CountryCode, active, value.RowVersion, ParentId: value.ParentId);
+    private Task<ContractorResponse?> Read(HttpClient client, int id) => client.GetFromJsonAsync<ContractorResponse>($"{ContractorsPath()}/{id}");
     private async Task GrantReaderEdit()
     {
         using var scope = application!.Services.CreateScope();
@@ -49,7 +49,7 @@ public sealed partial class AuthenticationIntegrationTests
         Assert.Equal((await scope.ServiceProvider.GetRequiredService<SystemDbContext>().InstallationIdentities.SingleAsync()).Id, audit.ActorIssuerId);
         Assert.Equal("NEW", JsonDocument.Parse(audit.AfterJson).RootElement.GetProperty("Code").GetString());
         await using var other = Company(true, companyB);
-        Assert.False(await other.Contractors.AnyAsync(x => x.Id == value.Id));
+        Assert.False(await other.Contractors.AnyAsync(x => x.Code == value.Code.Trim().ToUpper()));
         Assert.Empty(await other.ContractorChanges.ToListAsync());
     }
 
@@ -59,14 +59,14 @@ public sealed partial class AuthenticationIntegrationTests
         using var op = await Login("operator.test");
         await Csrf(op);
         var before = (await Read(op, contractorId))!;
-        var value = Edit(before, "Nowa fikcyjna nazwa", false) with { Code = "EDITED", CountryCode = "de", TaxIdentifier = "FIKCYJNY-123" };
+        var value = Edit(before, "Nowa fikcyjna nazwa", false) with { Code = "EDITED", CountryCode = "de" };
         using var update = await op.PutAsJsonAsync($"{ContractorsPath()}/{contractorId}", value);
         Assert.Equal(HttpStatusCode.OK, update.StatusCode);
         var after = (await Read(op, contractorId))!;
         Assert.NotEqual(before.RowVersion, after.RowVersion);
         Assert.False(after.IsActive);
         Assert.Equal("DE", after.CountryCode);
-        Assert.Equal(value.TaxIdentifier, after.TaxIdentifier);
+        Assert.Equal(before.TaxId, after.TaxId);
         await using var company = Company(false, companyA);
         var audit = Assert.Single(await company.ContractorChanges.ToListAsync());
         Assert.Equal("Update", audit.Operation);
@@ -111,7 +111,7 @@ public sealed partial class AuthenticationIntegrationTests
         Assert.Equal(HttpStatusCode.BadRequest, (await op.PostAsJsonAsync(ContractorsPath(), value)).StatusCode);
         op.DefaultRequestHeaders.Remove("X-Company-Id");
         Assert.Equal(HttpStatusCode.BadRequest, (await op.PostAsJsonAsync(ContractorsPath(), new
-        { value.Id, value.Code, value.Name, value.TaxIdentifier, value.CountryCode, value.IsActive, companyId = companyB })).StatusCode);
+        { value.Id, value.Code, value.Name, value.OperationId, value.CountryCode, value.IsActive, companyId = companyB })).StatusCode);
         var row = (await Read(op, contractorId))!;
         op.DefaultRequestHeaders.Remove("X-CSRF-TOKEN");
         Assert.Equal(HttpStatusCode.BadRequest, (await op.PutAsJsonAsync($"{ContractorsPath()}/{contractorId}", Edit(row, "Fikcyjna zmiana"))).StatusCode);
@@ -124,7 +124,7 @@ public sealed partial class AuthenticationIntegrationTests
     {
         using var op = await Login("operator.test");
         await Csrf(op);
-        foreach (var value in new[] { NewContractor(""), NewContractor() with { Name = " ", CountryCode = "P1", TaxIdentifier = new string('x', 33) } })
+        foreach (var value in new[] { NewContractor(""), NewContractor() with { Name = " ", CountryCode = "P1", Code = new string('x', 65) } })
         {
             using var response = await op.PostAsJsonAsync(ContractorsPath(), value);
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -136,8 +136,8 @@ public sealed partial class AuthenticationIntegrationTests
         var row = (await Read(op, contractorId))!;
         foreach (var version in new string?[] { null, "malformed", Convert.ToBase64String([1, 2]) })
             Assert.Equal(HttpStatusCode.BadRequest, (await op.PutAsJsonAsync($"{ContractorsPath()}/{contractorId}", Edit(row, "Test") with { RowVersion = version })).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await op.PutAsJsonAsync($"{ContractorsPath()}/{Guid.NewGuid()}", Edit(row, "Test"))).StatusCode);
-        var unknown = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.BadRequest, (await op.PutAsJsonAsync($"{ContractorsPath()}/{int.MaxValue}", Edit(row, "Test"))).StatusCode);
+        var unknown = int.MaxValue;
         Assert.Equal(HttpStatusCode.NotFound, (await op.PutAsJsonAsync($"{ContractorsPath()}/{unknown}", Edit(row, "Test") with { Id = unknown })).StatusCode);
         await using var company = Company(false, companyA);
         Assert.Empty(await company.ContractorChanges.ToListAsync());
@@ -204,7 +204,7 @@ public sealed partial class AuthenticationIntegrationTests
             var value = NewContractor("ROLLBACK");
             Assert.Equal(HttpStatusCode.ServiceUnavailable, (await op.PostAsJsonAsync(ContractorsPath(), value)).StatusCode);
             Assert.Equal(HttpStatusCode.ServiceUnavailable, (await op.PutAsJsonAsync($"{ContractorsPath()}/{contractorId}", Edit(original, "Nie wolno zapisać"))).StatusCode);
-            Assert.False(await company.Contractors.AnyAsync(x => x.Id == value.Id));
+            Assert.False(await company.Contractors.AnyAsync(x => x.Code == value.Code.Trim().ToUpper()));
             var current = (await Read(op, contractorId))!;
             Assert.Equal(original.Name, current.Name);
             Assert.Equal(original.RowVersion, current.RowVersion);
@@ -244,8 +244,8 @@ public sealed partial class AuthenticationIntegrationTests
         {
             for (var i = 0; i < 65; i++)
             {
-                var row = new Contractor(companyA, Guid.NewGuid(), $"PAGE{i:000}", $"Fikcyjna pozycja {i}", i % 2 == 0 ? "PL" : "DE", $"TEST-{i:000}");
-                row.Update(row.Code, row.Name, row.TaxIdentifier, row.CountryCode, i % 3 != 0);
+                var row = new Contractor($"PAGE{i:000}", $"Fikcyjna pozycja {i}", i % 2 == 0 ? "PL" : "DE", $"TEST-{i:000}");
+                row.Update(row.Code, row.Name, row.CountryCode, i % 3 != 0);
                 company.Contractors.Add(row);
             }
             await company.SaveChangesAsync();
@@ -275,7 +275,7 @@ public sealed partial class AuthenticationIntegrationTests
         {
             var system = scope.ServiceProvider.GetRequiredService<SystemDbContext>();
             await system.CompanyDatabases.Where(x => x.CompanyId == companyB).ExecuteDeleteAsync();
-            await system.CompanyDatabases.Where(x => x.CompanyId == companyA).ExecuteUpdateAsync(x => x.SetProperty(a => a.DatabaseName, "Vatowiec_Company_B_Test"));
+            await system.CompanyDatabases.Where(x => x.CompanyId == companyA).ExecuteUpdateAsync(x => x.SetProperty(a => a.DatabaseName, "Vatowiec_Company_B_Dev"));
         }
         Assert.Equal(HttpStatusCode.ServiceUnavailable, (await op.PostAsJsonAsync(ContractorsPath(), NewContractor())).StatusCode);
         await using var b = Company(true, companyB);

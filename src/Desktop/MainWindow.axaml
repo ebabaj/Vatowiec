@@ -103,7 +103,7 @@
                 <Grid ColumnDefinitions="110,*,160,60,100" Margin="8" HorizontalAlignment="Stretch">
                   <TextBlock Text="{Binding Code}" TextWrapping="Wrap" />
                   <TextBlock Grid.Column="1" Text="{Binding Name}" TextWrapping="Wrap" Margin="0,0,12,0" />
-                  <TextBlock Grid.Column="2" Text="{Binding TaxIdentifier}" TextWrapping="Wrap" />
+                  <TextBlock Grid.Column="2" Text="{Binding TaxId}" TextWrapping="Wrap" />
                   <TextBlock Grid.Column="3" Text="{Binding CountryCode}" />
                   <TextBlock Grid.Column="4" Text="{Binding ActivityLabel}" />
                 </Grid>
@@ -131,13 +131,13 @@
             <TextBlock Grid.Row="1" Text="Nazwa *" VerticalAlignment="Center" />
             <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Editor.Name, Mode=TwoWay}" MaxLength="256" AutomationProperties.AutomationId="ContractorName" />
             <TextBlock Grid.Row="2" Text="Identyfikator podatkowy" VerticalAlignment="Center" />
-            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Editor.TaxIdentifier, Mode=TwoWay}" MaxLength="32" AutomationProperties.AutomationId="ContractorTaxIdentifier" />
+            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Editor.TaxId}" IsReadOnly="True" PlaceholderText="Identyfikatory: tylko podgląd, bez walidacji podatkowej" AutomationProperties.AutomationId="ContractorTaxId" />
             <TextBlock Grid.Row="3" Text="Kraj *" VerticalAlignment="Center" />
             <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Editor.CountryCode, Mode=TwoWay}" MaxLength="2" AutomationProperties.AutomationId="ContractorCountry" />
             <TextBlock Grid.Row="4" Text="Status" VerticalAlignment="Center" />
             <CheckBox Grid.Row="4" Grid.Column="1" Content="Aktywny" IsChecked="{Binding Editor.IsActive, Mode=TwoWay}" AutomationProperties.AutomationId="ContractorActive" />
           </Grid>
-          <TextBlock Text="* Pole wymagane. Kraj: dwie litery, np. PL. Identyfikator podatkowy jest opcjonalny. Wyłączenie aktywności zachowuje pozycję i jej historię."
+          <TextBlock Text="* Pole wymagane. Kraj: dwie litery, np. PL. Identyfikatory podatkowe: tylko podgląd; program nie potwierdza ich poprawności. Wyłączenie aktywności zachowuje pozycję i jej historię."
                      TextWrapping="Wrap" Opacity="0.7" />
           <Border IsVisible="{Binding HasConflict}" BorderBrush="#B77816" BorderThickness="1" Padding="16">
             <StackPanel Spacing="12">

@@ -22,6 +22,42 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Vatowiec.Core.Domain.AddressType", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("AddressTypes", "ref", t =>
+                        {
+                            t.HasCheckConstraint("CK_AddressTypes_Name", "LEN(LTRIM(RTRIM([Name]))) > 0");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "Adres rejestrowy"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "Adres korespondencyjny"
+                        });
+                });
+
             modelBuilder.Entity("Vatowiec.Core.Domain.CompanyProfile", b =>
                 {
                     b.Property<byte>("SingletonKey")
@@ -57,6 +93,8 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
 
                     b.HasKey("SingletonKey");
 
+                    b.HasAlternateKey("CompanyId");
+
                     b.ToTable("CompanyProfile", "core", t =>
                         {
                             t.HasCheckConstraint("CK_CompanyProfile_CompanyId", "[CompanyId] <> '00000000-0000-0000-0000-000000000000'");
@@ -71,11 +109,11 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
 
             modelBuilder.Entity("Vatowiec.Core.Domain.Contractor", b =>
                 {
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
 
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Code")
                         .IsRequired()
@@ -93,10 +131,17 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<string>("KsefIdWew")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
+
+                    b.Property<int?>("ParentId")
+                        .HasColumnType("int");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -104,19 +149,25 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
-                    b.Property<string>("TaxIdentifier")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
+                    b.Property<string>("TaxId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.HasKey("CompanyId", "Id");
+                    b.Property<string>("VatEuId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
-                    b.HasIndex("CompanyId", "Code")
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
                         .IsUnique();
 
-                    b.HasIndex("CompanyId", "IsActive", "Code");
+                    b.HasIndex("ParentId");
+
+                    b.HasIndex("IsActive", "Code");
 
                     b.ToTable("Contractors", "core", t =>
                         {
@@ -126,17 +177,142 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
 
                             t.HasCheckConstraint("CK_Contractors_Dates", "[UpdatedAtUtc] >= [CreatedAtUtc]");
 
-                            t.HasCheckConstraint("CK_Contractors_Id", "[Id] <> '00000000-0000-0000-0000-000000000000'");
-
                             t.HasCheckConstraint("CK_Contractors_Name", "LEN(LTRIM(RTRIM([Name]))) > 0");
+
+                            t.HasCheckConstraint("CK_Contractors_Parent", "[ParentId] IS NULL OR [ParentId] <> [Id]");
                         });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.ContractorAddress", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AddressTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ApartmentNo")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("BuildingNo")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("ContractorId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CountryCode")
+                        .HasColumnType("char(2)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PostalCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Region")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Street")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AddressTypeId");
+
+                    b.HasIndex("ContractorId", "AddressTypeId")
+                        .IsUnique()
+                        .HasFilter("[IsDefault] = 1");
+
+                    b.ToTable("ContractorAddresses", "core");
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.ContractorBankAccount", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AccountHolderName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("AccountNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("BankName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Bic")
+                        .HasColumnType("varchar(11)");
+
+                    b.Property<int>("ContractorId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CurrencyCode")
+                        .HasColumnType("char(3)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContractorId", "CurrencyCode")
+                        .IsUnique()
+                        .HasFilter("[IsDefault] = 1");
+
+                    b.ToTable("ContractorBankAccounts", "core");
                 });
 
             modelBuilder.Entity("Vatowiec.Core.Domain.ContractorChange", b =>
                 {
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
@@ -158,8 +334,8 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
                     b.Property<string>("BeforeJson")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid>("ContractorId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<int>("ContractorId")
+                        .HasColumnType("int");
 
                     b.Property<string>("CorrelationId")
                         .IsRequired()
@@ -189,9 +365,9 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.HasKey("CompanyId", "Id");
+                    b.HasKey("Id");
 
-                    b.HasIndex("CompanyId", "ContractorId", "OccurredAtUtc");
+                    b.HasIndex("ContractorId", "OccurredAtUtc");
 
                     b.ToTable("ContractorChanges", "audit", t =>
                         {
@@ -201,22 +377,160 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
                         });
                 });
 
+            modelBuilder.Entity("Vatowiec.Core.Domain.ContractorContact", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ApartmentNo")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("BuildingNo")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("ContractorId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CountryCode")
+                        .HasColumnType("char(2)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Position")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PostalCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Street")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContractorId");
+
+                    b.ToTable("ContractorContacts", "core", t =>
+                        {
+                            t.HasCheckConstraint("CK_ContractorContacts_Name", "LEN(LTRIM(RTRIM([Name]))) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.ContractorCreateOperation", b =>
+                {
+                    b.Property<Guid>("ActorIssuerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ContractorId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<string>("ResponseJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("ActorIssuerId", "ActorId", "OperationId");
+
+                    b.HasIndex("ContractorId");
+
+                    b.ToTable("ContractorCreateOperations", "core");
+                });
+
             modelBuilder.Entity("Vatowiec.Core.Domain.Contractor", b =>
                 {
-                    b.HasOne("Vatowiec.Core.Domain.CompanyProfile", null)
+                    b.HasOne("Vatowiec.Core.Domain.Contractor", null)
                         .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .HasPrincipalKey("CompanyId")
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.NoAction);
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.ContractorAddress", b =>
+                {
+                    b.HasOne("Vatowiec.Core.Domain.AddressType", null)
+                        .WithMany()
+                        .HasForeignKey("AddressTypeId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Vatowiec.Core.Domain.Contractor", null)
+                        .WithMany()
+                        .HasForeignKey("ContractorId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.ContractorBankAccount", b =>
+                {
+                    b.HasOne("Vatowiec.Core.Domain.Contractor", null)
+                        .WithMany()
+                        .HasForeignKey("ContractorId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
                 });
 
             modelBuilder.Entity("Vatowiec.Core.Domain.ContractorChange", b =>
                 {
-                    b.HasOne("Vatowiec.Core.Domain.CompanyProfile", null)
+                    b.HasOne("Vatowiec.Core.Domain.Contractor", null)
                         .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .HasPrincipalKey("CompanyId")
+                        .HasForeignKey("ContractorId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.ContractorContact", b =>
+                {
+                    b.HasOne("Vatowiec.Core.Domain.Contractor", null)
+                        .WithMany()
+                        .HasForeignKey("ContractorId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.ContractorCreateOperation", b =>
+                {
+                    b.HasOne("Vatowiec.Core.Domain.Contractor", null)
+                        .WithMany()
+                        .HasForeignKey("ContractorId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
                 });

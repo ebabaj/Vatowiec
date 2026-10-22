@@ -1,14 +1,12 @@
 namespace Vatowiec.Core.Domain;
 
-public sealed class Contractor : ICompanyEntity
+public sealed class Contractor : ITrackedEntity
 {
     private Contractor() { }
 
-    public Contractor(Guid companyId, Guid id, string code, string name,
-        string countryCode, string? taxIdentifier = null)
+    public Contractor(string code, string name, string countryCode, string? taxId = null,
+        string? vatEuId = null, string? ksefIdWew = null, int? parentId = null)
     {
-        CompanyId = EntityText.Id(companyId, nameof(companyId));
-        Id = EntityText.Id(id, nameof(id));
         Code = EntityText.Required(code, 64, nameof(code)).ToUpperInvariant();
         Rename(name);
         CountryCode = EntityText.Required(countryCode, 2, nameof(countryCode)).ToUpperInvariant();
@@ -17,15 +15,20 @@ public sealed class Contractor : ICompanyEntity
             throw new ArgumentException("Kod kraju musi zawierać dwie litery ASCII.", nameof(countryCode));
         }
 
-        TaxIdentifier = EntityText.Optional(taxIdentifier, 32, nameof(taxIdentifier));
+        TaxId = EntityText.Optional(taxId, 100, nameof(taxId));
+        VatEuId = EntityText.Optional(vatEuId, 100, nameof(vatEuId));
+        KsefIdWew = EntityText.Optional(ksefIdWew, 100, nameof(ksefIdWew));
+        SetParent(parentId);
     }
 
-    public Guid CompanyId { get; private set; }
-    public Guid Id { get; private set; }
+    public int Id { get; private set; }
+    public int? ParentId { get; private set; }
     public string Code { get; private set; } = null!;
     public string Name { get; private set; } = null!;
     public string CountryCode { get; private set; } = null!;
-    public string? TaxIdentifier { get; private set; }
+    public string? TaxId { get; private set; }
+    public string? VatEuId { get; private set; }
+    public string? KsefIdWew { get; private set; }
     public bool IsActive { get; private set; } = true;
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset UpdatedAtUtc { get; private set; }
@@ -33,13 +36,20 @@ public sealed class Contractor : ICompanyEntity
 
     public void Rename(string name) => Name = EntityText.Required(name, 256, nameof(name));
 
-    public void Update(string code, string name, string? taxIdentifier, string countryCode, bool isActive)
+    public void SetParent(int? parentId)
+    {
+        if (parentId is <= 0 || (Id > 0 && parentId == Id))
+            throw new ArgumentException("Nieprawidłowy rekord nadrzędny.", nameof(parentId));
+        ParentId = parentId;
+    }
+
+    // Podstawowa kartoteka nie edytuje identyfikatorów do czasu wdrożenia ostrzeżeń.
+    public void Update(string code, string name, string countryCode, bool isActive)
     {
         // Waliduj całość przed zmianą stanu encji.
-        var valid = new Contractor(CompanyId, Id, code, name, countryCode, taxIdentifier);
+        var valid = new Contractor(code, name, countryCode);
         Code = valid.Code;
         Name = valid.Name;
-        TaxIdentifier = valid.TaxIdentifier;
         CountryCode = valid.CountryCode;
         IsActive = isActive;
     }

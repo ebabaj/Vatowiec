@@ -4,7 +4,8 @@ Klient korzysta wyłącznie z API HTTPS. Katalog firm i uprawnienia są w
 Vatowiec_System, a kontrahenci w osobnych Vatowiec_Company_A_Dev/B_Dev.
 Pierwszy etap odczytu opisuje [ADR-016](adr/ADR-016-desktop-logowanie-i-kontekst-firmy.md).
 **Aktualizacja 2026-10-22:** dodawanie, edycję, wyszukiwanie, stronicowanie,
-dezaktywację i konflikt opisuje [kartoteka kontrahentów](contractors.md), ADR-017.
+dezaktywację i konflikt opisuje [kartoteka kontrahentów](contractors.md), ADR-017/018/019.
+Id kontrahenta jest int; identyfikatory podatkowe są tylko do odczytu bez deklarowania ich poprawności.
 Operator edytuje w A, a w B nadal tylko czyta.
 
 ## Uruchomienie
@@ -96,7 +97,7 @@ dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- test
 dotnet format Vatowiec.slnx --verify-no-changes --no-restore
 ```
 
-Pełny runner tworzy i usuwa dedykowane bazy *_Test. Wynik TRX zapisuje w
+Aktualny runner odtwarza wyłącznie trzy bazy demonstracyjne i usuwa ich fikcyjne dane; zatrzymaj wcześniej API i desktop. Po testach inicjalizuje demonstrator. Wynik TRX zapisuje w
 TestResults. Zwykłe `dotnet test --no-build` bez włączenia SQL nie zalicza testów SQL;
 raportuje je jako pominięte.
 

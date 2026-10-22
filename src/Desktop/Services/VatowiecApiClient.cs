@@ -11,7 +11,7 @@ public interface IVatowiecApiClient : IDisposable
     Task<CompanyResponse[]> Companies();
     Task<CompanyProfileResponse> Profile(Guid companyId);
     Task<ContractorResponse[]> Contractors(Guid companyId, string? search = null, string? country = null, bool? active = null, int offset = 0, int limit = 50);
-    Task<ContractorResponse> Contractor(Guid companyId, Guid id);
+    Task<ContractorResponse> Contractor(Guid companyId, int id);
     Task<ContractorResponse> SaveContractor(Guid companyId, ContractorWriteRequest value, bool isNew);
     Task Logout();
 }
@@ -82,7 +82,7 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         return Get<ContractorResponse[]>($"api/v1/companies/{companyId:D}/contractors" + (query.Count == 0 ? "" : "?" + string.Join("&", query)));
     }
 
-    public Task<ContractorResponse> Contractor(Guid companyId, Guid id) => Get<ContractorResponse>($"api/v1/companies/{companyId:D}/contractors/{id:D}");
+    public Task<ContractorResponse> Contractor(Guid companyId, int id) => Get<ContractorResponse>($"api/v1/companies/{companyId:D}/contractors/{id:D}");
 
     public async Task<ContractorResponse> SaveContractor(Guid companyId, ContractorWriteRequest value, bool isNew)
     {
@@ -141,6 +141,7 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
             HttpStatusCode.NotFound => "Nie znaleziono kontrahenta w tej firmie. Odśwież listę.",
             HttpStatusCode.Conflict when error?.Code == "contractor_conflict" => "Inna osoba zmieniła kontrahenta. Porównaj wersje i wybierz sposób rozwiązania konfliktu.",
             HttpStatusCode.Conflict when error?.Code == "contractor_code_exists" => "Ten kod jest już zajęty w tej firmie. Wpisz inny kod.",
+            HttpStatusCode.Conflict when error?.Code == "operation_payload_mismatch" => "Ta operacja została już zapisana z innymi danymi. Anuluj formularz, wyszukaj kontrahenta i otwórz jego edycję.",
             HttpStatusCode.Conflict => "Pozycja już istnieje. Odśwież listę przed ponowieniem.",
             _ => "API nie może wykonać operacji. Spróbuj ponownie."
         };

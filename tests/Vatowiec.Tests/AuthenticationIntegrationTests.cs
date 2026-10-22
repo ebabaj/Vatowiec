@@ -28,7 +28,8 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
     private readonly string password = "Aa1!" + Guid.NewGuid().ToString("N");
     private readonly Guid companyA = Guid.NewGuid();
     private readonly Guid companyB = Guid.NewGuid();
-    private readonly Guid contractorId = Guid.NewGuid();
+    private int contractorId;
+    private int contractorIdB;
     private Guid operatorId;
     private Guid readerId;
     private string SystemConnection => Environment.GetEnvironmentVariable("ConnectionStrings__VatowiecSystemTest")!;
@@ -37,16 +38,17 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        if (Environment.GetEnvironmentVariable("VATOWIEC_DATABASE_PER_COMPANY_SQL") != "1") return;
+        if (Environment.GetEnvironmentVariable("VATOWIEC_DATABASE_PER_COMPANY_SQL") != "1" ||
+            Environment.GetEnvironmentVariable("VATOWIEC_DEMO_RESET_AUTHORIZED") != "1") return;
         // Bez dowolnych adresów: te same dokładne fixture co w testach persystencji.
-        foreach (var (connection, catalog) in new[] { (SystemConnection, "Vatowiec_System_Test"),
-                     (CompanyConnection(false), "Vatowiec_Company_A_Test"), (CompanyConnection(true), "Vatowiec_Company_B_Test") })
+        foreach (var (connection, catalog) in new[] { (SystemConnection, "Vatowiec_System"),
+                     (CompanyConnection(false), "Vatowiec_Company_A_Dev"), (CompanyConnection(true), "Vatowiec_Company_B_Dev") })
         {
             var target = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(connection);
             Assert.Equal(@"localhost\SQLEXPRESS", target.DataSource, ignoreCase: true);
             Assert.Equal(catalog, target.InitialCatalog);
             Assert.True(target.IntegratedSecurity);
-            if (catalog == "Vatowiec_System_Test") DatabaseConnectionPolicy.ValidateSystem(connection, true);
+            if (catalog == "Vatowiec_System") DatabaseConnectionPolicy.ValidateSystem(connection, true);
             else DatabaseConnectionPolicy.ValidateCompany(connection, true);
         }
         application = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
@@ -84,12 +86,15 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
         {
             system.Companies.Add(new Company(id, name));
             system.CompanyDatabases.Add(new CompanyDatabaseRegistration(id, @"localhost\SQLEXPRESS",
-                second ? "Vatowiec_Company_B_Test" : "Vatowiec_Company_A_Test", "LocalWindows"));
+                second ? "Vatowiec_Company_B_Dev" : "Vatowiec_Company_A_Dev", "LocalWindows"));
             system.CompanyAccesses.Add(new CompanyAccess(operatorId, id, (CompanyPermission)7));
             await using var company = Company(second, id);
             company.CompanyProfiles.Add(new CompanyProfile(id, name));
-            company.Contractors.Add(new Contractor(id, contractorId, "SAME", second ? "Kontrahent B" : "Kontrahent A", "PL"));
+            var seeded = new Contractor("SAME", second ? "Kontrahent B" : "Kontrahent A", "PL");
+            company.Contractors.Add(seeded);
             await company.SaveChangesAsync();
+            if (!second) contractorId = seeded.Id;
+            else contractorIdB = seeded.Id;
         }
         system.CompanyAccesses.Add(new CompanyAccess(readerId, companyA, CompanyPermission.ViewProfile));
         await system.SaveChangesAsync();
@@ -111,7 +116,13 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
         foreach (var second in new[] { false, true })
         {
             await using var company = Company(second, second ? companyB : companyA);
+            await company.ContractorCreateOperations.ExecuteDeleteAsync();
             await company.ContractorChanges.ExecuteDeleteAsync();
+            await company.ContractorAddresses.ExecuteDeleteAsync();
+            await company.ContractorBankAccounts.ExecuteDeleteAsync();
+            await company.ContractorContacts.ExecuteDeleteAsync();
+            await company.AddressTypes.Where(x => x.Id > 2).ExecuteDeleteAsync();
+            await company.Contractors.ExecuteUpdateAsync(x => x.SetProperty(r => r.ParentId, (int?)null));
             await company.Contractors.ExecuteDeleteAsync();
             await company.CompanyProfiles.ExecuteDeleteAsync();
         }
@@ -224,8 +235,8 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
         using var op = await Login("operator.test");
         var a = Assert.Single((await Json(op, $"/api/v1/companies/{companyA}/contractors")).EnumerateArray());
         var b = Assert.Single((await Json(op, $"/api/v1/companies/{companyB}/contractors")).EnumerateArray());
-        Assert.Equal(contractorId, a.GetProperty("id").GetGuid());
-        Assert.Equal(contractorId, b.GetProperty("id").GetGuid());
+        Assert.Equal(contractorId, a.GetProperty("id").GetInt32());
+        Assert.Equal(contractorIdB, b.GetProperty("id").GetInt32());
         Assert.Equal(companyA, a.GetProperty("companyId").GetGuid());
         Assert.Equal(companyB, b.GetProperty("companyId").GetGuid());
         Assert.Equal("Kontrahent A", a.GetProperty("name").GetString());
@@ -255,7 +266,7 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
             var system = scope.ServiceProvider.GetRequiredService<SystemDbContext>();
             await system.CompanyDatabases.Where(x => x.CompanyId == companyB).ExecuteDeleteAsync();
             await system.CompanyDatabases.Where(x => x.CompanyId == companyA)
-                .ExecuteUpdateAsync(x => x.SetProperty(p => p.DatabaseName, "Vatowiec_Company_B_Test"));
+                .ExecuteUpdateAsync(x => x.SetProperty(p => p.DatabaseName, "Vatowiec_Company_B_Dev"));
         }
         using var response = await op.GetAsync($"/api/v1/companies/{companyA}/contractors");
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
@@ -379,7 +390,7 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
         using var scope = application!.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<SystemDbContext>().CompanyDatabases
             .Where(x => x.CompanyId == companyA).ExecuteUpdateAsync(update =>
-                update.SetProperty(x => x.DatabaseName, "Vatowiec_System_Test"));
+                update.SetProperty(x => x.DatabaseName, "Vatowiec_System"));
         using var response = await op.GetAsync($"/api/v1/companies/{companyA}/profile");
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("{\"code\":\"company_unavailable\"}", await response.Content.ReadAsStringAsync());

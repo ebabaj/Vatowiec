@@ -5,18 +5,16 @@ Projekt wielostanowiskowej aplikacji dla polskich mikrofirm. Obecny stan to
 wybór firmy, dodawanie/edycja z audytem i konfliktami oraz wyszukiwanie po stronie serwera.
 Osobne SystemDbContext i CompanyDbContext, trzy bazy SQL
 Server oraz dwie fikcyjne firmy. Działają Identity, sesje API i autoryzowany resolver
-bazy firmy. Pełny zestaw obejmuje 117 testów, w tym 46 z SQL/API.
+bazy firmy. Pełny zestaw obejmuje 128 testów, w tym 57 z SQL/API.
 Nie jest to jeszcze program do prowadzenia księgowości.
 
-**Aktualny etap: projektowanie docelowego modelu kontrahentów, wyłącznie dokumentacja.**
-Implementacja nowych funkcji jest wstrzymana. [ADR-018](docs/adr/ADR-018-docelowy-model-kontrahentow.md)
-zawiera doprecyzowany model: ParentId bez dziedziczenia, własne adresy/kontakty/rachunki,
-TaxId/VatEuId do 100 znaków z audytowanymi ostrzeżeniami i domyślne rachunki według waluty.
-Oddziela go od pozostałych szczegółów implementacyjnych; poniższe instrukcje i wynik
-117 testów opisują wdrożony etap ADR-017. Obecny kod, schemat i dane pozostają
-bez zmian. Fikcyjnych danych demonstracyjnych nie trzeba przenosić: przy przyszłej
-zaakceptowanej implementacji można odtworzyć wyłącznie demonstracyjne bazy VATowca.
-Nie projektujemy migracji ich GUID ani zgodności ze starym schematem.
+**Aktualny etap: wdrożona podstawa modelu ADR-018.** Contractors ma int IDENTITY,
+ParentId bez dziedziczenia, osobne adresy/kontakty/rachunki i lokalny AddressTypes.
+Ponowienia POST rozpoznaje trwała operacja tworzenia; zapis i audyt są atomowe.
+Identyfikatory podatkowe w podstawowym UI/API są tylko do odczytu. Nie wdrożono
+walidatorów, integracji ani ekranów szczegółów. Rozstrzygnięcia techniczne:
+[ADR-019](docs/adr/ADR-019-implementacja-modelu-kontrahentow.md).
+Trzy lokalne bazy demonstracyjne odtworzono bez migracji dawnych danych i GUID.
 
 Wymagania produktu: [SPECYFIKACJA.md](SPECYFIKACJA.md).
 Architektura i granice modułów: [ADR-013](docs/adr/ADR-013-architektura-modularnego-monolitu.md).
@@ -42,8 +40,8 @@ Dodawanie, edycja, filtry i konflikt dwóch okien: [kartoteka](docs/contractors.
 - Git do pracy z repozytorium.
 
 Do pełnych testów SQL potrzebny jest lokalny **SQL Server 2025 Express**,
-instancja `localhost\SQLEXPRESS`, Windows Authentication i trzy dedykowane bazy
-`*_Test`, tworzone i usuwane przez narzędzie testowe. SQL nie jest potrzebny
+instancja `localhost\SQLEXPRESS`, Windows Authentication i trzy jawnie dozwolone
+bazy demonstracyjne. Pełny runner odtwarza je i usuwa bieżące fikcyjne dane. SQL nie jest potrzebny
 do kompilacji, generowania migracji/skryptów, testów bez bazy ani startu okna.
 Nie trzeba instalować szablonów Avalonia ani dodatkowych workloadów .NET.
 Avalonia i EF Core pobierają się jako pakiety NuGet; lokalne narzędzie `dotnet-ef`
@@ -197,22 +195,20 @@ Testy offline weryfikują rozłączne modele, lokalny profil/FK, historie i SQL
 migracji, zgodność snapshotów, odmowę bez wyboru bazy, izolację scope,
 politykę połączeń, filtry, kontrolę zapisu i host API.
 
-Powyższy przebieg bez SQL zalicza 71 testów i pomija 46 testów SQL/API. Pełny przebieg:
+Powyższy przebieg bez SQL zalicza 71 testów i pomija 57 testów SQL/API. Pełny przebieg:
 
 ```powershell
 dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- test
 ```
 
-Narzędzie sprawdza lokalny serwer, przygotowuje trzy oznaczone bazy *_Test,
-wykonuje wszystkie testy, zapisuje TRX, sprawdza rollbacky i usuwa te bazy w finally.
-Nie zmienia danych demonstracyjnych. Pełny zestaw obejmuje **117 testów**.
-
-Przy ręcznym uruchamianiu testów z wcześniej przygotowanymi bazami flaga
-`VATOWIEC_DATABASE_PER_COMPANY_SQL=1` włącza je jawnie; stara flaga
-`VATOWIEC_SQL_INTEGRATION` nie działa. Szczegóły i nazwy zmiennych połączeń:
-[instrukcja testów](docs/database-per-company.md#testy).
-Testy nie tworzą baz i nie wykonują migracji. Testy persystencji używają rollbacków,
-a testy Identity/API sprzątają dane dedykowanych fixture. Pominięcie nie jest zaliczeniem.
+Runner sprawdza instancję, nazwy, znaczniki i fikcyjne dane, po czym odtwarza
+wyłącznie Vatowiec_System i Vatowiec_Company_A_Dev/B_Dev. **Przed testem zatrzymaj
+API i desktop; bieżące fikcyjne dane i sesje zostaną usunięte.** Po pełnym
+przebiegu inicjalizuje konta i dane demonstracyjne z lokalnej konfiguracji.
+Nie tworzy dodatkowych *_Test i nie modyfikuje innych baz. Pełny wynik:
+**128/128**, bez pominięć (57 SQL/API, 71 bez SQL). Raport TRX: TestResults.
+Flagi SQL i dodatkową zgodę na przygotowane fixture ustawia runner;
+[instrukcja testów](docs/database-per-company.md#testy). Pominięcie nie jest zaliczeniem.
 
 ## Logowanie demonstracyjne
 

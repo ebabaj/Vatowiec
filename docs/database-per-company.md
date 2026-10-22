@@ -1,211 +1,121 @@
-# Lokalne wdrożenie database-per-company
+﻿# Lokalne bazy database-per-company — ADR-018/019
 
-**Bieżące ustalenie projektowe — ADR-018, 2026-10-22:** database-per-company
-pozostaje bez zmian. Docelowo nie powielamy CompanyId w tabelach danych jednej
-firmy (zwłaszcza Contractors); zachowujemy tożsamość bazy i CompanyId katalogu
-oraz autoryzacji. Preferowany klucz kontrahenta to int IDENTITY. Szczegóły:
-[docelowy model](adr/ADR-018-docelowy-model-kontrahentow.md).
-
-Wszystkie dotychczasowe dane projektu są fikcyjną demonstracją i nie wymagają
-zachowania. Po zatwierdzeniu szczegółów nowego modelu można odtworzyć od podstaw
-wyłącznie demonstracyjne bazy VATowca, po potwierdzeniu nazwy i przeznaczenia.
-Nie przygotowujemy migracji danych, map dawnych GUID ani zgodności ze starym
-schematem demonstracyjnym. Nie dotyczy to innych aplikacji ani baz systemowych SQL.
-Obecny etap jest tylko dokumentacyjny: nie wykonujemy odtworzenia, migracji
-ani jakichkolwiek zmian w bazach. Poniżej pozostaje opis wdrożonego demonstratora
-i wcześniejszych czynności; nie jest to plan przebudowy jego danych.
-
-Aktualizacja 2026-10-22: dodano security.Installation w bazie systemowej oraz
-audit.ContractorChanges i indeks listy w każdej bazie firmy. Jawne migracje wykonano
-po trzech kopiach COPY_ONLY/CHECKSUM i VERIFYONLY. Instrukcja polecenia
-`migrate-contractors`, schemat i ryzyko rollbacku: [kartoteka](contractors.md),
-[ADR-017](adr/ADR-017-kartoteka-kontrahentow-i-audyt.md).
-Pełny zestaw obejmuje obecnie 117 testów, w tym 46 SQL/API. Poniższy opis zachowuje
-również historię wcześniejszych etapów.
-
-Status historyczny 2026-10-21: wdrożono trzy bazy demonstracyjne, wykonano migracje EF Core
-i zainicjalizowano dwie fikcyjne firmy. Następnie dodano Identity i autoryzowany
-resolver; pełny zestaw obejmuje 70 testów (32 SQL/API).
+Wdrożenie używa localhost\SQLEXPRESS, SQL Server 2025 Express i Windows
+Authentication. Wszystkie dane demonstracyjne są fikcyjne i odtwarzalne.
 Decyzje: [ADR-014](adr/ADR-014-database-per-company.md),
-[ADR-015](adr/ADR-015-identity-i-autoryzowany-wybor-bazy.md).
-Logowanie dwóch użytkowników: [instrukcja](authentication.md).
+[ADR-018](adr/ADR-018-docelowy-model-kontrahentow.md),
+[ADR-019](adr/ADR-019-implementacja-modelu-kontrahentow.md).
 
-## Zgoda i zakres
+## Bazy i tabele
 
-Użytkownik potwierdził, że wszystkie bazy projektu są obecnie testowe, i zezwolił
-na ich usuwanie, ponowne tworzenie i modyfikowanie na localhost\SQLEXPRESS bez
-ponawiania pytań. Przed usunięciem sprawdzamy dokładną nazwę i przeznaczenie.
-Zgoda nie obejmuje baz innych aplikacji, baz systemowych SQL ani zdalnych instancji.
+Vatowiec_System zawiera 13 tabel:
 
-Dotychczasowa Vatowiec_Dev zawierała wyłącznie core.Companies, core.Contractors,
-historię 20261021092204_InitialCompaniesAndContractors i zero rekordów domenowych.
-Po sprawdzeniu została usunięta. Oryginalne pliki migracji pozostają w
-Persistence/LegacyMigrations, poza kompilacją. Nie kopiowano danych do nowych baz.
+- core.Companies, core.CompanyDatabases;
+- security.Users, security.Roles, security.UserRoles, security.UserClaims,
+  security.UserLogins, security.UserTokens, security.RoleClaims;
+- security.CompanyAccess, security.UserSessions, security.Installation;
+- dbo.__EFMigrationsHistory.
 
-## Pozostawione bazy i dane
+Każda z Vatowiec_Company_A_Dev i Vatowiec_Company_B_Dev zawiera 9 tabel:
 
-Instancja: localhost\SQLEXPRESS, SQL Server 2025 Express 17.0.1000.7.
-Połączenie: Windows Authentication (NTLM), Encrypt=True.
-TrustServerCertificate=True jest wyjątkiem wyłącznie dla lokalnego Development.
-Użyto istniejącego konta Windows operatora; nie tworzono loginów SQL ani haseł.
+- core.CompanyProfile;
+- core.Contractors;
+- core.ContractorAddresses;
+- core.ContractorBankAccounts;
+- core.ContractorContacts;
+- core.ContractorCreateOperations;
+- ref.AddressTypes;
+- audit.ContractorChanges;
+- dbo.__EFMigrationsHistory.
 
-| Baza | Tabele | Migracja |
-|---|---|---|
-| Vatowiec_System | core.Companies, core.CompanyDatabases, dbo.__EFMigrationsHistory oraz dziewięć tabel security opisanych poniżej | InitialSystem i IdentityAndCompanyAccess |
-| Vatowiec_Company_A_Dev | core.CompanyProfile, core.Contractors, dbo.__EFMigrationsHistory | 20261021102912_InitialCompany |
-| Vatowiec_Company_B_Dev | core.CompanyProfile, core.Contractors, dbo.__EFMigrationsHistory | 20261021102912_InitialCompany |
+Contractors.Id i klucze szczegółów są int IDENTITY, lokalne dla fizycznej bazy.
+Nie ma CompanyId w kartotece i audycie. CompanyProfile zachowuje CompanyId
+jako tożsamość bazy, a centralny katalog, dostęp i ścieżki API zachowują GUID.
+Resolver sprawdza uprawnienia, rzeczywisty profil i historię migracji przed
+udostępnieniem danych; brak zgodności oznacza odmowę, bez domyślnej bazy.
+AddressTypes jest otwartym lokalnym słownikiem dwóch początkowych rodzajów.
+Nie wdrożono TaxIdentifierSchemes ani ExternalVerifications.
 
-Tabele security: Users, Roles, UserRoles, UserClaims, UserLogins, UserTokens,
-RoleClaims, CompanyAccess i UserSessions. Druga migracja systemowa to
-20261021114324_IdentityAndCompanyAccess. Nie zmienia schematów firmowych.
+## Migracje i odtworzenie demonstratora
 
-Katalog zawiera dokładnie dwie firmy i dwie lokalizacje. Nie zawiera dokumentów
-księgowych ani kontrahentów. Każda firma ma własną historię migracji i singleton
-profilu z lokalnym FK kontrahentów do CompanyProfile.CompanyId, bez relacji SQL
-między bazami.
+Historia SystemDbContext pozostaje zestawem:
 
-| Firma fikcyjna | CompanyId | Baza |
-|---|---|---|
-| Firma demonstracyjna A — dane fikcyjne | aaaaaaaa-0000-4000-8000-000000000001 | Vatowiec_Company_A_Dev |
-| Firma demonstracyjna B — dane fikcyjne | bbbbbbbb-0000-4000-8000-000000000002 | Vatowiec_Company_B_Dev |
+- 20261021102909_InitialSystem;
+- 20261021114324_IdentityAndCompanyAccess;
+- 20261022055958_InstallationIdentity.
 
-Każda baza firmowa ma jeden profil i jednego fikcyjnego kontrahenta. NIP/REGON
-i identyfikator podatkowy kontrahenta są puste. Kontrahenci celowo mają ten sam
-techniczny Id cccccccc-0000-4000-8000-000000000001 i kod DEMO w obu bazach,
-ale inne nazwy i CompanyId. Nie są wspólną kartoteką.
+CompanyDbContext ma nową migrację inicjalną 20261022143310_CompanyModelV2.
+Poprzednie migracje firmy i snapshot są w LegacyCompanyMigrations, wyłączone
+z kompilacji. Archiwum Vatowiec_Dev pozostaje w LegacyMigrations.
+Nie przenosimy danych, nie mapujemy GUID na int i nie uruchamiamy nowej migracji
+inicjalnej na starym schemacie. API nie migruje baz przy starcie.
 
-## Narzędzie administracyjne
+W tym etapie jawnie odtworzono wyłącznie trzy wskazane bazy. Przed DROP sprawdzono
+maszynę i nazwę instancji, wersję Express 17, Windows Authentication,
+dokładną allowlistę nazw, znacznik Vatowiec.LocalTestPurpose o wartości
+„VATowiec M0 fictional company demonstration v1”, znane tabele/historie oraz
+cechy danych fikcyjnych. Niepotwierdzony cel blokuje zmianę. Ta kontrola
+korzysta z deklaracji użytkownika o demonstracyjnym charakterze danych;
+nie jest narzędziem automatycznego rozpoznawania autentycznych podatników.
+Nie wolno oznaczać w ten sposób baz zawierających dane rzeczywiste.
 
-Narzędzie tools/database/Vatowiec.DatabaseTools jest osobnym programem konsolowym
-.NET, zależnym od infrastruktury. Nie jest wywoływane przez API. Z głównego katalogu:
+Operacje administracyjne są jawne:
 
 ```powershell
-dotnet restore Vatowiec.slnx
 dotnet build Vatowiec.slnx --no-restore
 dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- inspect
-dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- initialize
 dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- verify
 ```
 
-Polecenia mają jawny zakres:
+initialize inicjalizuje aktualny pusty demonstrator i brakujące fikcyjne rekordy;
+seed-users odczytuje hasła z user-secrets API lub środowiska. Nie wpisuj haseł
+w polecenia przechowywane w repozytorium. Szczegóły: [konta](authentication.md).
+Stare polecenie migrate-contractors nie konwertuje starego schematu na nowy:
+stara historia jest odrzucana. Odtworzenie opisane niżej jest przeznaczone
+wyłącznie dla jawnie dozwolonych baz demonstracyjnych, nigdy produkcyjnych.
 
-- inspect: sprawdza lokalny serwer i wyświetla listę baz; jeśli istnieje Vatowiec_Dev,
-  sprawdza jej dokładny schemat i znaną migrację.
-- initialize: usuwa tylko potwierdzoną starą Vatowiec_Dev, tworzy trzy bazy
-  demonstracyjne, jawnie wykonuje EF MigrateAsync i seed przez encje domenowe.
-  Ponowienie zachowuje profile, dane i wpisy migracji; nie tworzy duplikatów.
-- verify: sprawdza własność, dokładne zestawy tabel, historie EF, brak oczekujących
-  migracji, zgodność CompanyId, katalog i dane firm.
-- prepare-tests / cleanup-tests: tworzy z migracjami lub usuwa wyłącznie trzy
-  oznaczone bazy *_Test.
-- test: przygotowuje bazy *_Test, uruchamia wszystkie testy, zapisuje TRX, weryfikuje
-  rollbacky i usuwa bazy *_Test w finally, także gdy testy zgłoszą błąd.
-- backup-system / migrate-system: kopia COPY_ONLY z CHECKSUM i VERIFYONLY oraz jawna
-  migracja wyłącznie bazy systemowej. Nie są wywoływane przy starcie API.
-- seed-users / verify-users: konta z lokalnej konfiguracji i próba dwóch sesji
-  na działającym HTTPS API; szczegóły w instrukcji logowania.
+## Testy
 
-Narzędzie sprawdza lokalną nazwę komputera, instancję SQLEXPRESS, wersję 17,
-edycję Express i Windows Authentication. Nazwy baz pochodzą z zamkniętej listy,
-a nie z argumentów użytkownika. Nowe bazy otrzymują rozszerzoną właściwość
-Vatowiec.LocalTestPurpose: osobno demonstrator i jednorazowe fixture integracyjne.
-Istniejąca baza bez zgodnego znacznika nie jest przejmowana, migrowana ani usuwana.
-Wyjątkiem jest wskazana przez użytkownika Vatowiec_Dev, rozpoznawana po dokładnym
-schemacie i archiwalnej migracji. Sam prefiks Vatowiec nie upoważnia do usunięcia.
-
-Kod używa Windows Authentication; poświadczenia nie są przekazywane klientowi
-Avalonia ani zapisywane w repozytorium. Administrator wykonujący narzędzie musi
-mieć istniejące uprawnienia do tworzenia baz i migracji. Nie nadawano nowych praw
-zwykłemu kontu aplikacji. Przyszły provisioning użyje osobnej tożsamości technicznej.
-
-## Konfiguracja API i granice obecnego etapu
-
-appsettings.Development.json wskazuje lokalną Vatowiec_System z Windows
-Authentication. Można nadpisać ConnectionStrings__VatowiecSystem.
-Bazowy appsettings poza Development nie ma domyślnego połączenia produkcyjnego.
-Stary klucz ConnectionStrings__Vatowiec jest ignorowany.
-
-CompanyDatabases.ConnectionProfileKey = LocalWindows jest referencją do
-serwerowego sposobu połączenia. Resolver sprawdza aktualne CompanyAccess, dopasowuje
-serwerowy profil połączenia i weryfikuje fizyczny profil i schemat przed odczytem.
-Sam wpis w katalogu nie udostępnia firmy. Bezpośrednio uzyskiwany CompanyDbContext
-nadal wymaga jawnego CompanyDatabaseSelection zgodnego z ICompanyContext.
-Nie ma domyślnego wyboru firmy i nie ma migracji przy starcie API.
-
-To narzędzie lokalnego wdrożenia, nie pełny provisioning firmy z interfejsu.
-Identity, role, sesje i autoryzowany resolver są wdrożone zgodnie z ADR-015.
-Logowanie Avalonia, trwała operacja provisioningu z checkpointami, audyt księgowy
-aktorów i backup/restore z aplikacji pozostają kolejnymi zadaniami. M0 nie jest ukończone.
-
-## Przegląd SQL offline
-
-Fabryki projektowe nadal nie mają connection stringów i nie odczytują konfiguracji
-środowiska. Poniższe polecenia jedynie generują SQL:
+Zatrzymaj API i desktop. Polecenie test **usuwa bieżące fikcyjne dane i sesje**
+w trzech wskazanych bazach, wykonuje nowe migracje, uruchamia pełny zestaw,
+a następnie inicjalizuje ponownie demonstrator i konta:
 
 ```powershell
-dotnet ef migrations script 0 --idempotent --context SystemDbContext --project src/Modules/Core/Infrastructure --no-build --output src/Modules/Core/Infrastructure/obj/system.initial.sql
-dotnet ef migrations script 0 --idempotent --context CompanyDbContext --project src/Modules/Core/Infrastructure --no-build --output src/Modules/Core/Infrastructure/obj/company.initial.sql
-```
-
-Oba skrypty przejrzano przed wdrożeniem. System tworzy tylko katalog i lokalizacje,
-Company tylko profil i kontrahentów; każdy dodaje własną historię EF. Nie zawierają
-DROP ani kopii księgowości innych firm. Migracje wykonano jawnie przez narzędzie,
-osobno dla każdej bazy. Nie stosuje się tych migracji do starego schematu.
-
-## Testy i wyniki
-
-Pełny przebieg z lokalnym SQL:
-
-```powershell
-dotnet build Vatowiec.slnx --no-restore
 dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- test
-dotnet format Vatowiec.slnx --verify-no-changes --no-restore
 ```
 
-Runner przygotowuje puste Vatowiec_System_Test, Vatowiec_Company_A_Test i
-Vatowiec_Company_B_Test, wykonuje ich migracje i włącza
-VATOWIEC_DATABASE_PER_COMPANY_SQL=1 wyłącznie w procesie testowym.
-Wyniki trafiają do ignorowanego TestResults/database-per-company-*.trx.
-Runner odrzuca przebieg bez testów lub z pominięciami, nawet przy kodzie wyjścia 0.
-Po sprawdzeniu rollbacków usuwa tylko te trzy fixture. Bazy demonstracyjne pozostają.
+Nie tworzy dodatkowych *_Test i nie modyfikuje baz innych aplikacji. Kontrola
+wszystkich zastanych celów poprzedza pierwszy DROP; tuż przed DROP sprawdzany
+jest ponownie konkretny cel. Niepowodzenie kontroli przerywa operację.
+Testy persystencji używają rollbacku, testy API sprzątają własne fixture.
+Runner sprawdza sprzątanie i niezależne historie. Jeżeli test nie posprząta
+fixture, nie należy ręcznie usuwać niezweryfikowanych danych; trzeba zbadać błąd.
 
-Przy ręcznym uruchamianiu testów po prepare-tests wymagane są zmienne:
+Runner ustawia VATOWIEC_DATABASE_PER_COMPANY_SQL=1 i dodatkową flagę
+VATOWIEC_DEMO_RESET_AUTHORIZED=1 dopiero po przygotowaniu baz. Zmienne
+ConnectionStrings__VatowiecSystemTest oraz VatowiecCompanyATest/BTest
+wskazują odpowiednio trzy bazy demonstracyjne; nazwy zmiennych zachowano
+technicznie, nie oznaczają tworzenia baz o sufiksie _Test. Nie ustawiaj tych
+flag na używanym demonstratorze bez jawnego przygotowania pustych fixture.
+Bez runnera testy SQL są pomijane, nie zaliczane.
 
-| Zmienna | Wymagany katalog |
-|---|---|
-| ConnectionStrings__VatowiecSystemTest | Vatowiec_System_Test |
-| ConnectionStrings__VatowiecCompanyATest | Vatowiec_Company_A_Test |
-| ConnectionStrings__VatowiecCompanyBTest | Vatowiec_Company_B_Test |
+Pełny wynik: **128/128**, bez pominięć (57 SQL/API, 71 bez SQL). Testy sprawdzają
+również wszystkie kolumny/typy adresów i rachunków, klucze i zaufane FK,
+trigger hierarchii, domyślność PLN/EUR/NULL, niezależne historie migracji,
+odmowę obcego profilu, rowversion, atomowy audyt oraz trwałe ponowienia.
+Raporty TRX znajdują się w TestResults, poza repozytorium.
 
-Każde połączenie wskazuje localhost\SQLEXPRESS, Windows Authentication,
-Encrypt=True; lokalne TrustServerCertificate=True jest dozwolone.
-Nie wskazuj baz demonstracyjnych w tych zmiennych.
-Stara flaga VATOWIEC_SQL_INTEGRATION nie włącza testów.
+## Konfiguracja, backup i granice
 
-Zwykłe dotnet test bez flagi SQL wykonuje 38 testów i pomija 32 testy SQL/API.
-Można wymusić ten tryb ustawiając VATOWIEC_DATABASE_PER_COMPANY_SQL=0.
-To odrębny wynik od pełnego przebiegu opisanego poniżej.
+ConnectionStrings:VatowiecSystem wskazuje centralną bazę; CompanyConnections:
+LocalWindows zawiera serwerowy profil połączenia. Lokalizacje A/B pochodzą
+z katalogu. Dane dostępowe do SQL nie są zwracane klientowi Avalonia.
+Poza Development wymagane jest prawidłowe zaufanie TLS; nie rozszerzamy
+lokalnego TrustServerCertificate na inne serwery.
 
-Weryfikacja wcześniejszego etapu trzech baz przed Identity (2026-10-21):
-
-- Build wszystkich ośmiu projektów: 0 błędów, 0 ostrzeżeń.
-- Wszystkie 50 testów zaliczone: 38 bez SQL i 12 na rzeczywistym SQL Server,
-  bez pominięć i błędów.
-- SQL: fizyczna izolacja dwóch baz, ten sam Id/kod kontrahenta w różnych firmach,
-  odmowa odczytu/zapisu przy złym/brakującym kontekście, singleton profilu,
-  FK także przy surowym SQL, unikalność kodu i lokalizacji bazy, rowversion,
-  atomowość SaveChanges, daty i rollbacky.
-- Niezależność migracji: usunięcie wpisu historii w A w wycofywanej transakcji
-  nie zmieniło historii B ani systemowej; po testach każda historia wróciła do
-  jednego wpisu i wszystkie fixture były puste.
-- Ponowiono initialize: nadal dwie firmy, dwa wskazania baz i po jednym profilu
-  oraz kontrahencie w firmach, bez powtórzenia migracji.
-- Końcowa inspekcja: tylko cztery bazy systemowe SQL i trzy bazy demonstracyjne;
-  brak Vatowiec_Dev i tymczasowych *_Test.
-- Formatowanie i git diff --check poprawne. Nie wykonano commit ani push.
-
-Test rowversion używa dwóch kontekstów. W etapie Identity osobno sprawdzono
-równoczesne żądania HTTP dwóch zalogowanych użytkowników firmy A, odmowy dostępu,
-CSRF, wygasanie i unieważnianie sesji oraz rzeczywisty profil bazy. Wyniki etapu
-Identity i ręczna próba działającego HTTPS API są w docs/authentication.md.
-Backup/restore z aplikacji, provisioning i audyt księgowy pozostają poza tym etapem.
+Każda baza zachowuje własny backup i historię migracji. Interfejs samodzielnego
+backup/restore, provisioning firm i przenoszenie na inną instancję pozostają
+kolejnymi zadaniami ADR-014. Nie ma automatycznych migracji przy starcie API.
+Aktualny reset jest destrukcyjnym narzędziem demonstratora, nie planem migracji
+ani procedurą odtworzenia produkcji. Historyczne etapy, wyniki i kopie przed
+wcześniejszymi migracjami opisują ADR-014–017.

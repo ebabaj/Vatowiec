@@ -6,7 +6,7 @@ using Vatowiec.Core.Infrastructure.Persistence;
 
 namespace Vatowiec.Tests;
 
-// Tylko dedykowane, wcześniej zmigrowane i puste bazy *_Test. Bez CREATE/DROP/Migrate.
+// Jawnie opróżnione i oznaczone trzy bazy demonstracyjne. Testy nie wykonują DDL baz.
 [Trait("Category", "SqlIntegration")]
 [Collection("LocalSql")]
 public sealed class SqlServerPersistenceTests
@@ -14,7 +14,7 @@ public sealed class SqlServerPersistenceTests
     [SqlServerFact]
     public async Task SystemSchema_ContainsOnlyCatalogAndItsOwnMigrationHistory()
     {
-        await using var session = await Session.Open("Vatowiec_System_Test", "ConnectionStrings__VatowiecSystemTest");
+        await using var session = await Session.Open("Vatowiec_System", "ConnectionStrings__VatowiecSystemTest");
         await using var context = session.System();
         Assert.Equal(3, (await context.Database.GetAppliedMigrationsAsync()).Count());
         Assert.EndsWith("_InstallationIdentity", (await context.Database.GetAppliedMigrationsAsync()).Last());
@@ -33,14 +33,14 @@ public sealed class SqlServerPersistenceTests
         var idA = Guid.NewGuid();
         var idB = Guid.NewGuid();
         var contractorId = Guid.NewGuid();
-        await a.Seed(idA, contractorId);
-        await b.Seed(idB, contractorId);
+        await a.Seed(idA);
+        await b.Seed(idB);
         await using var first = a.Company(idA);
         await using var second = b.Company(idB);
-        Assert.EndsWith("_ContractorAudit", (await first.Database.GetAppliedMigrationsAsync()).Last());
+        Assert.EndsWith("_CompanyModelV2", (await first.Database.GetAppliedMigrationsAsync()).Last());
         Assert.Empty(await first.Database.GetPendingMigrationsAsync());
-        Assert.Equal(idA, (await first.Contractors.SingleAsync()).CompanyId);
-        Assert.Equal(idB, (await second.Contractors.SingleAsync()).CompanyId);
+        Assert.Equal("KLIENT", (await first.Contractors.SingleAsync()).Code);
+        Assert.Equal("KLIENT", (await second.Contractors.SingleAsync()).Code);
         Assert.Equal(idA, (await first.CompanyProfiles.SingleAsync()).CompanyId);
         Assert.Equal(idB, (await second.CompanyProfiles.SingleAsync()).CompanyId);
     }
@@ -50,15 +50,15 @@ public sealed class SqlServerPersistenceTests
     {
         await using var a = await Session.CompanyA();
         await using var b = await Session.CompanyB();
-        await using var s = await Session.Open("Vatowiec_System_Test", "ConnectionStrings__VatowiecSystemTest");
+        await using var s = await Session.Open("Vatowiec_System", "ConnectionStrings__VatowiecSystemTest");
         await using var first = a.Company(null);
         await using var second = b.Company(null);
         await using var system = s.System();
         using var command = new SqlCommand("DELETE FROM dbo.__EFMigrationsHistory;", a.Connection, a.Transaction);
-        Assert.Equal(2, await command.ExecuteNonQueryAsync());
+        Assert.Equal(1, await command.ExecuteNonQueryAsync());
         Assert.Empty(await first.Database.GetAppliedMigrationsAsync());
-        Assert.Equal(2, (await first.Database.GetPendingMigrationsAsync()).Count());
-        Assert.EndsWith("_ContractorAudit", (await second.Database.GetAppliedMigrationsAsync()).Last());
+        Assert.Single(await first.Database.GetPendingMigrationsAsync());
+        Assert.EndsWith("_CompanyModelV2", (await second.Database.GetAppliedMigrationsAsync()).Last());
         Assert.Empty(await second.Database.GetPendingMigrationsAsync());
         Assert.Equal(3, (await system.Database.GetAppliedMigrationsAsync()).Count());
         Assert.EndsWith("_InstallationIdentity", (await system.Database.GetAppliedMigrationsAsync()).Last());
@@ -67,24 +67,24 @@ public sealed class SqlServerPersistenceTests
     }
 
     [SqlServerFact]
-    public async Task LocalForeignKey_RejectsContractorOfAnotherCompanyThroughRawSql()
+    public async Task LocalForeignKey_RejectsUnknownParentThroughRawSql()
     {
         await using var session = await Session.CompanyA();
-        await session.Seed(Guid.NewGuid(), Guid.NewGuid());
+        await session.Seed(Guid.NewGuid());
         using var command = new SqlCommand("""
-            INSERT core.Contractors (CompanyId, Id, Code, Name, CountryCode, IsActive, CreatedAtUtc, UpdatedAtUtc)
-            VALUES (@foreignCompany, NEWID(), N'FOREIGN', N'Fikcyjny obcy kontrahent', N'PL', 1, SYSUTCDATETIME(), SYSUTCDATETIME());
+            INSERT core.Contractors (ParentId, Code, Name, CountryCode, IsActive, CreatedAtUtc, UpdatedAtUtc)
+            VALUES (2147483647, N'FOREIGN', N'Fikcyjny obcy kontrahent', N'PL', 1, SYSUTCDATETIME(), SYSUTCDATETIME());
             """, session.Connection, session.Transaction);
         command.Parameters.AddWithValue("@foreignCompany", Guid.NewGuid());
         var error = await Assert.ThrowsAsync<SqlException>(() => command.ExecuteNonQueryAsync());
         Assert.Equal(547, error.Number);
-        Assert.Contains("FK_Contractors_CompanyProfile_CompanyId", error.Message);
+        Assert.Contains("FK_Contractors_Contractors_ParentId", error.Message);
     }
 
     [SqlServerFact]
     public async Task SystemCatalog_EnforcesCompanyForeignKeyAndUniqueDatabaseLocation()
     {
-        await using var session = await Session.Open("Vatowiec_System_Test", "ConnectionStrings__VatowiecSystemTest");
+        await using var session = await Session.Open("Vatowiec_System", "ConnectionStrings__VatowiecSystemTest");
         await using var context = session.System();
         var a = Guid.NewGuid();
         var b = Guid.NewGuid();
@@ -105,11 +105,11 @@ public sealed class SqlServerPersistenceTests
     {
         await using var session = await Session.CompanyA();
         var id = Guid.NewGuid();
-        await session.Seed(id, Guid.NewGuid());
+        await session.Seed(id);
         await using var context = session.Company(null);
         Assert.Empty(await context.CompanyProfiles.ToListAsync());
         Assert.Empty(await context.Contractors.ToListAsync());
-        context.Contractors.Add(new Contractor(id, Guid.NewGuid(), "NEW", "Test", "PL"));
+        context.Contractors.Add(new Contractor("NEW", "Test", "PL"));
         await Assert.ThrowsAsync<InvalidOperationException>(() => context.SaveChangesAsync());
     }
 
@@ -118,10 +118,10 @@ public sealed class SqlServerPersistenceTests
     {
         await using var session = await Session.CompanyA();
         var id = Guid.NewGuid();
-        await session.Seed(id, Guid.NewGuid());
+        await session.Seed(id);
         await using var context = session.Company(Guid.NewGuid());
         Assert.Empty(await context.Contractors.ToListAsync());
-        context.Contractors.Add(new Contractor(id, Guid.NewGuid(), "NEW", "Test", "PL"));
+        context.Contractors.Add(new Contractor("NEW", "Test", "PL"));
         await Assert.ThrowsAsync<InvalidOperationException>(() => context.SaveChangesAsync());
         context.ChangeTracker.Clear();
         var foreign = await context.Contractors.IgnoreQueryFilters().SingleAsync();
@@ -136,11 +136,11 @@ public sealed class SqlServerPersistenceTests
     {
         await using var session = await Session.CompanyA();
         var id = Guid.NewGuid();
-        await session.Seed(id, Guid.NewGuid());
+        await session.Seed(id);
         await using (var context = session.Company(id))
         {
-            context.Contractors.Add(new Contractor(id, Guid.NewGuid(), "UNIQUE", "Test", "PL"));
-            context.Contractors.Add(new Contractor(id, Guid.NewGuid(), "KLIENT", "Duplicate", "PL"));
+            context.Contractors.Add(new Contractor("UNIQUE", "Test", "PL"));
+            context.Contractors.Add(new Contractor("KLIENT", "Duplicate", "PL"));
             await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
         }
         await using var verify = session.Company(id);
@@ -148,26 +148,26 @@ public sealed class SqlServerPersistenceTests
     }
 
     [SqlServerFact]
-    public async Task LocalProfileForeignKey_RejectsOrphanAndProfileDeletion()
+    public async Task PhysicalProfile_RequiredForWritesAndCannotBeDeleted()
     {
         await using var session = await Session.CompanyA();
         var id = Guid.NewGuid();
         await using (var context = session.Company(id))
         {
-            context.Contractors.Add(new Contractor(id, Guid.NewGuid(), "ORPHAN", "Test", "PL"));
-            await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
+            context.Contractors.Add(new Contractor("ORPHAN", "Test", "PL"));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => context.SaveChangesAsync());
         }
-        await session.Seed(id, Guid.NewGuid());
+        await session.Seed(id);
         await using var seeded = session.Company(id);
         seeded.CompanyProfiles.Remove(await seeded.CompanyProfiles.SingleAsync());
-        await Assert.ThrowsAsync<DbUpdateException>(() => seeded.SaveChangesAsync());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => seeded.SaveChangesAsync());
     }
 
     [SqlServerFact]
     public async Task SingletonProfile_RejectsAnotherCompanyEvenThroughRawSql()
     {
         await using var session = await Session.CompanyA();
-        await session.Seed(Guid.NewGuid(), Guid.NewGuid());
+        await session.Seed(Guid.NewGuid());
         using var command = new SqlCommand("""
             INSERT core.CompanyProfile (SingletonKey, CompanyId, Name, CreatedAtUtc, UpdatedAtUtc)
             VALUES (2, NEWID(), N'Druga firma', SYSUTCDATETIME(), SYSUTCDATETIME());
@@ -181,7 +181,7 @@ public sealed class SqlServerPersistenceTests
     {
         await using var session = await Session.CompanyA();
         var id = Guid.NewGuid();
-        await session.Seed(id, Guid.NewGuid());
+        await session.Seed(id);
         await using var first = session.Company(id);
         await using var stale = session.Company(id);
         var profile = await first.CompanyProfiles.SingleAsync();
@@ -205,7 +205,7 @@ public sealed class SqlServerPersistenceTests
         var id = Guid.NewGuid();
         await using (var session = await Session.CompanyA())
         {
-            await session.Seed(id, Guid.NewGuid());
+            await session.Seed(id);
             await using var context = session.Company(id);
             var contractor = await context.Contractors.SingleAsync();
             Assert.Equal(8, contractor.RowVersion.Length);
@@ -223,8 +223,8 @@ public sealed class SqlServerPersistenceTests
         public SqlConnection Connection { get; } = connection;
         public SqlTransaction Transaction { get; } = transaction;
 
-        public static Task<Session> CompanyA() => Open("Vatowiec_Company_A_Test", "ConnectionStrings__VatowiecCompanyATest");
-        public static Task<Session> CompanyB() => Open("Vatowiec_Company_B_Test", "ConnectionStrings__VatowiecCompanyBTest");
+        public static Task<Session> CompanyA() => Open("Vatowiec_Company_A_Dev", "ConnectionStrings__VatowiecCompanyATest");
+        public static Task<Session> CompanyB() => Open("Vatowiec_Company_B_Dev", "ConnectionStrings__VatowiecCompanyBTest");
 
         public static async Task<Session> Open(string database, string variable)
         {
@@ -234,7 +234,7 @@ public sealed class SqlServerPersistenceTests
             Assert.Equal(@"localhost\SQLEXPRESS", builder.DataSource, ignoreCase: true);
             Assert.Equal(database, builder.InitialCatalog);
             Assert.True(builder.IntegratedSecurity);
-            if (database == "Vatowiec_System_Test") DatabaseConnectionPolicy.ValidateSystem(value, true);
+            if (database == "Vatowiec_System") DatabaseConnectionPolicy.ValidateSystem(value, true);
             else DatabaseConnectionPolicy.ValidateCompany(value!, true);
             var connection = new SqlConnection(value);
             try
@@ -265,12 +265,12 @@ public sealed class SqlServerPersistenceTests
             return context;
         }
 
-        public async Task Seed(Guid companyId, Guid contractorId)
+        public async Task Seed(Guid companyId)
         {
             await using var context = Company(companyId);
             Assert.False(await context.CompanyProfiles.IgnoreQueryFilters().AnyAsync(), "Baza *_Test musi być pusta.");
             context.CompanyProfiles.Add(new CompanyProfile(companyId, "Firma testowa — dane fikcyjne"));
-            context.Contractors.Add(new Contractor(companyId, contractorId, "KLIENT", "Kontrahent testowy", "PL"));
+            context.Contractors.Add(new Contractor( "KLIENT", "Kontrahent testowy", "PL"));
             await context.SaveChangesAsync();
         }
 

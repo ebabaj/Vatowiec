@@ -19,13 +19,13 @@ public sealed class CompanyModelTests
         Assert.Throws<ArgumentException>(() => new CompanyProfile(Guid.NewGuid(), new string('X', 257)));
         Assert.Throws<ArgumentException>(() => new CompanyDatabaseRegistration(Guid.Empty, "sql", "db", "profile"));
         Assert.Throws<ArgumentException>(() => new CompanyDatabaseRegistration(Guid.NewGuid(), " ", "db", "profile"));
-        Assert.Throws<ArgumentException>(() => new Contractor(Guid.Empty, Guid.NewGuid(), "A", "Test", "PL"));
-        Assert.Throws<ArgumentException>(() => new Contractor(Guid.NewGuid(), Guid.NewGuid(), "A", "Test", "P1"));
-        var contractor = new Contractor(Guid.NewGuid(), Guid.NewGuid(), " abc ", " Test ", "pl");
+        Assert.Throws<ArgumentException>(() => new Contractor("", "Test", "PL"));
+        Assert.Throws<ArgumentException>(() => new Contractor("A", "Test", "P1"));
+        var contractor = new Contractor(" abc ", " Test ", "pl");
         Assert.Equal("ABC", contractor.Code);
         Assert.Equal("Test", contractor.Name);
         Assert.Equal("PL", contractor.CountryCode);
-        Assert.Null(contractor.TaxIdentifier);
+        Assert.Null(contractor.TaxId);
     }
 
     [Fact]
@@ -39,11 +39,14 @@ public sealed class CompanyModelTests
         Assert.Null(system.Model.FindEntityType(typeof(Contractor)));
         Assert.Null(system.Model.FindEntityType(typeof(CompanyProfile)));
         Assert.Null(system.Model.FindEntityType(typeof(ContractorChange)));
-        Assert.Equal(new[] { typeof(CompanyProfile), typeof(Contractor), typeof(ContractorChange) },
+        Assert.Equal(new[] { typeof(AddressType), typeof(CompanyProfile), typeof(Contractor), typeof(ContractorAddress),
+                typeof(ContractorBankAccount), typeof(ContractorChange), typeof(ContractorContact), typeof(ContractorCreateOperation) },
             company.Model.GetEntityTypes().Select(x => x.ClrType).OrderBy(x => x.Name));
         var contractor = company.Model.FindEntityType(typeof(Contractor))!;
-        Assert.Equal(typeof(CompanyProfile), Assert.Single(contractor.GetForeignKeys()).PrincipalEntityType.ClrType);
-        Assert.Equal(new[] { "CompanyId", "Id" }, contractor.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Equal(typeof(Contractor), Assert.Single(contractor.GetForeignKeys()).PrincipalEntityType.ClrType);
+        Assert.Equal(new[] { "Id" }, contractor.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Null(contractor.FindProperty("CompanyId"));
+        Assert.Equal(typeof(int), contractor.FindProperty("Id")!.ClrType);
         Assert.True(contractor.FindProperty("RowVersion")!.IsConcurrencyToken);
         var profile = company.Model.FindEntityType(typeof(CompanyProfile))!;
         Assert.Equal("SingletonKey", Assert.Single(profile.FindPrimaryKey()!.Properties).Name);
@@ -61,7 +64,7 @@ public sealed class CompanyModelTests
         {
             await using var context = new CompanyDbContext(options, new CompanyContext(scope));
             context.CompanyProfiles.Add(new CompanyProfile(id, "Firma testowa"));
-            context.Contractors.Add(new Contractor(id, Guid.NewGuid(), "A", "Test", "PL"));
+            context.Contractors.Add(new Contractor("A", "Test", "PL"));
             if (async)
                 await Assert.ThrowsAsync<InvalidOperationException>(() => context.SaveChangesAsync());
             else
@@ -91,8 +94,8 @@ public sealed class CompanyModelTests
         using var company = new CompanyDbContextFactory().CreateDbContext([]);
         Assert.Equal(3, system.Database.GetMigrations().Count());
         Assert.EndsWith("_InstallationIdentity", system.Database.GetMigrations().Last());
-        Assert.Equal(2, company.Database.GetMigrations().Count());
-        Assert.EndsWith("_ContractorAudit", company.Database.GetMigrations().Last());
+        Assert.Single(company.Database.GetMigrations());
+        Assert.EndsWith("_CompanyModelV2", company.Database.GetMigrations().Last());
         Assert.False(system.Database.HasPendingModelChanges());
         Assert.False(company.Database.HasPendingModelChanges());
         Assert.NotEqual(system.GetService<IMigrationsAssembly>().ModelSnapshot!.GetType(),
