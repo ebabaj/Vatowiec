@@ -89,7 +89,8 @@ internal sealed class ContractorCreateOperationConfiguration : IEntityTypeConfig
     public void Configure(EntityTypeBuilder<ContractorCreateOperation> b)
     {
         b.ToTable("ContractorCreateOperations", "core");
-        b.HasKey(x => new { x.ActorIssuerId, x.ActorId, x.OperationId });
+        b.HasKey(x => new { x.ActorIssuerId, x.ActorId, x.OperationKind, x.OperationId });
+        b.Property(x => x.OperationKind).HasMaxLength(32).HasDefaultValue("Contractor");
         b.Property(x => x.RequestHash).HasColumnType("varchar(64)").IsRequired();
         b.Property(x => x.ResponseJson).HasColumnType("nvarchar(max)").IsRequired();
         b.HasOne<Contractor>().WithMany().HasForeignKey(x => x.ContractorId).OnDelete(DeleteBehavior.NoAction);

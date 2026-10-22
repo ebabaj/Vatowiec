@@ -5,16 +5,16 @@ Projekt wielostanowiskowej aplikacji dla polskich mikrofirm. Obecny stan to
 wybór firmy, dodawanie/edycja z audytem i konfliktami oraz wyszukiwanie po stronie serwera.
 Osobne SystemDbContext i CompanyDbContext, trzy bazy SQL
 Server oraz dwie fikcyjne firmy. Działają Identity, sesje API i autoryzowany resolver
-bazy firmy. Pełny zestaw obejmuje 128 testów, w tym 57 z SQL/API.
+bazy firmy. Pełny zestaw obejmuje 142 testy, w tym 67 z SQL/API.
 Nie jest to jeszcze program do prowadzenia księgowości.
 
-**Aktualny etap: wdrożona podstawa modelu ADR-018.** Contractors ma int IDENTITY,
-ParentId bez dziedziczenia, osobne adresy/kontakty/rachunki i lokalny AddressTypes.
-Ponowienia POST rozpoznaje trwała operacja tworzenia; zapis i audyt są atomowe.
-Identyfikatory podatkowe w podstawowym UI/API są tylko do odczytu. Nie wdrożono
-walidatorów, integracji ani ekranów szczegółów. Rozstrzygnięcia techniczne:
-[ADR-019](docs/adr/ADR-019-implementacja-modelu-kontrahentow.md).
-Trzy lokalne bazy demonstracyjne odtworzono bez migracji dawnych danych i GUID.
+**Aktualny etap: kompletna kartoteka kontrahentów w Avalonia.** Jeden formularz
+ma Dane główne, Adresy, Kontakty i Rachunki bankowe. Można wybierać grupę,
+dodawać rodzaje adresów, edytować szczegóły i atomowo zmieniać preferencje.
+TaxId/VatEuId/KsefIdWew są osobnymi polami tylko do odczytu. Nietypowy zapis
+rachunku wymaga świadomej, audytowanej akceptacji przez uprawnioną osobę;
+nie oznacza to weryfikacji numeru. Szczegóły: [ADR-020](docs/adr/ADR-020-kompletna-kartoteka-avalonia.md).
+Bazy i tabele biznesowe zachowano; wykonano tylko jawne migracje techniczne.
 
 Wymagania produktu: [SPECYFIKACJA.md](SPECYFIKACJA.md).
 Architektura i granice modułów: [ADR-013](docs/adr/ADR-013-architektura-modularnego-monolitu.md).
@@ -41,7 +41,7 @@ Dodawanie, edycja, filtry i konflikt dwóch okien: [kartoteka](docs/contractors.
 
 Do pełnych testów SQL potrzebny jest lokalny **SQL Server 2025 Express**,
 instancja `localhost\SQLEXPRESS`, Windows Authentication i trzy jawnie dozwolone
-bazy demonstracyjne. Pełny runner odtwarza je i usuwa bieżące fikcyjne dane. SQL nie jest potrzebny
+bazy demonstracyjne. Pełny runner czyści ich fikcyjne fixture przez DML, bez DROP/CREATE. SQL nie jest potrzebny
 do kompilacji, generowania migracji/skryptów, testów bez bazy ani startu okna.
 Nie trzeba instalować szablonów Avalonia ani dodatkowych workloadów .NET.
 Avalonia i EF Core pobierają się jako pakiety NuGet; lokalne narzędzie `dotnet-ef`
@@ -195,18 +195,18 @@ Testy offline weryfikują rozłączne modele, lokalny profil/FK, historie i SQL
 migracji, zgodność snapshotów, odmowę bez wyboru bazy, izolację scope,
 politykę połączeń, filtry, kontrolę zapisu i host API.
 
-Powyższy przebieg bez SQL zalicza 71 testów i pomija 57 testów SQL/API. Pełny przebieg:
+Powyższy przebieg bez SQL zalicza 75 testów i pomija 67 testów SQL/API. Pełny przebieg:
 
 ```powershell
 dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- test
 ```
 
-Runner sprawdza instancję, nazwy, znaczniki i fikcyjne dane, po czym odtwarza
+Runner sprawdza instancję, nazwy, znaczniki i fikcyjne dane, po czym czyści fixture przez DML w
 wyłącznie Vatowiec_System i Vatowiec_Company_A_Dev/B_Dev. **Przed testem zatrzymaj
 API i desktop; bieżące fikcyjne dane i sesje zostaną usunięte.** Po pełnym
 przebiegu inicjalizuje konta i dane demonstracyjne z lokalnej konfiguracji.
-Nie tworzy dodatkowych *_Test i nie modyfikuje innych baz. Pełny wynik:
-**128/128**, bez pominięć (57 SQL/API, 71 bez SQL). Raport TRX: TestResults.
+Nie odtwarza baz ani tabel, nie tworzy dodatkowych *_Test i nie modyfikuje innych baz. Pełny wynik:
+**142/142**, bez pominięć (67 SQL/API, 75 bez SQL). Raport TRX: TestResults.
 Flagi SQL i dodatkową zgodę na przygotowane fixture ustawia runner;
 [instrukcja testów](docs/database-per-company.md#testy). Pominięcie nie jest zaliczeniem.
 

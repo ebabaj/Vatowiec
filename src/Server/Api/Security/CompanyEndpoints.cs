@@ -31,6 +31,7 @@ public static class CompanyEndpoints
         }).AddEndpointFilter(ValidateCompanySource);
 
         group.MapContractors();
+        group.MapContractorDetails();
     }
 
     private static Guid UserId(HttpContext context) => Guid.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);

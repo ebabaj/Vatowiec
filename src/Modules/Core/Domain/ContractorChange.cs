@@ -4,12 +4,16 @@ public sealed class ContractorChange : ITrackedEntity
 {
     private ContractorChange() { }
 
-    public ContractorChange(int contractorId, Guid actorId, Guid actorIssuerId,
-        string actorName, DateTimeOffset occurredAtUtc, string correlationId, string? beforeJson, string afterJson)
+    public ContractorChange(int? contractorId, Guid actorId, Guid actorIssuerId,
+        string actorName, DateTimeOffset occurredAtUtc, string correlationId, string? beforeJson, string afterJson,
+        string recordType = "Contractor", int? recordId = null, string? warningJson = null)
     {
         Id = Guid.NewGuid();
-        if (contractorId <= 0) throw new ArgumentException("Brak kontrahenta.", nameof(contractorId));
+        if (contractorId is <= 0) throw new ArgumentException("Brak kontrahenta.", nameof(contractorId));
         ContractorId = contractorId;
+        RecordType = recordType;
+        RecordId = recordId ?? contractorId ?? throw new ArgumentException("Brak identyfikatora rekordu.");
+        WarningJson = warningJson;
         ActorId = EntityText.Id(actorId, nameof(actorId));
         ActorIssuerId = EntityText.Id(actorIssuerId, nameof(actorIssuerId));
         ActorName = EntityText.Required(actorName, 256, nameof(actorName));
@@ -21,7 +25,10 @@ public sealed class ContractorChange : ITrackedEntity
     }
 
     public Guid Id { get; private set; }
-    public int ContractorId { get; private set; }
+    public int? ContractorId { get; private set; }
+    public string RecordType { get; private set; } = "Contractor";
+    public int RecordId { get; private set; }
+    public string? WarningJson { get; private set; }
     public Guid ActorId { get; private set; }
     public Guid ActorIssuerId { get; private set; }
     public string ActorName { get; private set; } = null!;

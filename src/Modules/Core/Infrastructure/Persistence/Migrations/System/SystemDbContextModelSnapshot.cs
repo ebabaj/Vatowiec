@@ -223,7 +223,7 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
 
                     b.ToTable("CompanyAccess", "security", t =>
                         {
-                            t.HasCheckConstraint("CK_CompanyAccess_Permissions", "[Permissions] > 0 AND [Permissions] <= 7");
+                            t.HasCheckConstraint("CK_CompanyAccess_Permissions", "[Permissions] > 0 AND [Permissions] <= 15");
                         });
                 });
 

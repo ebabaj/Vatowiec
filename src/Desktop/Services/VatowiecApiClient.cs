@@ -13,6 +13,13 @@ public interface IVatowiecApiClient : IDisposable
     Task<ContractorResponse[]> Contractors(Guid companyId, string? search = null, string? country = null, bool? active = null, int offset = 0, int limit = 50);
     Task<ContractorResponse> Contractor(Guid companyId, int id);
     Task<ContractorResponse> SaveContractor(Guid companyId, ContractorWriteRequest value, bool isNew);
+    Task<DetailResponse[]> Details(Guid companyId, int contractorId, string kind, int offset = 0, int limit = 50) => Task.FromResult<DetailResponse[]>([]);
+    Task<DetailResponse> Detail(Guid companyId, int contractorId, string kind, int id) => throw new NotSupportedException();
+    Task<DetailResponse> SaveDetail(Guid companyId, int contractorId, string kind, DetailWriteRequest value, bool isNew) => throw new NotSupportedException();
+    Task<AddressTypeResponse[]> AddressTypes(Guid companyId) => Task.FromResult<AddressTypeResponse[]>([]);
+    Task<AddressTypeResponse> AddAddressType(Guid companyId, AddressTypeWriteRequest value) => throw new NotSupportedException();
+    Task<ContractorResponse[]> ParentCandidates(Guid companyId, string search, int excludeId, int offset = 0) => Task.FromResult<ContractorResponse[]>([]);
+    Task<ContractorResponse[]> Children(Guid companyId, int parentId, int offset = 0) => Task.FromResult<ContractorResponse[]>([]);
     Task Logout();
 }
 
@@ -21,6 +28,9 @@ public sealed class ApiException(int statusCode, string message) : Exception(mes
     public int StatusCode { get; } = statusCode;
     public string? Code { get; init; }
     public ContractorResponse? Current { get; init; }
+    public DetailResponse? DetailCurrent { get; init; }
+    public string? WarningHash { get; init; }
+    public Dictionary<string, string[]>? Errors { get; init; }
 }
 
 public sealed class VatowiecApiClient : IVatowiecApiClient
@@ -94,6 +104,27 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         return await Send<ContractorResponse>(request);
     }
 
+    public Task<DetailResponse[]> Details(Guid companyId, int contractorId, string kind, int offset = 0, int limit = 50) =>
+        Get<DetailResponse[]>($"api/v1/companies/{companyId}/contractors/{contractorId}/{kind}?offset={offset}&limit={limit}");
+    public Task<DetailResponse> Detail(Guid companyId, int contractorId, string kind, int id) =>
+        Get<DetailResponse>($"api/v1/companies/{companyId}/contractors/{contractorId}/{kind}/{id}");
+    public Task<DetailResponse> SaveDetail(Guid companyId, int contractorId, string kind, DetailWriteRequest value, bool isNew) =>
+        Write<DetailResponse>($"api/v1/companies/{companyId}/contractors/{contractorId}/{kind}" + (isNew ? "" : $"/{value.Id}"), value, !isNew);
+    public Task<AddressTypeResponse[]> AddressTypes(Guid companyId) => Get<AddressTypeResponse[]>($"api/v1/companies/{companyId}/address-types");
+    public Task<AddressTypeResponse> AddAddressType(Guid companyId, AddressTypeWriteRequest value) => Write<AddressTypeResponse>($"api/v1/companies/{companyId}/address-types", value, false);
+    public Task<ContractorResponse[]> ParentCandidates(Guid companyId, string search, int excludeId, int offset = 0) =>
+        Get<ContractorResponse[]>($"api/v1/companies/{companyId}/contractors?q={Uri.EscapeDataString(search)}&excludeId={excludeId}&limit=51&offset={offset}");
+    public Task<ContractorResponse[]> Children(Guid companyId, int parentId, int offset = 0) =>
+        Get<ContractorResponse[]>($"api/v1/companies/{companyId}/contractors?parentId={parentId}&limit=51&offset={offset}");
+    private async Task<T> Write<T>(string path, object value, bool update)
+    {
+        var csrf = await Get<CsrfResponse>("api/v1/auth/csrf");
+        using var request = new HttpRequestMessage(update ? HttpMethod.Put : HttpMethod.Post, path);
+        request.Headers.Add("X-CSRF-TOKEN", csrf.Token);
+        request.Content = JsonContent.Create(value);
+        return await Send<T>(request);
+    }
+
     public async Task Logout()
     {
         // Token anonimowy sprzed login nie jest tokenem uwierzytelnionego użytkownika.
@@ -135,22 +166,30 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
             HttpStatusCode.Unauthorized when login => "Nieprawidłowy login lub hasło albo konto jest zablokowane.",
             HttpStatusCode.Unauthorized => "Sesja wygasła lub została unieważniona. Zaloguj się ponownie.",
             HttpStatusCode.Forbidden => "Brak uprawnień do firmy lub kartoteki kontrahentów.",
+            HttpStatusCode.BadRequest when error?.Code is "hierarchy_cycle" or "invalid_parent" or "invalid_address_type" => error.Message ?? "Sprawdź wybrane powiązanie.",
             HttpStatusCode.BadRequest => "API odrzuciło żądanie. Spróbuj ponownie; sprawdź wersję aplikacji i API.",
             HttpStatusCode.TooManyRequests => "Zbyt wiele prób logowania. Odczekaj minutę i spróbuj ponownie.",
             HttpStatusCode.ServiceUnavailable => "Baza firmy jest niedostępna lub niezgodna. Spróbuj później lub skontaktuj się z administratorem.",
+            HttpStatusCode.NotFound when error?.Code == "detail_not_found" => "Nie znaleziono pozycji u tego kontrahenta. Odśwież listę.",
             HttpStatusCode.NotFound => "Nie znaleziono kontrahenta w tej firmie. Odśwież listę.",
             HttpStatusCode.Conflict when error?.Code == "contractor_conflict" => "Inna osoba zmieniła kontrahenta. Porównaj wersje i wybierz sposób rozwiązania konfliktu.",
             HttpStatusCode.Conflict when error?.Code == "contractor_code_exists" => "Ten kod jest już zajęty w tej firmie. Wpisz inny kod.",
             HttpStatusCode.Conflict when error?.Code == "operation_payload_mismatch" => "Ta operacja została już zapisana z innymi danymi. Anuluj formularz, wyszukaj kontrahenta i otwórz jego edycję.",
+            HttpStatusCode.UnprocessableEntity when error?.Code == "bank_warning" => error.Message ?? "Numer wymaga świadomego potwierdzenia ostrzeżenia.",
+            HttpStatusCode.Conflict when error?.Code == "detail_conflict" => "Inna osoba zmieniła pozycję. Porównaj wersje i świadomie rozstrzygnij konflikt.",
+            HttpStatusCode.Conflict when error?.Code == "address_type_exists" => "Taki rodzaj adresu już istnieje. Wybierz go z listy.",
+            HttpStatusCode.Conflict when error?.Code == "detail_default_conflict" => "Inna osoba zmieniła preferencję. Odśwież pozycję przed ponownym zapisem.",
             HttpStatusCode.Conflict => "Pozycja już istnieje. Odśwież listę przed ponowieniem.",
             _ => "API nie może wykonać operacji. Spróbuj ponownie."
         };
         if (response.StatusCode == HttpStatusCode.BadRequest && error?.Code == "validation_failed" && error.Errors is not null)
             message = string.Join(Environment.NewLine, error.Errors.Values.SelectMany(x => x));
-        throw new ApiException((int)response.StatusCode, message) { Code = error?.Code, Current = error?.Current };
+        throw new ApiException((int)response.StatusCode, message)
+        { Code = error?.Code, Current = error?.Current, DetailCurrent = error?.DetailCurrent, WarningHash = error?.WarningHash, Errors = error?.Errors };
     }
 
-    private sealed record ApiError(string? Code, Dictionary<string, string[]>? Errors, ContractorResponse? Current);
+    private sealed record ApiError(string? Code, Dictionary<string, string[]>? Errors, ContractorResponse? Current,
+        DetailResponse? DetailCurrent, string? WarningHash, string? Message);
 
     public void Dispose() => http.Dispose();
 }

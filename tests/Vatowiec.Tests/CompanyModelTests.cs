@@ -92,10 +92,10 @@ public sealed class CompanyModelTests
     {
         using var system = new SystemDbContextFactory().CreateDbContext([]);
         using var company = new CompanyDbContextFactory().CreateDbContext([]);
-        Assert.Equal(3, system.Database.GetMigrations().Count());
-        Assert.EndsWith("_InstallationIdentity", system.Database.GetMigrations().Last());
-        Assert.Single(company.Database.GetMigrations());
-        Assert.EndsWith("_CompanyModelV2", company.Database.GetMigrations().Last());
+        Assert.Equal(4, system.Database.GetMigrations().Count());
+        Assert.EndsWith("_WarningPermission", system.Database.GetMigrations().Last());
+        Assert.Equal(2, company.Database.GetMigrations().Count());
+        Assert.EndsWith("_ContractorDetailAudit", company.Database.GetMigrations().Last());
         Assert.False(system.Database.HasPendingModelChanges());
         Assert.False(company.Database.HasPendingModelChanges());
         Assert.NotEqual(system.GetService<IMigrationsAssembly>().ModelSnapshot!.GetType(),

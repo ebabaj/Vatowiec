@@ -73,6 +73,9 @@ public sealed class CompanyDbContext(
             throw new InvalidOperationException("Zapis wymaga zgodnego kontekstu firmy.");
         if (ChangeTracker.Entries<Contractor>().Any(x => x.State == EntityState.Deleted))
             throw new InvalidOperationException("Kontrahenta oznaczamy jako nieaktywnego, bez usuwania.");
+        if (ChangeTracker.Entries().Any(x => x.State == EntityState.Deleted &&
+            x.Entity is ContractorAddress or ContractorContact or ContractorBankAccount or AddressType))
+            throw new InvalidOperationException("Nie usuwamy fizycznie danych kartotekowych.");
         if (ChangeTracker.Entries<CompanyProfile>().Any(x => x.State == EntityState.Deleted))
             throw new InvalidOperationException("Nie można usunąć tożsamości bazy firmy.");
         foreach (var entry in ChangeTracker.Entries<ICompanyEntity>()

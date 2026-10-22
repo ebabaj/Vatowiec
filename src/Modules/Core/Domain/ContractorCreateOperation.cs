@@ -5,7 +5,7 @@ public sealed class ContractorCreateOperation
 {
     private ContractorCreateOperation() { }
     public ContractorCreateOperation(Guid operationId, Guid actorId, Guid actorIssuerId,
-        string requestHash, int contractorId, string responseJson)
+        string requestHash, int? contractorId, string responseJson, string operationKind = "Contractor")
     {
         OperationId = EntityText.Id(operationId, nameof(operationId));
         ActorId = EntityText.Id(actorId, nameof(actorId));
@@ -13,11 +13,13 @@ public sealed class ContractorCreateOperation
         RequestHash = requestHash;
         ContractorId = contractorId;
         ResponseJson = responseJson;
+        OperationKind = operationKind;
     }
     public Guid OperationId { get; private set; }
     public Guid ActorId { get; private set; }
     public Guid ActorIssuerId { get; private set; }
     public string RequestHash { get; private set; } = null!;
-    public int ContractorId { get; private set; }
+    public int? ContractorId { get; private set; }
+    public string OperationKind { get; private set; } = "Contractor";
     public string ResponseJson { get; private set; } = null!;
 }

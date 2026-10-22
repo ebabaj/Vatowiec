@@ -10,7 +10,7 @@ internal sealed class CompanyAccessConfiguration : IEntityTypeConfiguration<Comp
     public void Configure(EntityTypeBuilder<CompanyAccess> builder)
     {
         builder.ToTable("CompanyAccess", "security", table =>
-            table.HasCheckConstraint("CK_CompanyAccess_Permissions", "[Permissions] > 0 AND [Permissions] <= 7"));
+            table.HasCheckConstraint("CK_CompanyAccess_Permissions", "[Permissions] > 0 AND [Permissions] <= 15"));
         builder.HasKey(x => new { x.UserId, x.CompanyId });
         builder.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         builder.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.NoAction);

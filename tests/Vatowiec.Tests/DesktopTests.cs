@@ -267,6 +267,16 @@ public sealed partial class DesktopTests
         public Task<ContractorResponse[]>? Pending { get; set; }
         public Exception? SaveError { get; set; }
         public List<ContractorWriteRequest> Writes { get; } = [];
+        public List<DetailWriteRequest> DetailWrites { get; } = [];
+        public DetailResponse[] DetailData { get; set; } = [];
+        public Task<DetailResponse[]> Details(Guid companyId, int contractorId, string kind, int offset = 0, int limit = 50) => Task.FromResult(DetailData);
+        public Task<DetailResponse> Detail(Guid companyId, int contractorId, string kind, int id) => Task.FromResult(DetailData.Single(x => x.Id == id));
+        public Task<DetailResponse> SaveDetail(Guid companyId, int contractorId, string kind, DetailWriteRequest value, bool isNew)
+        {
+            DetailWrites.Add(value);
+            if (SaveError is not null) throw SaveError;
+            return Task.FromResult(new DetailResponse(value.Id == 0 ? 1 : value.Id, companyId, contractorId, kind, value.Data, "AAAAAAAAAAE="));
+        }
         public (string? Search, string? Country, bool? Active, int Offset, int Limit) LastQuery { get; private set; }
         public Task<SessionResponse> Login(string userName, string password) => Task.FromResult(new SessionResponse(userName, Expires));
         public Task<CompanyResponse[]> Companies() => CompanyListError ? throw new HttpRequestException() : Task.FromResult<CompanyResponse[]>(

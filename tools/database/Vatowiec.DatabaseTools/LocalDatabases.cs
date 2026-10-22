@@ -137,7 +137,7 @@ internal static class LocalDatabases
         if (Convert.ToInt32(unknownTables) != 0) throw new InvalidOperationException($"Obce tabele w {database}.");
         var unknownHistory = await Scalar(database, """
             SELECT COUNT(*) FROM dbo.__EFMigrationsHistory WHERE MigrationId NOT IN (
-                '20261021102912_InitialCompany','20261022060000_ContractorAudit','20261022143310_CompanyModelV2',
+                '20261021102912_InitialCompany','20261022060000_ContractorAudit','20261022143310_CompanyModelV2','20261022161050_ContractorDetailAudit',
                 '20261021102909_InitialSystem','20261021114324_IdentityAndCompanyAccess','20261022055958_InstallationIdentity');
             """);
         // Rzeczywiste identyfikatory migracji systemowych weryfikuje niżej kontekst.
@@ -169,7 +169,9 @@ internal static class LocalDatabases
             {
                 var unknownAccounts = await Scalar(database, """
                     SELECT COUNT(*) FROM core.ContractorBankAccounts WHERE AccountNumber NOT LIKE N'DEMO%'
-                        AND AccountNumber NOT LIKE N'TEST%' AND AccountNumber NOT LIKE N'FIKCYJN%';
+                        AND AccountNumber NOT LIKE N'TEST%' AND AccountNumber NOT LIKE N'FIKCYJN%'
+                        AND AccountNumber NOT IN (N'00000000000000000000000000',N'00000000000000000000000001',
+                            N'00000000000000000000000002',N'00000000000000000000000003',N'00000000000000000000000004');
                     """);
                 if (Convert.ToInt32(unknownAccounts) != 0) throw new InvalidOperationException($"Niepotwierdzone numery rachunków w {database}.");
             }
@@ -249,13 +251,13 @@ internal static class LocalDatabases
             var demoId = await company.Contractors.Where(x => x.Code == "DEMO").Select(x => x.Id).SingleAsync();
             if (!await company.ContractorAddresses.AnyAsync(x => x.ContractorId == demoId))
                 company.ContractorAddresses.Add(new ContractorAddress(demoId, 1)
-                    { Name = "Adres demonstracyjny", Street = "Fikcyjna", City = "Miejscowość testowa", CountryCode = "PL", IsDefault = true });
+                { Name = "Adres demonstracyjny", Street = "Fikcyjna", City = "Miejscowość testowa", CountryCode = "PL", IsDefault = true });
             if (!await company.ContractorBankAccounts.AnyAsync(x => x.ContractorId == demoId))
                 company.ContractorBankAccounts.Add(new ContractorBankAccount(demoId, "DEMO-RACHUNEK-NIE-DO-PLATNOSCI", "PLN")
-                    { Name = "Fikcyjny rachunek", IsDefault = true });
+                { Name = "Fikcyjny rachunek", IsDefault = true });
             if (!await company.ContractorContacts.AnyAsync(x => x.ContractorId == demoId))
                 company.ContractorContacts.Add(new ContractorContact(demoId, "Fikcyjny kontakt")
-                    { Email = "demo@example.invalid", Street = "Fikcyjna" });
+                { Email = "demo@example.invalid", Street = "Fikcyjna" });
             await company.SaveChangesAsync();
             await transaction.CommitAsync();
         }
@@ -280,23 +282,38 @@ internal static class LocalDatabases
     public static async Task PrepareTests()
     {
         foreach (var database in TestDatabases)
-            if (await Exists(database)) await CheckDemoData(database);
-        foreach (var database in TestDatabases)
+            await CheckDemoData(database);
+        // Fixture wymagają pustych kartotek, ale nie wymagają DROP/CREATE baz ani tabel.
+        await using (var system = SystemContext(SystemDatabase))
         {
-            await Drop(database);
-            await CreateOrCheck(database);
-            if (database == SystemDatabase)
-            {
-                await using var system = SystemContext(database);
-                await system.Database.MigrateAsync();
-            }
-            else
-            {
-                await using var company = CompanyContext(database, null);
-                await company.Database.MigrateAsync();
-            }
+            if ((await system.Database.GetPendingMigrationsAsync()).Any()) throw new InvalidOperationException("Najpierw wykonaj migrate-contractors.");
         }
-        Console.WriteLine("Trzy jawnie dozwolone bazy demonstracyjne są odtworzone i gotowe do testów. Po teście nastąpi inicjalizacja demonstratora.");
+        foreach (var (id, _, database) in DemoCompanies)
+        {
+            await using var company = CompanyContext(database, id);
+            if ((await company.Database.GetPendingMigrationsAsync()).Any()) throw new InvalidOperationException("Najpierw wykonaj migrate-contractors.");
+        }
+        foreach (var (_, _, database) in DemoCompanies)
+            await Execute(database, """
+                DELETE FROM core.ContractorCreateOperations;
+                DELETE FROM audit.ContractorChanges;
+                DELETE FROM core.ContractorAddresses;
+                DELETE FROM core.ContractorContacts;
+                DELETE FROM core.ContractorBankAccounts;
+                UPDATE core.Contractors SET ParentId=NULL;
+                DELETE FROM core.Contractors;
+                DELETE FROM core.CompanyProfile;
+                DELETE FROM ref.AddressTypes WHERE Id NOT IN (1,2);
+                """);
+        await Execute(SystemDatabase, """
+            DELETE FROM security.UserSessions;
+            DELETE FROM security.CompanyAccess;
+            DELETE FROM security.Users;
+            DELETE FROM security.Roles;
+            DELETE FROM core.CompanyDatabases;
+            DELETE FROM core.Companies;
+            """);
+        Console.WriteLine("Wyczyszczono fikcyjne fixture w istniejących bazach; bez DROP/CREATE. Po testach nastąpi inicjalizacja demonstratora.");
     }
 
     public static async Task CleanupTests()
@@ -400,7 +417,7 @@ internal static class LocalDatabases
         await using var system = SystemContext(SystemDatabase);
         await ShowSchema(system, SystemDatabase, ["core.Companies", "core.CompanyDatabases", "dbo.__EFMigrationsHistory",
             "security.Users", "security.Roles", "security.UserRoles", "security.UserClaims", "security.UserLogins",
-            "security.UserTokens", "security.RoleClaims", "security.CompanyAccess", "security.UserSessions", "security.Installation"], "_InstallationIdentity");
+            "security.UserTokens", "security.RoleClaims", "security.CompanyAccess", "security.UserSessions", "security.Installation"], "_WarningPermission");
         if (await system.InstallationIdentities.CountAsync() != 1 || (await system.InstallationIdentities.SingleAsync()).Id == Guid.Empty)
             throw new InvalidOperationException("Brak trwałej identyfikacji instalacji.");
         if (await system.Companies.CountAsync() != 2 || await system.CompanyDatabases.CountAsync() != 2)
@@ -413,7 +430,7 @@ internal static class LocalDatabases
             if (registration.ServerName != Server || registration.DatabaseName != database)
                 throw new InvalidOperationException("Błędna lokalizacja firmy.");
             await using var company = CompanyContext(database, id);
-            await ShowSchema(company, database, ["core.CompanyProfile", "core.Contractors", "core.ContractorAddresses", "core.ContractorContacts", "core.ContractorBankAccounts", "core.ContractorCreateOperations", "ref.AddressTypes", "audit.ContractorChanges", "dbo.__EFMigrationsHistory"], "_CompanyModelV2");
+            await ShowSchema(company, database, ["core.CompanyProfile", "core.Contractors", "core.ContractorAddresses", "core.ContractorContacts", "core.ContractorBankAccounts", "core.ContractorCreateOperations", "ref.AddressTypes", "audit.ContractorChanges", "dbo.__EFMigrationsHistory"], "_ContractorDetailAudit");
             var profile = await company.CompanyProfiles.IgnoreQueryFilters().SingleAsync();
             if (profile.CompanyId != id)
                 throw new InvalidOperationException("Niezgodna tożsamość danych firmy.");
@@ -459,7 +476,7 @@ internal static class LocalDatabases
             foreach (var (id, _, _) in DemoCompanies)
             {
                 var permissions = role == "Operator"
-                    ? (id == DemoCompanies[0].Id ? (CompanyPermission)7 : (CompanyPermission)3)
+                    ? (id == DemoCompanies[0].Id ? (CompanyPermission)15 : (CompanyPermission)3)
                     : (id == DemoCompanies[0].Id ? CompanyPermission.ViewProfile : CompanyPermission.None);
                 var access = await system.CompanyAccesses.SingleOrDefaultAsync(x => x.UserId == user.Id && x.CompanyId == id);
                 if (permissions == CompanyPermission.None)

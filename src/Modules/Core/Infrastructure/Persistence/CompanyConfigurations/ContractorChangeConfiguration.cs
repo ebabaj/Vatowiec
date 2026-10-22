@@ -18,6 +18,7 @@ internal sealed class ContractorChangeConfiguration : IEntityTypeConfiguration<C
         builder.Property(x => x.ActorName).HasMaxLength(256).IsRequired();
         builder.Property(x => x.CorrelationId).HasMaxLength(128).IsRequired();
         builder.Property(x => x.Operation).HasMaxLength(16).IsRequired();
+        builder.Property(x => x.RecordType).HasMaxLength(32).HasDefaultValue("Contractor");
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.HasOne<Contractor>().WithMany().HasForeignKey(x => x.ContractorId).OnDelete(DeleteBehavior.NoAction);
         builder.HasIndex(x => new { x.ContractorId, x.OccurredAtUtc });

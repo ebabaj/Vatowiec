@@ -1,21 +1,18 @@
-﻿# Kartoteka kontrahentów — model ADR-018
+﻿# Kompletna kartoteka kontrahentów w Avalonia
 
-Wdrożono podstawę nowego modelu: int IDENTITY, ParentId bez dziedziczenia,
-osobne adresy, kontakty i rachunki oraz lokalny słownik rodzajów adresów.
-Decyzje biznesowe: [ADR-018](adr/ADR-018-docelowy-model-kontrahentow.md).
-Rozstrzygnięcia techniczne i zakres wdrożenia: [ADR-019](adr/ADR-019-implementacja-modelu-kontrahentow.md).
+Formularz ma cztery zakładki: **Dane główne, Adresy, Kontakty, Rachunki bankowe**.
+Korzysta wyłącznie z HTTPS API. Zachowane są logowanie, wybór firmy, uprawnienia,
+rowversion, izolacja fizycznych baz i atomowy audyt.
+Model biznesowy: [ADR-018](adr/ADR-018-docelowy-model-kontrahentow.md).
+Technika modelu: [ADR-019](adr/ADR-019-implementacja-modelu-kontrahentow.md).
+Bieżące API i formularz: [ADR-020](adr/ADR-020-kompletna-kartoteka-avalonia.md).
 
-## Uruchomienie i konta
+## Uruchomienie
 
-Lokalne localhost\SQLEXPRESS zawiera Vatowiec_System oraz niezależne
-Vatowiec_Company_A_Dev i Vatowiec_Company_B_Dev. W obu firmach są fikcyjne
-pozycje DEMO, adres, kontakt i rachunek demonstracyjny, nieprzeznaczony do płatności.
-Nie odtwarzamy dawnych GUID ani danych poprzedniego demonstratora.
-API nie wykonuje migracji ani seeda przy starcie.
+W katalogu projektu:
 
 ```powershell
 dotnet build Vatowiec.slnx --no-restore
-dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- verify
 dotnet run --project src/Server/Api --no-build --launch-profile https
 ```
 
@@ -25,132 +22,181 @@ W drugim terminalu:
 dotnet run --project src/Desktop --no-build
 ```
 
-Domyślny adres klienta to https://localhost:7243; można zmienić go na ekranie
-logowania lub przez VATOWIEC_API_URL. Certyfikat musi być zaufany; nie wyłączaj
-weryfikacji HTTPS. Hasła pozostają w lokalnym user-secrets API lub środowisku,
-poza repozytorium. Konfiguracja: [logowanie](authentication.md).
+Domyślny adres: https://localhost:7243, zmieniany na ekranie logowania lub przez
+VATOWIEC_API_URL. Używaj zaufanego certyfikatu; nie wyłączaj walidacji HTTPS.
+Hasła kont są wyłącznie w lokalnym user-secrets API lub środowisku.
+Konfiguracja i uprawnienia: [logowanie](authentication.md).
 
 | Konto | Firma A | Firma B |
 |---|---|---|
-| operator.m0 | Profil, kartoteka, dodawanie i edycja | Profil i odczyt kartoteki |
-| czytelnik.m0 | Tylko profil | Brak dostępu |
+| operator.m0 | Profil, pełna kartoteka, edycja i akceptacja ostrzeżeń | Profil i kartoteka tylko do odczytu |
+| czytelnik.m0 | Wyłącznie profil | Brak dostępu |
 
-## Samodzielna próba
+## Dane główne i grupy
 
-1. Zaloguj się jako operator.m0 lokalnym hasłem, wybierz firmę A i kliknij
-   Pokaż kontrahentów. Nie wpisuj rzeczywistych danych.
-2. Ctrl+N otwiera formularz. Wpisz kod TEST-001, nazwę „Kontrahent fikcyjny — próba”,
-   kraj PL i pozostaw Aktywny. Ctrl+S zapisuje kontrahenta, audyt i wynik
-   operacji tworzenia w jednej transakcji. Id nadaje SQL Server.
-3. Wyszukaj TEST-001 i naciśnij Enter. Filtry kraju i aktywności oraz strony
-   po 50 pozycji wykonują zapytania SQL przez API, bez pobierania całej kartoteki.
-4. Zaznacz pozycję, naciśnij F2 lub Edytuj, zmień nazwę i zapisz Ctrl+S.
-   Edycja wymaga rowversion. Kod do 64 znaków i nazwa do 256 są wymagane;
-   kraj to dwie litery ASCII. Kod pozostaje unikalny w obrębie fizycznej bazy.
-5. Odznacz Aktywny i zapisz. Pozycja pozostaje w bazie; wyszukaj ją filtrem
-   Nieaktywni. Nie ma fizycznego usuwania z API ani klienta.
-6. Zmień firmę na B. Pozycja z A nie pojawia się w B; przyciski edycji są ukryte.
-   Serwer niezależnie od UI odrzuca próbę zapisu bez EditContractors.
-7. Wyloguj się bez zamykania aplikacji. Czytelnik widzi wyłącznie profil A,
-   bez kartoteki i bez dostępu do B.
+1. Zaloguj operator.m0, wybierz A i Pokaż kontrahentów.
+2. Ctrl+N: wpisz np. kod TEST-GRUPA i nazwę „Grupa demonstracyjna — dane fikcyjne”,
+   kraj PL, Aktywny. Ctrl+S zapisuje grupę bez identyfikatora podatkowego.
+3. Utwórz drugiego kontrahenta z kodem TEST-KH. Zapisz, wyszukaj i otwórz F2
+   lub dwuklikiem. Szkic nowego kontrahenta najpierw zapisuje się w danych
+   głównych; adresy/kontakty/rachunki dodaje się do już zapisanej pozycji.
+4. W sekcji nadrzędnego wyszukaj TEST-GRUPA po kodzie/nazwie, zaznacz wynik
+   i kliknij Wybierz nadrzędnego. Zapisz dane główne. Nie wpisujesz int Id.
+5. Możesz zmienić przypisanie albo kliknąć Usuń powiązanie i zapisać.
+   Otwórz grupę: lista podmiotów pokazuje jej bezpośrednich członków ze stronami.
+   Wybierz członka i Otwórz podmiot lub dwuklik.
 
-Tab/Shift+Tab przechodzi po polach, Ctrl+F wybiera wyszukiwanie, Esc anuluje.
-Przed zmianą firmy lub logout zapisz albo anuluj otwarty formularz.
-401 usuwa sesję i dane, 403 usuwa kontekst firmy, a utrata sieci pozostawia
-szkic do ponowienia. Szkic, hasło, cookie i CSRF nie są zapisywane w plikach.
+Code, Name, CountryCode, IsActive i wybór nadrzędnego są edytowalne.
+Kod ma do 64 znaków, nazwa do 256, kraj dwie litery ASCII; kod jest unikalny
+w firmie. TaxId, VatEuId i KsefIdWew mają osobne etykiety i są tylko do odczytu.
+Program nie potwierdza poprawności tych numerów ani weryfikacji urzędowej.
+Zmiana grupy nie kopiuje żadnych danych. Wskazanie siebie lub cyklu jest odrzucane.
 
-TaxId jest tylko do podglądu; podstawowy formularz i API nie edytują TaxId,
-VatEuId ani KsefIdWew. Brak walidatorów nie potwierdza poprawności numerów.
-Obsługę ostrzeżeń i świadomej akceptacji wdrożymy przed udostępnieniem edycji
-identyfikatorów. Nie ma jeszcze ekranów adresów, kontaktów ani rachunków.
+## Adresy
 
-## Konflikt dwóch użytkowników lub dwóch okien
+W zakładce Adresy kliknij Nowy. Wybierz rodzaj (początkowo rejestrowy lub
+korespondencyjny) i uzupełnij dowolne pola: nazwa adresu, ulica, budynek, lokal,
+kod pocztowy, miejscowość, region i kraj. Zapisz pozycję. Można utworzyć wiele
+adresów tego samego rodzaju. Lista pokazuje rodzaj, opis i status.
 
-Otwórz dwa okna Avalonia i zaloguj oba jako operator.m0 do A. W obu otwórz
-ten sam kontrahent do edycji. W pierwszym zmień nazwę i zapisz. W drugim
-wprowadź inną nazwę i spróbuj zapisać: pojawi się konflikt z porównaniem.
-Druga próba nie nadpisuje pierwszej i nie tworzy audytu.
+Preferowany dotyczy pary kontrahent–rodzaj. Zaznaczenie nowego preferowanego
+automatycznie odznacza poprzedni tego samego rodzaju, atomowo z audytem obu
+rekordów. Odznaczenie preferencji bez wyboru następnej jest dozwolone.
+Aktywny można wyłączyć bez usuwania rekordu.
 
-Wybierz jawnie wczytanie wersji serwera albo zachowanie własnych pól. W drugim
-przypadku sprawdź porównanie i ponownie naciśnij Zapisz. Kolejna cudza zmiana
-ponownie wywoła konflikt; nie ma force-update. Zapis bez zmiany nie tworzy historii.
+Nowy rodzaj dodasz z bocznego pola i przycisku Dodaj rodzaj. Nazwa jest wymagana,
+do 100 znaków; istniejącej nazwy nie duplikujemy. Po dodaniu lista rodzajów jest
+odświeżana. Operacja ma audyt oraz ochronę ponowienia po utracie odpowiedzi.
 
-## Zmiana kontraktu API
+## Kontakty
 
-CompanyId pozostaje GUID w ścieżce /api/v1/companies/{companyId}/contractors.
-Id kontrahenta w GET/PUT jest teraz dodatnim int, lokalnym dla bazy.
-POST wymaga Id=0 i OperationId, np.:
+W zakładce Kontakty kliknij Nowy. Wymagana jest tylko nazwa, np. „Księgowość”.
+Możesz dodać sam e-mail poza nazwą, sam telefon, adres pocztowy albo dowolne
+połączenie tych danych. Pozostałe pola to stanowisko/funkcja i uwagi.
 
-```json
-{
-  "id": 0,
-  "code": "TEST-API",
-  "name": "Fikcyjna pozycja API",
-  "countryCode": "PL",
-  "isActive": true,
-  "operationId": "d9555013-724a-469c-a6ab-d23d0b197c54"
-}
-```
+Przykłady do samodzielnej próby:
 
-Klucz operacji generuj raz dla konkretnej operacji tworzenia; przykład nie jest
-stałym kluczem do wszystkich żądań. POST/PUT wymagają aktualnego cookie i CSRF,
-a serwer przy każdej próbie sprawdza ViewContractors i EditContractors.
+- Księgowość — ksiegowosc@example.invalid, bez adresu i telefonu;
+- Magazyn — Fikcyjna 2, Miasto testowe, bez telefonu i e-maila;
+- Fikcyjna osoba — sama nazwa, bez pozostałych danych.
 
-Pierwszy POST zwraca 201 z int Id i RowVersion. Ponów identyczny POST z tym samym
-OperationId: otrzymasz 200 z pierwotnym DTO i Id, bez nowego rekordu/audytu.
-Mechanizm jest trwały także po restarcie API. Inna treść zatwierdzonej operacji
-daje 409 operation_payload_mismatch. Po utracie odpowiedzi klient zachowuje
-OperationId; nie tworzy nowego klucza automatycznie.
+Nie wybierasz rodzaju kontaktu. Nie ma tabel osób/działów/miejsc ani CRM.
+Adres kontaktu jest niezależny od kartoteki adresów. Kontakty można przeglądać,
+dodawać i edytować, bez usuwania. Zatwierdzony model kontaktu nie ma IsActive.
 
-PUT /{intId} wymaga tego samego Id w JSON, RowVersion ostatniego odczytu,
-bez OperationId. Może przekazać ParentId; UI zachowuje istniejący ParentId.
-Nieznany rodzic, wskazanie siebie lub cykl daje odmowę. Nie ma dziedziczenia.
-Odpowiedź zawiera TaxId zamiast TaxIdentifier oraz VatEuId, KsefIdWew i ParentId.
-Numery nie są polami zapisu — wysłanie ich w JSON powoduje 400. Wdrożenie
-API i desktopu musi być wspólne; nie utrzymujemy zgodności starego demonstratora.
+## Rachunki bankowe
 
-## Schemat i weryfikacja
+W zakładce Rachunki bankowe kliknij Nowy. Wpisz numer, opcjonalnie nazwę banku,
+BIC/SWIFT, walutę, właściciela, nazwę własną i uwagi. Przykładowe, wyłącznie
+fikcyjne numery do próby UI to 00000000000000000000000001–04. Nie są
+przeznaczone do płatności i nie deklarujemy ich poprawności.
 
-W każdej firmie istnieją core.CompanyProfile, core.Contractors,
-core.ContractorAddresses (14 kolumn), core.ContractorBankAccounts (12),
-core.ContractorContacts (14, w tym RowVersion), core.ContractorCreateOperations,
-ref.AddressTypes, audit.ContractorChanges oraz dbo.__EFMigrationsHistory.
-Migracja firmowa: 20261022143310_CompanyModelV2. System zachowuje trzy migracje
-katalogu/Identity/Installation i 13 tabel, bez kontrahentów.
+1. Dodaj rachunek PLN z Domyślny oraz rachunek EUR z Domyślny.
+2. Dodaj dwa rachunki z pustą walutą, kolejno oznaczając je jako domyślne.
+3. Otwórz pierwszy bez waluty: nie powinien już mieć znacznika. PLN i EUR
+   zachowują własne oznaczenia.
+4. Możesz odznaczyć domyślność bez wskazania następnego, dezaktywować rachunek
+   lub edytować jego dane. Numery rachunków mogą się powtarzać.
 
-Audyt zachowuje autora i historyczną nazwę po usunięciu konta centralnego.
-Nie ma kaskad ani FK do użytkownika. Zmiana oraz audyt i wynik tworzenia są
-atomowe pomimo kilku SaveChanges wewnątrz jednej jawnej transakcji.
+Pusta waluta oznacza NULL, nie PLN. Jeden domyślny jest dozwolony dla każdej
+waluty i osobnej grupy NULL. Zmiana wycofuje się w całości przy błędzie audytu
+lub konflikcie; nie istnieje dodatkowa tabela rachunków domyślnych.
 
-Pełny przebieg odtwarza tylko trzy dozwolone bazy demonstracyjne. Zatrzymaj
-API i desktop; bieżące fikcyjne rekordy i sesje zostaną usunięte:
+API usuwa białe znaki z numeru i zamienia litery na wielkie. Nietypowa długość
+lub znaki wywołują ostrzeżenie. Spróbuj np. DEMO-?TEST. Program pokaże opis:
+operator mający AcceptWarnings może kliknąć **Świadomie zapisz pomimo ostrzeżenia**.
+Nie jest wymagane uzasadnienie. Potwierdzenie dotyczy dokładnie pokazanej wersji;
+zmiana danych wymaga nowego potwierdzenia. Odstępstwo jest audytowane.
+
+Ta podstawowa kontrola nie sprawdza sumy kontrolnej, kraju, białej listy ani
+innego rejestru. Jej przejście ani potwierdzenie ostrzeżenia nie oznacza,
+że rachunek jest prawidłowy lub został zweryfikowany urzędowo.
+
+## Klawiatura, szkice i konflikty
+
+Tab/Shift+Tab przechodzi po kontrolkach. Ctrl+N tworzy w aktywnej kartotece,
+F2/dwuklik otwiera aktualne dane, Ctrl+S zapisuje, Esc anuluje pozycję lub zamyka
+kartotekę. Przy zmianach pojawia się potwierdzenie porzucenia. Zamknięcie okna
+również chroni niezapisany szkic. Nie utrwalamy szkiców, haseł, cookie ani CSRF
+w plikach. Przewijaj formularz; przyciski zapisu i anulowania pozostają poza
+przewijaną treścią. Nowe okno dopasowuje maksymalny rozmiar do obszaru roboczego.
+
+Zapis danych głównych i zapis jednej pozycji szczegółu są odrębnymi operacjami.
+Zapis szczegółu nie zapisuje automatycznie niezapisanych zmian głównych.
+Po wygaśnięciu sesji lub odebraniu uprawnień szkic jest czyszczony dla ochrony danych.
+
+Konflikt sprawdzisz w dwóch oknach zalogowanych do A. Otwórz ten sam adres,
+kontakt albo rachunek i zmień go w obu. Zapisz pierwsze okno, następnie drugie:
+pojawi się porównanie, a drugi zapis niczego nie nadpisze. Wczytaj serwer albo
+jawnie zachowaj własne pola i ponownie zapisz. Nowa cudza zmiana wywoła nowy
+konflikt. Nie ma force-update ani automatycznego zastępowania wersji.
+
+Wyszukiwanie i stronicowanie listy głównej oraz szczegółów wykonuje API/SQL;
+klient nie pobiera całej kartoteki. Można przeglądać i otworzyć B w trybie odczytu,
+ale POST/PUT także z pominięciem interfejsu otrzymają odmowę.
+
+## API, audyt i wdrożenie
+
+W kontekście /api/v1/companies/{companyId}:
+
+| Operacja | Ścieżka |
+|---|---|
+| Lista kontrahentów/grupy | GET /contractors z q/country/active/offset/limit oraz parentId/excludeId |
+| Lista/szczegół adresu, kontaktu, rachunku | GET /contractors/{id}/{addresses,contacts,bank-accounts}[/{detailId}] |
+| Dodanie/edycja szczegółu | POST kolekcji, PUT /{detailId} |
+| Rodzaje adresów / dodawanie | GET/POST /address-types |
+
+Wszystkie zapisy wymagają sesji, praw do firmy i czynności oraz świeżego CSRF.
+POST szczegółu wymaga Id=0 i OperationId, PUT zgodnego int Id i RowVersion.
+Nie przyjmujemy CompanyId ani ContractorId z Data; kontekst pochodzi z trasy.
+Nie ma DELETE. Te same lokalne Id w innych bazach nie identyfikują tych samych danych.
+
+ContractorChanges zawiera RecordType/RecordId, trwałego autora, czas, korelację
+i stan przed/po; WarningJson opisuje świadome odstępstwo. Wszystkie zmienione
+preferencje mają własny audyt. Wykorzystano istniejącą tabelę operacji z OperationKind,
+bez dodatkowych tabel biznesowych. Powtórzony skuteczny POST zwraca ten sam
+wynik i nie dopisuje rekordu ani audytu. Inna treść zatwierdzonej operacji daje 409.
+
+Wdrożono jawnie 20261022161054_WarningPermission w System oraz
+20261022161050_ContractorDetailAudit niezależnie w A i B. Poprzedziły je kopie
+COPY_ONLY/CHECKSUM i VERIFYONLY. Nie odtwarzano baz ani tabel biznesowych.
+API nie wykonuje migracji przy starcie. Uprawnienia operatora to A=15, B=3.
+Nowe szczegóły nie zmieniają zatwierdzonych 14 kolumn adresów i 12 rachunków.
+
+## Testy i granice
+
+Zatrzymaj API i desktop. Pełny runner czyści **fikcyjne dane** wyłącznie w trzech
+zweryfikowanych bazach, bez DROP/CREATE; po testach inicjalizuje demonstrator:
 
 ```powershell
 dotnet build Vatowiec.slnx --no-restore
 dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- test
+dotnet format Vatowiec.slnx --verify-no-changes --no-restore
 ```
 
-Runner sprawdza instancję, dokładne nazwy, znacznik Vatowiec.LocalTestPurpose,
-znany schemat/historię i oznaczenia fikcyjnych danych przed DROP. Niepotwierdzony
-cel blokuje odtworzenie. Po testach inicjalizuje ponownie firmy i konta z lokalnej
-konfiguracji. Nie tworzy baz *_Test ani nie dotyka baz innych aplikacji.
+Testy sprawdzają trzy kartoteki, słownik, domyślności PLN/EUR/NULL i współbieżne
+zmiany preferencji, rowversion, ponowienia, błędy audytu, ostrzeżenia/uprawnienia,
+CSRF, właściciela, A/B, grupy, trzy identyfikatory oraz ochronę szkicu w kliencie.
+Weryfikacja 2026-10-22: **142/142 testy**, bez pominięć (67 SQL/API i 75 bez SQL).
+Pełna kompilacja zakończyła się bez błędów i ostrzeżeń; kontrola
+`dotnet format --verify-no-changes --no-restore` przeszła poprawnie.
+Pominięte testy SQL bez runnera nie są zaliczane; raporty TRX są w TestResults.
 
-Wynik pełnego przebiegu: **128/128**, bez pominięć, w tym **57 SQL/API** i **71 bez SQL**.
-Potwierdzono fizyczne kolumny/typy/klucze/FK, cykle (także równoczesne próby),
-izolację A/B, int Id, rowversion, trwałe ponowienia, zakres aktora/firmy,
-rollback audytu oraz indeks domyślności PLN/EUR/NULL. Test klienta z prawdziwym
-API/SQL potwierdza dodanie, edycję, wyszukiwanie, zmianę firmy i logout.
-Wyniki TRX znajdują się lokalnie w TestResults. Domyślne testy bez runnera
-pomijają SQL; pominięcie nie jest zaliczeniem. Próba rzeczywistego okna Avalonia
-jest sprawdzana osobno i nie wchodzi do licznika xUnit.
+W rzeczywistym oknie Avalonia operator.m0 utworzył w firmie A kontrahenta
+**GUI-KH-BC96C2** (Id 737) i grupę **GUI-GRUPA-BC96C2**, przypisał grupę,
+dodał własny rodzaj adresu, dwa adresy, dwa kontakty i pięć rachunków.
+Przetestowano edycję i ponowny odczyt po zamknięciu formularza, domyślność
+PLN/EUR/NULL, odznaczenie poprzedniego rachunku bez waluty i świadome
+potwierdzenie ostrzeżenia dla fikcyjnego numeru. SQL potwierdził rekordy,
+domyślności oraz audyt. W firmie B nie znaleziono tego kontrahenta i sprawdzono
+otwieranie istniejącej kartoteki tylko do odczytu.
 
-Próba rzeczywistego okna Windows UI Automation z 2026-10-22 przeszła: login,
-utworzenie i edycja, wyszukiwanie, TaxId tylko do odczytu, izolacja B i logout.
-SQL potwierdził fikcyjny GUI-V2-87D0EC24 z int Id=139 w A, dwa zdarzenia
-Create/Update z SnapshotVersion=2 i wykonawcą operator.m0 oraz brak rekordu w B.
-Id jest wynikiem tej próby, nie stałą wymaganą przez aplikację. Dodatkowa próba
-HTTPS verify-users potwierdziła oba konta, CSRF, logout i odmowy 403 czytelnika.
+Trzy różne fikcyjne identyfikatory przygotowano jako dane testowe w bazie
+i sprawdzono ich osobne pola tylko do odczytu w API/oknie; nie była to edycja
+identyfikatorów przez formularz. Na Windows sprawdzono ekran 1920×1080 oraz
+okno 940×650: widoczność zapisu, błąd przy pustej nazwie kontaktu i potwierdzenia
+porzucenia szkicu przy anulowaniu oraz zamykaniu okna. Nie przeprowadzono
+osobnej próby po zmianie skali DPI Windows ani na Linuksie.
 
-Nie implementowano TaxIdentifierSchemes, ExternalVerifications, walidacji
-podatkowej, integracji rejestrów/KSeF, dokumentów ani księgowania. M0 nie jest
-jeszcze ukończone. Historyczne wyniki wcześniejszego modelu opisuje ADR-017.
+Nie wdrożono walidatorów podatkowych, TaxIdentifierSchemes, ExternalVerifications,
+VIES/białej listy, KSeF/GUS, faktur, księgowania ani CRM. M0 pozostaje nieukończone.

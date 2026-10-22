@@ -10,11 +10,13 @@ Nie ma operacji księgowych ani provisioningu firm.
 
 | Konto | Rola Identity | Firma A | Firma B |
 |---|---|---|---|
-| operator.m0 | Operator | ViewProfile, ViewContractors, EditContractors | ViewProfile, ViewContractors |
+| operator.m0 | Operator | ViewProfile, ViewContractors, EditContractors, AcceptWarnings | ViewProfile, ViewContractors |
 | czytelnik.m0 | Reader | ViewProfile | brak dostępu |
 
 EditContractors od etapu ADR-017 pozwala na dodawanie i edycję z CSRF i rowversion;
 zapis wymaga także ViewContractors. Instrukcja: [kartoteka](contractors.md).
+AcceptWarnings od ADR-020 pozwala świadomie potwierdzić ostrzeżenie podstawowej
+kontroli rachunku, z audytem i zgodnym hashem; samo EditContractors nie wystarcza.
 Rola Identity nie daje dostępu do firmy bez przypisania CompanyAccess.
 
 Firma A: aaaaaaaa-0000-4000-8000-000000000001, Vatowiec_Company_A_Dev.
@@ -156,9 +158,9 @@ dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- verify
 
 Nie ma migracji ani seedowania kont przy starcie API. Nie wdrażamy hasła z repozytorium.
 
-Pełne testy aktualnego modelu ADR-018/019 używają wyłącznie trzech lokalnych baz
-demonstracyjnych. **Zatrzymaj API i desktop: runner usuwa ich fikcyjne dane
-i sesje, a po teście inicjalizuje ponownie demonstrator i konta.** Nie tworzy *_Test.
+Pełne testy aktualnego modelu ADR-018/019/020 używają wyłącznie trzech lokalnych baz
+demonstracyjnych. **Zatrzymaj API i desktop: runner czyści fikcyjne dane i sesje
+przez DML, bez DROP/CREATE, a po teście inicjalizuje ponownie demonstrator i konta.** Nie tworzy *_Test.
 
 ```powershell
 dotnet build Vatowiec.slnx --no-restore
@@ -171,8 +173,8 @@ Weryfikują sesje, CSRF, role/przypisania, zmianę uprawnień i SecurityStamp, p
 bazę i obcy profil, manipulację CompanyId, wygasły bilet i sesję SQL, replay po
 logout oraz dwóch równoległych użytkowników firmy A. Wygaśnięcie sprawdzane jest
 przez testowy TimeProvider, bez czekania i bez publicznego endpointu zegara.
-Raporty TRX są w ignorowanym TestResults. Bieżący wynik to 128/128 bez pominięć
-(57 SQL/API i 71 bez SQL); szczegóły: [kartoteka](contractors.md).
+Raporty TRX są w ignorowanym TestResults. Bieżący wynik to 142/142 bez pominięć
+(67 SQL/API i 75 bez SQL); szczegóły: [kartoteka](contractors.md).
 Audyt księgowy, backup/restore z aplikacji i pełne M0
 nadal wymagają kolejnych etapów.
 

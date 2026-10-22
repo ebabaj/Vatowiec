@@ -334,7 +334,7 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
                     b.Property<string>("BeforeJson")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("ContractorId")
+                    b.Property<int?>("ContractorId")
                         .HasColumnType("int");
 
                     b.Property<string>("CorrelationId")
@@ -353,6 +353,16 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
                         .HasMaxLength(16)
                         .HasColumnType("nvarchar(16)");
 
+                    b.Property<int>("RecordId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RecordType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)")
+                        .HasDefaultValue("Contractor");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -364,6 +374,9 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
 
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("WarningJson")
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
@@ -455,10 +468,16 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
                     b.Property<Guid>("ActorId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("OperationKind")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)")
+                        .HasDefaultValue("Contractor");
+
                     b.Property<Guid>("OperationId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<int>("ContractorId")
+                    b.Property<int?>("ContractorId")
                         .HasColumnType("int");
 
                     b.Property<string>("RequestHash")
@@ -469,7 +488,7 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.HasKey("ActorIssuerId", "ActorId", "OperationId");
+                    b.HasKey("ActorIssuerId", "ActorId", "OperationKind", "OperationId");
 
                     b.HasIndex("ContractorId");
 
@@ -513,8 +532,7 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
                     b.HasOne("Vatowiec.Core.Domain.Contractor", null)
                         .WithMany()
                         .HasForeignKey("ContractorId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.NoAction);
                 });
 
             modelBuilder.Entity("Vatowiec.Core.Domain.ContractorContact", b =>
@@ -531,8 +549,7 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
                     b.HasOne("Vatowiec.Core.Domain.Contractor", null)
                         .WithMany()
                         .HasForeignKey("ContractorId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.NoAction);
                 });
 #pragma warning restore 612, 618
         }

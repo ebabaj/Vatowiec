@@ -31,6 +31,7 @@ public sealed class ContractorAddress
     public bool IsDefault { get; set; }
     public bool IsActive { get; set; } = true;
     public byte[] RowVersion { get; private set; } = [];
+
 }
 
 public sealed class ContractorBankAccount
@@ -55,6 +56,12 @@ public sealed class ContractorBankAccount
     public bool IsActive { get; set; } = true;
     public string? Notes { get; set; }
     public byte[] RowVersion { get; private set; } = [];
+
+    public void SetNumberAndCurrency(string accountNumber, string? currencyCode)
+    {
+        AccountNumber = EntityText.Required(accountNumber, 100, nameof(accountNumber));
+        CurrencyCode = EntityText.Optional(currencyCode, 3, nameof(currencyCode))?.ToUpperInvariant();
+    }
 }
 
 public sealed class ContractorContact
@@ -66,6 +73,7 @@ public sealed class ContractorContact
         ContractorId = contractorId;
         Name = EntityText.Required(name, 256, nameof(name));
     }
+    public void Rename(string name) => Name = EntityText.Required(name, 256, nameof(name));
     public int Id { get; private set; }
     public int ContractorId { get; private set; }
     public string Name { get; private set; } = null!;

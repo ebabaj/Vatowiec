@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -15,7 +15,7 @@ public sealed partial class AuthenticationIntegrationTests
     public async Task DesktopClient_CreatesAndEditsIntIdentityWithoutTaxIdentifierWrites()
     {
         using var model = new Vatowiec.Desktop.ViewModels.MainViewModel(_ => new Vatowiec.Desktop.Services.VatowiecApiClient(Client()))
-            { UserName = "operator.test" };
+        { UserName = "operator.test" };
         await model.Login(password);
         model.SelectedCompany = model.Companies.Single(x => x.CompanyId == companyA);
         await model.OpenCompany();

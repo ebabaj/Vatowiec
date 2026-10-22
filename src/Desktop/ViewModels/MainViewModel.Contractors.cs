@@ -8,6 +8,7 @@ public sealed partial class MainViewModel
     private ContractorResponse? selectedContractor;
     private ContractorEditor? editor;
     private ContractorResponse? conflictCurrent;
+    private string conflictParentLabel = "Brak powiązania nadrzędnego";
     private int pageOffset;
     private bool hasNextPage;
     private (string, string, int) loadedFilter;
@@ -19,12 +20,12 @@ public sealed partial class MainViewModel
     public bool CanBrowse => CanViewContractors && !IsEditing;
     public bool IsBrowsingWorkspace => IsWorkspace && !IsEditing;
     public bool IsEditing => editor is not null;
-    public bool CanSaveContractor => IsEditing && !HasConflict && CanEditContractors;
+    public bool CanSaveContractor => IsEditing && !HasConflict && CanEditContractors && DetailEditor is null;
     public bool HasConflict => conflictCurrent is not null;
     public ContractorEditor? Editor => editor;
     public string EditorTitle => editor?.IsNew == true ? "Nowy kontrahent" : "Edycja kontrahenta";
-    public string ServerVersionSummary => conflictCurrent is null ? "" : Summary(conflictCurrent);
-    public string LocalVersionSummary => editor is null ? "" : $"Kod: {editor.Code}\nNazwa: {editor.Name}\nIdentyfikator: {editor.TaxId}\nKraj: {editor.CountryCode}\nStatus: {(editor.IsActive ? "Aktywny" : "Nieaktywny")}";
+    public string ServerVersionSummary => conflictCurrent is null ? "" : Summary(conflictCurrent, conflictParentLabel);
+    public string LocalVersionSummary => editor is null ? "" : $"Kod: {editor.Code}\nNazwa: {editor.Name}\nTaxId: {editor.TaxId}\nVatEuId: {editor.VatEuId}\nKsefIdWew: {editor.KsefIdWew}\nNadrzędny: {ParentLabel}\nKraj: {editor.CountryCode}\nStatus: {(editor.IsActive ? "Aktywny" : "Nieaktywny")}";
     public bool HasPreviousPage => pageOffset > 0;
     public bool HasNextPage => hasNextPage;
     public string PageLabel => $"Strona {pageOffset / 50 + 1} · do 50 pozycji";
@@ -48,12 +49,13 @@ public sealed partial class MainViewModel
 
     public Task EditContractor() => Run(async () =>
     {
-        if (!CanEditContractors || api is null || profile is null || selectedContractor is null)
-            throw new ArgumentException("Zaznacz kontrahenta do edycji. Wymagane jest uprawnienie edycji.");
+        if (!CanViewContractors || api is null || profile is null || selectedContractor is null)
+            throw new ArgumentException("Zaznacz kontrahenta do otwarcia.");
         var row = await api.Contractor(profile.CompanyId, selectedContractor.Id);
         CheckContractorCompany(row);
         editor = new ContractorEditor(row);
         conflictCurrent = null;
+        await LoadFormContext();
     });
 
     public Task SaveContractor() => Run(async () =>
@@ -61,6 +63,7 @@ public sealed partial class MainViewModel
         if (!CanSaveContractor || api is null || profile is null || editor is null) return;
         var value = editor.Request();
         var errors = ContractorValidation.Validate(value);
+        editor.SetErrors(errors);
         if (errors.Count != 0) throw new ArgumentException(string.Join(Environment.NewLine, errors.Values.SelectMany(x => x)));
         try
         {
@@ -71,6 +74,7 @@ public sealed partial class MainViewModel
             contractors = [];
             contractorsLoaded = false;
             selectedContractor = null;
+            ResetDetails();
             ChangedAll();
             message = "Zapisano kontrahenta i historię zmiany. Odśwież lub wyszukaj pozycję w kartotece.";
         }
@@ -79,7 +83,24 @@ public sealed partial class MainViewModel
             CheckContractorCompany(ex.Current);
             if (ex.Current.Id != value.Id) throw new ApiException(502, "Niezgodny identyfikator odpowiedzi API.");
             conflictCurrent = ex.Current;
+            conflictParentLabel = "Brak powiązania nadrzędnego";
+            if (ex.Current.ParentId.HasValue)
+            {
+                var parent = await api.Contractor(profile.CompanyId, ex.Current.ParentId.Value);
+                CheckContractorCompany(parent);
+                conflictParentLabel = parent.ToString();
+            }
             message = "Konflikt: niczego nie nadpisano. Porównaj wersje poniżej.";
+        }
+        catch (ApiException ex) when (ex.Code is "hierarchy_cycle" or "invalid_parent")
+        {
+            editor?.SetErrors(new() { ["ParentId"] = [ex.Message] });
+            message = ex.Message;
+        }
+        catch (ApiException ex) when (ex.Code == "validation_failed" && ex.Errors is not null)
+        {
+            editor?.SetErrors(ex.Errors);
+            message = ex.Message;
         }
     });
 
@@ -87,7 +108,7 @@ public sealed partial class MainViewModel
     {
         if (busy || editor is null || conflictCurrent is null) return;
         if (keepLocal) editor.RowVersion = conflictCurrent.RowVersion;
-        else editor = new ContractorEditor(conflictCurrent);
+        else { editor = new ContractorEditor(conflictCurrent); ParentLabel = conflictParentLabel; }
         conflictCurrent = null;
         message = keepLocal ? "Zachowano Twoje pola. Sprawdź je i ponownie kliknij Zapisz, aby zastąpić porównaną wersję."
             : "Wczytano wersję z serwera. Twoje poprzednie zmiany zostały odrzucone.";
@@ -97,8 +118,14 @@ public sealed partial class MainViewModel
     public void CancelEditor()
     {
         if (busy) return;
+        if (HasUnsavedChanges) { RequestDiscard(CloseEditor); return; }
+        CloseEditor();
+    }
+    private void CloseEditor()
+    {
         editor = null;
         conflictCurrent = null;
+        ResetDetails();
         message = "Anulowano edycję. Nie zapisano zmian.";
         ChangedAll();
     }
@@ -108,9 +135,10 @@ public sealed partial class MainViewModel
         if (profile is null || row.CompanyId != profile.CompanyId)
             throw new ApiException(502, "API zwróciło dane innej firmy. Odmowa wyświetlenia danych.");
     }
-    private static string Summary(ContractorResponse row) => $"Kod: {row.Code}\nNazwa: {row.Name}\nIdentyfikator: {row.TaxId}\nKraj: {row.CountryCode}\nStatus: {row.ActivityLabel}";
+    private static string Summary(ContractorResponse row, string parentLabel) => $"Kod: {row.Code}\nNazwa: {row.Name}\nTaxId: {row.TaxId}\nVatEuId: {row.VatEuId}\nKsefIdWew: {row.KsefIdWew}\nNadrzędny: {parentLabel}\nKraj: {row.CountryCode}\nStatus: {row.ActivityLabel}";
     private void ClearContractorState()
     {
+        ResetDetails();
         editor = null;
         conflictCurrent = null;
         selectedContractor = null;
@@ -123,8 +151,9 @@ public sealed partial class MainViewModel
     }
 }
 
-public sealed class ContractorEditor
+public sealed class ContractorEditor : System.ComponentModel.INotifyPropertyChanged
 {
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
     public ContractorEditor() { }
     public ContractorEditor(ContractorResponse row)
     {
@@ -133,20 +162,43 @@ public sealed class ContractorEditor
         Code = row.Code;
         Name = row.Name;
         TaxId = row.TaxId ?? "";
+        VatEuId = row.VatEuId ?? "";
+        KsefIdWew = row.KsefIdWew ?? "";
         CountryCode = row.CountryCode;
         IsActive = row.IsActive;
         RowVersion = row.RowVersion;
         IsNew = false;
+        original = System.Text.Json.JsonSerializer.Serialize(Request());
     }
     public int Id { get; }
     public Guid OperationId { get; } = Guid.NewGuid();
-    public int? ParentId { get; }
+    public int? ParentId { get; set; }
     public string Code { get; set; } = "";
     public string Name { get; set; } = "";
     public string TaxId { get; } = "";
+    public string VatEuId { get; } = "";
+    public string KsefIdWew { get; } = "";
     public string CountryCode { get; set; } = "PL";
     public bool IsActive { get; set; } = true;
     public bool IsNew { get; } = true;
     public string? RowVersion { get; set; }
+    private string? original;
+    public bool IsDirty => original is null ? Code.Length != 0 || Name.Length != 0 || ParentId.HasValue || CountryCode != "PL" || !IsActive
+        : original != System.Text.Json.JsonSerializer.Serialize(Request());
+    public string CodeError { get; private set; } = "";
+    public string NameError { get; private set; } = "";
+    public string CountryError { get; private set; } = "";
+    public string ParentError { get; private set; } = "";
+    public void SetErrors(Dictionary<string, string[]> errors)
+    {
+        CodeError = errors.TryGetValue("Code", out var code) ? string.Join(" ", code) : "";
+        NameError = errors.TryGetValue("Name", out var name) ? string.Join(" ", name) : "";
+        CountryError = errors.TryGetValue("CountryCode", out var country) ? string.Join(" ", country) : "";
+        ParentError = errors.TryGetValue("ParentId", out var parent) ? string.Join(" ", parent) : "";
+        PropertyChanged?.Invoke(this, new(nameof(CodeError)));
+        PropertyChanged?.Invoke(this, new(nameof(NameError)));
+        PropertyChanged?.Invoke(this, new(nameof(CountryError)));
+        PropertyChanged?.Invoke(this, new(nameof(ParentError)));
+    }
     public ContractorWriteRequest Request() => new(Id, Code, Name, CountryCode, IsActive, RowVersion, IsNew ? OperationId : null, ParentId);
 }

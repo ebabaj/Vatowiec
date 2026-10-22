@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -30,13 +30,15 @@ public static class ContractorEndpoints
             environment.IsDevelopment(), context.RequestAborted);
 
     private static async Task<IResult> List(Guid companyId, HttpContext context, CompanyDatabaseResolver resolver,
-        IWebHostEnvironment environment, string? q, string? country, bool? active, int offset = 0, int limit = 50)
+        IWebHostEnvironment environment, string? q, string? country, bool? active, int? parentId, int? excludeId, int offset = 0, int limit = 50)
     {
         await using var db = await Resolve(companyId, context, resolver, environment);
         if (offset < 0 || offset > 1000000 || limit is < 1 or > 100 || q?.Length > 128 ||
             (!string.IsNullOrWhiteSpace(country) && (country.Trim().Length != 2 || country.Trim().Any(c => !char.IsAsciiLetter(c)))))
             return Error(400, "invalid_filter", "Nieprawidłowe filtry lub strona wyników.");
         var rows = db.Context.Contractors.AsNoTracking();
+        if (parentId.HasValue) rows = rows.Where(x => x.ParentId == parentId);
+        if (excludeId.HasValue) rows = rows.Where(x => x.Id != excludeId);
         var search = q?.Trim();
         if (!string.IsNullOrEmpty(search)) rows = rows.Where(x => x.Code.Contains(search) || x.Name.Contains(search) ||
             (x.TaxId != null && x.TaxId.Contains(search)) || (x.VatEuId != null && x.VatEuId.Contains(search)));
@@ -107,7 +109,7 @@ public static class ContractorEndpoints
             if (!contractorId.HasValue)
             {
                 var previous = await db.Context.ContractorCreateOperations.AsNoTracking().SingleOrDefaultAsync(x =>
-                    x.ActorId == actor && x.ActorIssuerId == issuer && x.OperationId == value.OperationId, context.RequestAborted);
+                    x.ActorId == actor && x.ActorIssuerId == issuer && x.OperationKind == "Contractor" && x.OperationId == value.OperationId, context.RequestAborted);
                 if (previous is not null)
                     return previous.RequestHash == hash ? Results.Content(previous.ResponseJson, "application/json", statusCode: 200)
                         : Error(409, "operation_payload_mismatch", "Ta operacja tworzenia została już wykonana z innymi danymi. Odśwież kartotekę.");
@@ -175,7 +177,14 @@ public static class ContractorEndpoints
     private static IResult Error(int status, string code, string message) => Results.Json(new { code, message }, statusCode: status);
     private static string Snapshot(Contractor row) => JsonSerializer.Serialize(new
     {
-        row.Code, row.Name, row.TaxId, row.VatEuId, row.KsefIdWew, row.ParentId, row.CountryCode, row.IsActive
+        row.Code,
+        row.Name,
+        row.TaxId,
+        row.VatEuId,
+        row.KsefIdWew,
+        row.ParentId,
+        row.CountryCode,
+        row.IsActive
     });
     private static ContractorResponse Response(Contractor row, Guid companyId) => new(row.Id, companyId, row.Code, row.Name,
         row.CountryCode, row.TaxId, row.IsActive, Convert.ToBase64String(row.RowVersion), row.ParentId, row.VatEuId, row.KsefIdWew);

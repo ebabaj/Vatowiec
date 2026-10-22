@@ -25,7 +25,7 @@ public static class ContractorBankAccountDefaults
         selected.IsDefault = true;
         await db.SaveChangesAsync(ct);
         db.ContractorChanges.Add(new ContractorChange(selected.ContractorId, actorId, issuerId, actorName,
-            now, correlationId, before, JsonSerializer.Serialize(new { BankAccounts = accounts })));
+            now, correlationId, before, JsonSerializer.Serialize(new { BankAccounts = accounts }), "BankAccountGroup", selected.Id));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
     }
