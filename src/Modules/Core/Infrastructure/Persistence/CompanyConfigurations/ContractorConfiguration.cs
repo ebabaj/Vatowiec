@@ -27,5 +27,6 @@ internal sealed class ContractorConfiguration : IEntityTypeConfiguration<Contrac
         builder.HasOne<CompanyProfile>().WithMany().HasForeignKey(x => x.CompanyId)
             .HasPrincipalKey(x => x.CompanyId).OnDelete(DeleteBehavior.NoAction);
         builder.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+        builder.HasIndex(x => new { x.CompanyId, x.IsActive, x.Code });
     }
 }

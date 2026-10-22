@@ -7,7 +7,7 @@ using Vatowiec.SharedContracts;
 
 namespace Vatowiec.Desktop.ViewModels;
 
-public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
+public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly Func<string, IVatowiecApiClient> connect;
     private readonly TimeProvider clock;
@@ -51,7 +51,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public bool CanViewContractors => IsWorkspace && selectedCompany?.CanViewContractors == true;
     public bool CannotViewContractors => IsWorkspace && !CanViewContractors;
     public string ContractorStatus => !contractorsLoaded ? "Wybierz „Pokaż kontrahentów”, aby pobrać aktualne dane."
-        : contractors.Length == 0 ? "Brak kontrahentów w wybranej firmie." : $"Liczba kontrahentów: {contractors.Length}";
+        : contractors.Length == 0 ? "Brak kontrahentów spełniających filtry." : $"Pozycje na tej stronie: {contractors.Length}";
 
     public async Task Login(string password)
     {
@@ -89,19 +89,28 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         profile = result;
     });
 
-    public Task LoadContractors() => Run(async () =>
+    public Task LoadContractors() => Run(() => LoadPage(0));
+
+    private async Task LoadPage(int offset)
     {
         contractors = [];
         contractorsLoaded = false;
         ChangedAll();
         if (api is null || profile is null || !CanViewContractors)
             throw new ApiException(403, "Brak uprawnień do kartoteki kontrahentów.");
-        var rows = await api.Contractors(profile.CompanyId);
+        var filter = (SearchText.Trim(), FilterCountry.Trim(), FilterActivity);
+        if (filter != loadedFilter) offset = 0;
+        var rows = await api.Contractors(profile.CompanyId, filter.Item1, filter.Item2,
+            FilterActivity == 0 ? null : FilterActivity == 1, offset, 51);
         if (rows.Any(x => x.CompanyId != profile.CompanyId))
             throw new ApiException(502, "API zwróciło dane innej firmy. Odmowa wyświetlenia danych.");
-        contractors = rows;
+        contractors = rows.Take(50).ToArray();
+        hasNextPage = rows.Length > 50;
+        pageOffset = offset;
+        loadedFilter = filter;
+        selectedContractor = null;
         contractorsLoaded = true;
-    });
+    }
 
     public Task ChangeCompany() => Run(async () =>
     {
@@ -170,6 +179,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         profile = null;
         contractors = [];
         contractorsLoaded = false;
+        ClearContractorState();
     }
     private void ResetSession()
     {

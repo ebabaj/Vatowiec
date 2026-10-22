@@ -305,7 +305,8 @@ internal static class LocalDatabases
             await using var company = CompanyContext(database, null);
             if (await company.CompanyProfiles.IgnoreQueryFilters().AnyAsync() ||
                 await company.Contractors.IgnoreQueryFilters().AnyAsync() ||
-                (await company.Database.GetAppliedMigrationsAsync()).Count() != 1)
+                await company.ContractorChanges.IgnoreQueryFilters().AnyAsync() ||
+                !(await company.Database.GetAppliedMigrationsAsync()).SequenceEqual(company.Database.GetMigrations()))
                 throw new InvalidOperationException($"Testy nie wycofały danych lub historii w {database}.");
         }
         Console.WriteLine("Potwierdzono rollback: wszystkie bazy *_Test puste, historie migracji zachowane.");
@@ -337,7 +338,9 @@ internal static class LocalDatabases
         await using var system = SystemContext(SystemDatabase);
         await ShowSchema(system, SystemDatabase, ["core.Companies", "core.CompanyDatabases", "dbo.__EFMigrationsHistory",
             "security.Users", "security.Roles", "security.UserRoles", "security.UserClaims", "security.UserLogins",
-            "security.UserTokens", "security.RoleClaims", "security.CompanyAccess", "security.UserSessions"], "_IdentityAndCompanyAccess");
+            "security.UserTokens", "security.RoleClaims", "security.CompanyAccess", "security.UserSessions", "security.Installation"], "_InstallationIdentity");
+        if (await system.InstallationIdentities.CountAsync() != 1 || (await system.InstallationIdentities.SingleAsync()).Id == Guid.Empty)
+            throw new InvalidOperationException("Brak trwałej identyfikacji instalacji.");
         if (await system.Companies.CountAsync() != 2 || await system.CompanyDatabases.CountAsync() != 2)
             throw new InvalidOperationException("Katalog demonstratora powinien zawierać dokładnie dwie firmy i dwa wskazania baz.");
         var now = DateTimeOffset.UtcNow;
@@ -348,7 +351,7 @@ internal static class LocalDatabases
             if (registration.ServerName != Server || registration.DatabaseName != database)
                 throw new InvalidOperationException("Błędna lokalizacja firmy.");
             await using var company = CompanyContext(database, id);
-            await ShowSchema(company, database, ["core.CompanyProfile", "core.Contractors", "dbo.__EFMigrationsHistory"], "_InitialCompany");
+            await ShowSchema(company, database, ["core.CompanyProfile", "core.Contractors", "audit.ContractorChanges", "dbo.__EFMigrationsHistory"], "_ContractorAudit");
             var profile = await company.CompanyProfiles.IgnoreQueryFilters().SingleAsync();
             if (profile.CompanyId != id || await company.Contractors.IgnoreQueryFilters().AnyAsync(x => x.CompanyId != id))
                 throw new InvalidOperationException("Niezgodna tożsamość danych firmy.");
@@ -415,16 +418,50 @@ internal static class LocalDatabases
     }
 
     public static async Task BackupSystem()
+        => await Backup(SystemDatabase);
+
+    private static async Task Backup(string database)
     {
-        await CheckOwnership(SystemDatabase);
+        await CheckOwnership(database);
         var directory = (string?)await Scalar("master", "SELECT CONVERT(nvarchar(4000), SERVERPROPERTY('InstanceDefaultBackupPath'));");
         if (string.IsNullOrWhiteSpace(directory) || !Path.IsPathFullyQualified(directory))
             throw new InvalidOperationException("Brak jawnego katalogu backupów lokalnej instancji SQL.");
-        var backup = Path.Combine(directory, $"Vatowiec_System_before_identity_{Guid.NewGuid():N}.bak");
-        await Execute("master", "BACKUP DATABASE [Vatowiec_System] TO DISK = @path WITH COPY_ONLY, CHECKSUM;",
+        var backup = Path.Combine(directory, $"{database}_before_contractors_{Guid.NewGuid():N}.bak");
+        await Execute("master", $"BACKUP DATABASE {Identifier(database)} TO DISK = @path WITH COPY_ONLY, CHECKSUM;",
             new SqlParameter("@path", backup));
         await Execute("master", "RESTORE VERIFYONLY FROM DISK = @path WITH CHECKSUM;", new SqlParameter("@path", backup));
-        Console.WriteLine($"Backup systemowy COPY_ONLY i VERIFYONLY z CHECKSUM: {backup}");
+        Console.WriteLine($"Backup {database} COPY_ONLY i VERIFYONLY z CHECKSUM: {backup}");
+    }
+
+    public static async Task MigrateContractors()
+    {
+        // Wyłącznie trzy konkretne lokalne bazy demonstracyjne. Nigdy API startup.
+        foreach (var database in new[] { SystemDatabase }.Concat(DemoCompanies.Select(x => x.Database)))
+            await CheckOwnership(database);
+        await using (var system = SystemContext(SystemDatabase)) await CheckKnownHistory(system);
+        foreach (var (id, _, database) in DemoCompanies)
+        {
+            await using var company = CompanyContext(database, id);
+            await CheckKnownHistory(company);
+            if ((await company.CompanyProfiles.IgnoreQueryFilters().SingleAsync()).CompanyId != id)
+                throw new InvalidOperationException($"Obcy profil w {database}; odmowa migracji.");
+        }
+        foreach (var database in new[] { SystemDatabase }.Concat(DemoCompanies.Select(x => x.Database))) await Backup(database);
+        await using (var system = SystemContext(SystemDatabase)) await system.Database.MigrateAsync();
+        foreach (var (id, _, database) in DemoCompanies)
+        {
+            await using var company = CompanyContext(database, id);
+            await company.Database.MigrateAsync();
+        }
+        await Verify();
+    }
+
+    private static async Task CheckKnownHistory(DbContext context)
+    {
+        var applied = (await context.Database.GetAppliedMigrationsAsync()).ToArray();
+        var known = context.Database.GetMigrations().ToArray();
+        if (applied.Length == 0 || !applied.SequenceEqual(known.Take(applied.Length)))
+            throw new InvalidOperationException("Nieznana historia migracji. Przerwano przed zmianą schematów.");
     }
 
     public static async Task MigrateSystem()

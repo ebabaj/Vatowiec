@@ -30,14 +30,7 @@ public static class CompanyEndpoints
             return Results.Ok(new { profile.CompanyId, profile.Name, profile.Nip, profile.Regon });
         }).AddEndpointFilter(ValidateCompanySource);
 
-        group.MapGet("/{companyId:guid}/contractors", async (Guid companyId, HttpContext request,
-            CompanyDatabaseResolver resolver, IWebHostEnvironment environment) =>
-        {
-            await using var database = await resolver.Resolve(UserId(request), companyId,
-                CompanyPermission.ViewContractors, environment.IsDevelopment(), request.RequestAborted);
-            return Results.Ok(await database.Context.Contractors.AsNoTracking().OrderBy(x => x.Code)
-                .Select(x => new { x.Id, x.CompanyId, x.Code, x.Name, x.CountryCode }).ToListAsync(request.RequestAborted));
-        }).AddEndpointFilter(ValidateCompanySource);
+        group.MapContractors();
     }
 
     private static Guid UserId(HttpContext context) => Guid.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -45,7 +38,7 @@ public static class CompanyEndpoints
     private static string[] Permissions(CompanyPermission permissions) => Enum.GetValues<CompanyPermission>()
         .Where(x => x != CompanyPermission.None && (permissions & x) == x).Select(x => x.ToString()).ToArray();
 
-    private static ValueTask<object?> ValidateCompanySource(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
+    internal static ValueTask<object?> ValidateCompanySource(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         if (context.HttpContext.Request.Query.ContainsKey("companyId") ||
             context.HttpContext.Request.Headers.ContainsKey("X-Company-Id") || context.GetArgument<Guid>(0) == Guid.Empty)

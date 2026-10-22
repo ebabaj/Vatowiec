@@ -2,7 +2,10 @@
 
 Klient korzysta wyłącznie z API HTTPS. Katalog firm i uprawnienia są w
 Vatowiec_System, a kontrahenci w osobnych Vatowiec_Company_A_Dev/B_Dev.
-Ten etap umożliwia tylko odczyt. Decyzja: [ADR-016](adr/ADR-016-desktop-logowanie-i-kontekst-firmy.md).
+Pierwszy etap odczytu opisuje [ADR-016](adr/ADR-016-desktop-logowanie-i-kontekst-firmy.md).
+**Aktualizacja 2026-10-22:** dodawanie, edycję, wyszukiwanie, stronicowanie,
+dezaktywację i konflikt opisuje [kartoteka kontrahentów](contractors.md), ADR-017.
+Operator edytuje w A, a w B nadal tylko czyta.
 
 ## Uruchomienie
 
@@ -83,7 +86,7 @@ cookie w pamięci, więc użytkownicy i wybory firm nie zmieniają sobie sesji.
 
 ## Weryfikacja etapu
 
-Build ośmiu projektów: bez błędów i ostrzeżeń. Pełny zestaw: **96/96** testów,
+Historyczny build etapu ADR-016: bez błędów i ostrzeżeń. Zestaw tego etapu: **96/96** testów,
 bez pominięć, w tym **35 SQL/API** i **61 bez SQL**. Zawiera 26 nowych przypadków:
 23 transportu/modelu desktopu oraz 3 integracyjne z API/SQL.
 

@@ -1,7 +1,7 @@
 # Otwarty następca VATowca — specyfikacja produktu i architektury
 
-**Wersja dokumentu:** 0.4.0 (scenariusz desktopowy, ADR-016)
-**Data:** 2026-10-21  
+**Wersja dokumentu:** 0.5.0 (kartoteka kontrahentów i audyt, ADR-017)
+**Data:** 2026-10-22
 **Status:** projekt założeń; nie jest potwierdzeniem zgodności podatkowej gotowego oprogramowania  
 **Nazwa projektu:** robocza „Otwarty następca VATowca”; docelowa nazwa i użycie nazwy „VATowiec” wymagają odrębnej decyzji i sprawdzenia praw  
 **Główna platforma:** Windows; klient i serwer projektowane także z myślą o Linux  
@@ -128,7 +128,18 @@ Wyłączenie oznacza brak w pierwszym wydaniu, nie zakaz dodania później.
 - Polski klient loguje przez API HTTPS, pobiera dostępne firmy, otwiera profil wybranej firmy i odczytuje kontrahentów. Zmiana firmy i wylogowanie nie wymagają restartu. Okno pokazuje aktualną firmę, użytkownika i termin sesji.
 - Adres API jest konfigurowalny przez VATOWIEC_API_URL i ekran logowania. Klient zachowuje standardową walidację certyfikatów; nie akceptuje HTTP ani przekierowań. Hasło nie jest zapisywane, cookie i CSRF są tylko w pamięci. Login/logout zachowują wymagania ADR-015.
 - ViewContractors jest sprawdzane przez serwer niezależnie od widoczności przycisku. Brak uprawnień, sesja 401, błąd resolvera i utrata połączenia nie powodują wyboru domyślnej firmy. Zmiana firmy i odświeżanie kartoteki usuwają stare rekordy; wygaśnięcie sesji czyści całą sesję także podczas bezczynności. Operacje UI są serializowane, opóźnione dane po terminie sesji są odrzucane.
-- Nie ma dodawania/edycji kontrahentów ani automatycznego provisioningu. Instrukcja kont i ograniczeń wylogowania offline: docs/desktop.md. Architektura database-per-company i migracje pozostają bez zmian.
+- Etap ADR-016 obejmował odczyt; edycję dodaje §3.7. Instrukcja kont i ograniczeń wylogowania offline: docs/desktop.md. Automatyczny provisioning pozostaje kolejnym zadaniem.
+
+### 3.7. Podstawowa kartoteka kontrahentów (ADR-017)
+
+- Avalonia umożliwia dodanie i edycję kodu, nazwy, opcjonalnego identyfikatora podatkowego, dwuliterowego kraju i aktywności. Dezaktywacja zachowuje rekord i historię; nie ma fizycznego usuwania z API. Skróty: Ctrl+N, F2, Ctrl+F, Ctrl+S, Esc. Formularz i szkice nie są utrwalane lokalnie.
+- API wymaga ViewContractors do odczytu oraz ViewContractors + EditContractors i CSRF do POST/PUT. Dotychczasowe HTTPS, cookie i resolver obowiązują także przy zapisie. Filtry q/country/active oraz offset/limit działają w SQL; API zwraca domyślnie 50, maksymalnie 100 pozycji. Klient pokazuje strony po 50 i sprawdza istnienie następnej.
+- PUT wymaga rowversion: błędny/brak daje 400, stary daje 409 i aktualne dane. Klient zachowuje własne pola, pokazuje porównanie i wymaga jawnej decyzji przed kolejnym zapisem. Nie ma force-update. Id nowej pozycji jest stałe podczas ponawiania formularza; identyczne powtórzenie POST nie tworzy drugiej pozycji ani audytu. Kolizja kodu daje 409.
+- Każdy rzeczywisty zapis przez API dopisuje audit.ContractorChanges w tej samej transakcji CompanyDbContext: autor, trwała przestrzeń identyfikatorów instalacji, historyczna nazwa użytkownika, czas UTC i korelacja, typ operacji oraz wartości pięciu pól przed/po. Audyt nie ma FK do centralnego konta; usunięcie konta nie odbiera identyfikacji autora. Brak zmiany stanu nie dopisuje sztucznej historii.
+- security.Installation jest pojedynczym identyfikatorem źródłowej instalacji generowanym przez migrację systemową, zachowywanym przy aktualizacjach. Centralna baza nadal nie zawiera kontrahentów ani ich audytu. Zastosowano osobne migracje systemową InstallationIdentity i firmową ContractorAudit; start API nie migruje. Historia sprzed wdrożenia nie jest odtwarzana wstecz.
+- Walidacja odpowiada długościom istniejącego modelu; nie dodano weryfikacji podatkowej NIP/rejestrów (ORG-007), adresów i rachunków ani dokumentów księgowych. Instrukcja testu, migracji i granic: docs/contractors.md, ADR-017.
+
+Weryfikacja etapu 2026-10-22: 117/117 testów (46 SQL/API, 71 bez SQL), bez pominięć; kompilacja ośmiu projektów bez błędów i ostrzeżeń oraz poprawne formatowanie. W dwóch rzeczywistych oknach Avalonia sprawdzono dodanie i edycję, wyszukiwanie, konflikt z zachowaniem pól, świadome rozstrzygnięcie i dezaktywację. SQL potwierdził pięć atomowo zapisanych zdarzeń dla fikcyjnej próby GUI-60D3A33B; próba odrzucona przez konflikt nie dopisała audytu. Migracje trzech baz wykonano jawnie po zweryfikowanych kopiach. M0 nadal wymaga cyklu życia firm i audytu operacji księgowych.
 
 ---
 
@@ -532,7 +543,7 @@ Ważne jest odróżnienie **daty zmiany przepisów** od **daty wydania aktualiza
 
 Rejestr: kto, kiedy, z jakiego stanowiska/kontekstu, co utworzył/zmienił/zatwierdził, źródło żądania, identyfikator korelacji, poprzednia i nowa istotna wartość. Odróżniamy log techniczny od audytu biznesowego. Retencja, zakres danych osobowych i prawo do usunięcia są projektowane z uwzględnieniem obowiązków księgowych i RODO, a nie przez proste usuwanie zapisów podatkowych.
 
-Historia księgowa jest samowystarczalna w bazie firmy: zapisuje niezmienny `ActorId`, przestrzeń identyfikatorów źródłowej instalacji (`ActorIssuerId`) i historyczny opis pozwalający zidentyfikować wykonawcę. Identyfikatory nie są ponownie używane; zmiana nazwy ani fizyczne usunięcie centralnego konta nie zmienia zapisanej identyfikacji. Bez FK/kaskad do `User` i bez wymogu odczytu centralnej kartoteki do wyświetlenia historii. Restore lub przeniesienie firmy zachowuje identyfikację dawnych aktorów, ale nie nadaje im bieżących uprawnień. Model oraz zapis audytu biznesowego będą osobną implementacją; same daty encji nie są audytem.
+Historia księgowa jest samowystarczalna w bazie firmy: zapisuje niezmienny `ActorId`, przestrzeń identyfikatorów źródłowej instalacji (`ActorIssuerId`) i historyczny opis pozwalający zidentyfikować wykonawcę. Identyfikatory nie są ponownie używane; zmiana nazwy ani fizyczne usunięcie centralnego konta nie zmienia zapisanej identyfikacji. Bez FK/kaskad do `User` i bez wymogu odczytu centralnej kartoteki do wyświetlenia historii. Restore lub przeniesienie firmy zachowuje identyfikację dawnych aktorów, ale nie nadaje im bieżących uprawnień. ADR-017 implementuje te zasady dla audytu kartoteki kontrahentów; audyt dokumentów księgowych pozostaje osobnym zadaniem. Same daty encji nie są audytem.
 
 ### 11.3. Backup i odtwarzanie
 
@@ -632,7 +643,7 @@ szyfrowanym połączeniu; to odrębne ustawienie od certyfikatu HTTPS API.
 
 Weryfikacja etapu Identity: 70/70 testów, w tym 32 SQL/API, bez pominięć; build ośmiu projektów bez błędów i ostrzeżeń. Rzeczywista próba HTTPS dwóch kont potwierdziła profile A/B dla operatora, 403 dla czytelnika w B, 400 przy manipulacji CompanyId i 401 po logout. Dane dostępowe SQL nie trafiają do klienta.
 
-**Aktualny etap desktopowy (2026-10-21, ADR-016):** logowanie, lista dostępnych firm, otwieranie profilu, odczyt kontrahentów, zmiana firmy i wylogowanie w jednym procesie Avalonia. Weryfikacja: 96/96 testów, w tym 35 SQL/API, bez pominięć; build ośmiu projektów bez błędów i ostrzeżeń. Rzeczywista próba Windows UI Automation potwierdziła konto operatora i odrębne kartoteki A/B przez HTTPS, zmianę firmy i logout. Hasła/sesje nie są utrwalane przez klienta. M0 nadal wymaga m.in. audytu i cyklu życia firm. Instrukcja: docs/desktop.md.
+**Etap desktopowy (2026-10-21, ADR-016):** logowanie, lista dostępnych firm, otwieranie profilu, odczyt kontrahentów, zmiana firmy i wylogowanie w jednym procesie Avalonia. Weryfikacja: 96/96 testów, w tym 35 SQL/API, bez pominięć; build ośmiu projektów bez błędów i ostrzeżeń. Rzeczywista próba Windows UI Automation potwierdziła konto operatora i odrębne kartoteki A/B przez HTTPS, zmianę firmy i logout. Hasła/sesje nie są utrwalane przez klienta. M0 nadal wymaga m.in. audytu i cyklu życia firm. Instrukcja: docs/desktop.md.
 
 - Publiczne repo, `LICENSE`, `README`, `CONTRIBUTING`, `SECURITY`, `AGENTS.md`.
 - Solution .NET 10, serwer ASP.NET Core, klient Avalonia, model modułowy.
@@ -718,7 +729,8 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | [ADR-005](docs/adr/ADR-005-izolacja-firm-i-pierwszy-model.md) | Historyczna wspólna baza | Zastąpiony przez ADR-014; pozostaje zapisem zastosowanej migracji Vatowiec_Dev |
 | [ADR-014](docs/adr/ADR-014-database-per-company.md) | Database-per-company, dwa konteksty i cykl życia baz | Wdrożony lokalny demonstrator: trzy bazy, dwie fikcyjne firmy, migracje i pełne testy SQL |
 | [ADR-015](docs/adr/ADR-015-identity-i-autoryzowany-wybor-bazy.md) | Identity, sesje i autoryzowany wybór bazy | Wdrożone API logowania, uprawnienia do firm, resolver i sprawdzanie rzeczywistego profilu; bez UI Avalonia |
-  | [ADR-016](docs/adr/ADR-016-desktop-logowanie-i-kontekst-firmy.md) | Avalonia: logowanie i kontekst firmy | Wdrożony scenariusz desktopowy, odczyt kontrahentów, zmiana firmy i wylogowanie |
+| [ADR-016](docs/adr/ADR-016-desktop-logowanie-i-kontekst-firmy.md) | Avalonia: logowanie i kontekst firmy | Wdrożony scenariusz desktopowy, odczyt kontrahentów, zmiana firmy i wylogowanie |
+| [ADR-017](docs/adr/ADR-017-kartoteka-kontrahentow-i-audyt.md) | Edycja kontrahentów, filtry, rowversion i atomowy audyt | Wdrożony formularz, serwerowe filtrowanie/strony i autoryzowany zapis; jawne migracje systemowa i firmowa |
 | ADR-006 | Podpisywanie XML i przechowywanie certyfikatów | Przed implementacją wysyłek MF; nie przechowywać sekretów w zwykłej bazie |
 | ADR-007 | API pluginów: manifest, sandbox, granice dostępu | Przed pierwszą wykonywalną wtyczką |
 | ADR-008 | Pełny wykaz typów VAT i deklaracji na 1.0 | Przed M3; uzgodnić precyzyjne scenariusze |

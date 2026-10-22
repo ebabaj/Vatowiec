@@ -13,7 +13,8 @@ Nie ma operacji księgowych ani provisioningu firm.
 | operator.m0 | Operator | ViewProfile, ViewContractors, EditContractors | ViewProfile, ViewContractors |
 | czytelnik.m0 | Reader | ViewProfile | brak dostępu |
 
-EditContractors jest zapisanym uprawnieniem na przyszłość; obecnie nie ma endpointu edycji.
+EditContractors od etapu ADR-017 pozwala na dodawanie i edycję z CSRF i rowversion;
+zapis wymaga także ViewContractors. Instrukcja: [kartoteka](contractors.md).
 Rola Identity nie daje dostępu do firmy bez przypisania CompanyAccess.
 
 Firma A: aaaaaaaa-0000-4000-8000-000000000001, Vatowiec_Company_A_Dev.
@@ -98,7 +99,10 @@ użyj narzędzia .NET powyżej; nie trzeba zmieniać polityki PowerShell.
 | POST /api/v1/auth/logout | Ważna sesja i nowy token CSRF pobrany po logowaniu; 204 |
 | GET /api/v1/companies | Dostępne firmy i uprawnienia; nigdy lokalizacje SQL ani dane dostępowe |
 | GET /api/v1/companies/{id}/profile | Wymaga ViewProfile; 200 po kontroli profilu i schematu bazy |
-| GET /api/v1/companies/{id}/contractors | Wymaga ViewContractors; tylko odczyt kartoteki wskazanej firmy |
+| GET /api/v1/companies/{id}/contractors | Wymaga ViewContractors; filtry q/country/active oraz offset/limit, maks. 100 pozycji |
+| GET /api/v1/companies/{id}/contractors/{contractorId} | Odczyt aktualnej wersji i rowversion; ViewContractors |
+| POST /api/v1/companies/{id}/contractors | ViewContractors + EditContractors i CSRF; atomowy audyt utworzenia |
+| PUT /api/v1/companies/{id}/contractors/{contractorId} | Te same prawa i CSRF, wymagane rowversion; 409 przy konflikcie |
 
 Własny klient utrzymuje osobny magazyn cookie dla każdego użytkownika. Najpierw
 pobiera /csrf, wysyła token w X-CSRF-TOKEN razem z JSON logowania, zachowuje cookie

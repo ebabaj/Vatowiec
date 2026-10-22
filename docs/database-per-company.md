@@ -1,6 +1,14 @@
 # Lokalne wdrożenie database-per-company
 
-Status 2026-10-21: wdrożono trzy bazy demonstracyjne, wykonano migracje EF Core
+Aktualizacja 2026-10-22: dodano security.Installation w bazie systemowej oraz
+audit.ContractorChanges i indeks listy w każdej bazie firmy. Jawne migracje wykonano
+po trzech kopiach COPY_ONLY/CHECKSUM i VERIFYONLY. Instrukcja polecenia
+`migrate-contractors`, schemat i ryzyko rollbacku: [kartoteka](contractors.md),
+[ADR-017](adr/ADR-017-kartoteka-kontrahentow-i-audyt.md).
+Pełny zestaw obejmuje obecnie 117 testów, w tym 46 SQL/API. Poniższy opis zachowuje
+również historię wcześniejszych etapów.
+
+Status historyczny 2026-10-21: wdrożono trzy bazy demonstracyjne, wykonano migracje EF Core
 i zainicjalizowano dwie fikcyjne firmy. Następnie dodano Identity i autoryzowany
 resolver; pełny zestaw obejmuje 70 testów (32 SQL/API).
 Decyzje: [ADR-014](adr/ADR-014-database-per-company.md),

@@ -12,11 +12,15 @@ public sealed class CompanyDbContext(
     public Guid? CurrentCompanyId { get; } = companyContext.CompanyId;
     public DbSet<CompanyProfile> CompanyProfiles => Set<CompanyProfile>();
     public DbSet<Contractor> Contractors => Set<Contractor>();
+    public DbSet<ContractorChange> ContractorChanges => Set<ContractorChange>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfiguration(new CompanyProfileConfiguration());
         modelBuilder.ApplyConfiguration(new ContractorConfiguration());
+        modelBuilder.ApplyConfiguration(new ContractorChangeConfiguration());
+        modelBuilder.Entity<ContractorChange>().HasQueryFilter(x =>
+            CurrentCompanyId != null && x.CompanyId == CurrentCompanyId);
         modelBuilder.Entity<CompanyProfile>().HasQueryFilter(x =>
             CurrentCompanyId != null && x.CompanyId == CurrentCompanyId);
         modelBuilder.Entity<Contractor>().HasQueryFilter(x =>
@@ -39,6 +43,8 @@ public sealed class CompanyDbContext(
     private void PrepareChanges()
     {
         ChangeTracker.DetectChanges();
+        if (ChangeTracker.Entries<ContractorChange>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Historia kontrahenta jest niezmienna.");
         foreach (var entry in ChangeTracker.Entries<ICompanyEntity>()
                      .Where(x => x.State is EntityState.Added or EntityState.Modified or EntityState.Deleted))
         {

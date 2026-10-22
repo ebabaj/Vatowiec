@@ -1,10 +1,11 @@
 # Otwarty następca VATowca
 
 Projekt wielostanowiskowej aplikacji dla polskich mikrofirm. Obecny stan to
-**pierwszy scenariusz desktopowy M0 database-per-company**: logowanie Avalonia,
-wybór firmy i odczyt kontrahentów, osobne SystemDbContext i CompanyDbContext, trzy bazy SQL
+**kartoteka kontrahentów M0 database-per-company**: logowanie Avalonia,
+wybór firmy, dodawanie/edycja z audytem i konfliktami oraz wyszukiwanie po stronie serwera.
+Osobne SystemDbContext i CompanyDbContext, trzy bazy SQL
 Server oraz dwie fikcyjne firmy. Działają Identity, sesje API i autoryzowany resolver
-bazy firmy. Pełny zestaw obejmuje 96 testów, w tym 35 z SQL/API.
+bazy firmy. Pełny zestaw obejmuje 117 testów, w tym 46 z SQL/API.
 Nie jest to jeszcze program do prowadzenia księgowości.
 
 Wymagania produktu: [SPECYFIKACJA.md](SPECYFIKACJA.md).
@@ -16,6 +17,8 @@ Logowanie dwóch kont i test odmowy dostępu: [instrukcja](docs/authentication.m
 [ADR-015](docs/adr/ADR-015-identity-i-autoryzowany-wybor-bazy.md).
 Scenariusz okienkowy operatora i czytelnika: [desktop](docs/desktop.md),
 [ADR-016](docs/adr/ADR-016-desktop-logowanie-i-kontekst-firmy.md).
+Dodawanie, edycja, filtry i konflikt dwóch okien: [kartoteka](docs/contractors.md),
+[ADR-017](docs/adr/ADR-017-kartoteka-kontrahentow-i-audyt.md).
 
 ## Wymagane narzędzia
 
@@ -106,7 +109,9 @@ wybierz firmę A lub B i kliknij **Pokaż kontrahentów / odśwież**. Przyciski
 **Zmień firmę** i **Wyloguj** działają bez restartu. Klient komunikuje się wyłącznie
 z API HTTPS, domyślnie `https://localhost:7243`; adres można zmienić w oknie
 lub przez `VATOWIEC_API_URL`. Cookie i tokeny pozostają w pamięci.
-Szczegóły haseł, odmów dostępu i błędów: [instrukcja desktopu](docs/desktop.md).
+W A operator może użyć **Nowy (Ctrl+N)** lub **Edytuj (F2)**; w B ma tylko odczyt.
+Po zapisie wyszukaj pozycję albo odśwież listę. Szczegóły haseł, odmów dostępu i błędów:
+[instrukcja desktopu](docs/desktop.md), [kartoteka i konflikt](docs/contractors.md).
 
 ### Skróty i debugowanie
 
@@ -140,7 +145,8 @@ Nie ma bezpośredniego dostępu klienta do SQL Server.
 `SystemDbContext` zawiera centralny katalog firm, wskazania baz, Identity,
 przypisania/uprawnienia użytkowników i sesje.
 `CompanyDbContext` zawiera lokalny profil i kontrahentów jednej firmy.
-Provisioning z aplikacji i audyt księgowy/backup/restore pozostają kolejnymi
+Audyt kartoteki jest atomowy w audit.ContractorChanges bazy firmy; security.Installation
+przechowuje trwałą przestrzeń identyfikatorów aktorów. Provisioning z aplikacji i audyt księgowy/backup/restore pozostają kolejnymi
 zadaniami. W bazie systemowej nie ma kartoteki kontrahentów
 ani dokumentów księgowych.
 
@@ -153,7 +159,7 @@ Resolver tworzy osobny kontekst i weryfikuje rzeczywisty profil oraz schemat SQL
 Bezpośrednia rejestracja DI nadal odmawia kontekstu firmy bez jawnego wyboru.
 Sekrety i połączenia nie trafiają do klienta Avalonia.
 
-Każdy kontekst ma własną migrację początkową i snapshot. Fabryki projektowe
+Każdy kontekst ma własną historię migracji i snapshot. Fabryki projektowe
 generują model i SQL bez połączenia z bazą. Polecenia offline i powtarzalne
 wdrożenie Vatowiec_System oraz dwóch baz firmowych opisuje
 [instrukcja](docs/database-per-company.md).
@@ -181,7 +187,7 @@ Testy offline weryfikują rozłączne modele, lokalny profil/FK, historie i SQL
 migracji, zgodność snapshotów, odmowę bez wyboru bazy, izolację scope,
 politykę połączeń, filtry, kontrolę zapisu i host API.
 
-Powyższy przebieg bez SQL zalicza 61 testów i pomija 35 testów SQL/API. Pełny przebieg:
+Powyższy przebieg bez SQL zalicza 71 testów i pomija 46 testów SQL/API. Pełny przebieg:
 
 ```powershell
 dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- test
@@ -189,7 +195,7 @@ dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- test
 
 Narzędzie sprawdza lokalny serwer, przygotowuje trzy oznaczone bazy *_Test,
 wykonuje wszystkie testy, zapisuje TRX, sprawdza rollbacky i usuwa te bazy w finally.
-Nie zmienia danych demonstracyjnych. Pełny zestaw obejmuje **96 testów**.
+Nie zmienia danych demonstracyjnych. Pełny zestaw obejmuje **117 testów**.
 
 Przy ręcznym uruchamianiu testów z wcześniej przygotowanymi bazami flaga
 `VATOWIEC_DATABASE_PER_COMPANY_SQL=1` włącza je jawnie; stara flaga

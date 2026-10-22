@@ -5,8 +5,9 @@
         xmlns:contracts="using:Vatowiec.SharedContracts"
         x:DataType="vm:MainViewModel"
         Title="VATowiec — firmy i kontrahenci"
-        Width="1020" Height="720"
-        MinWidth="760" MinHeight="600"
+        Width="1180" Height="860"
+        MinWidth="900" MinHeight="700"
+        KeyDown="WindowKeyDown"
         WindowStartupLocation="CenterScreen">
   <Grid RowDefinitions="Auto,*,Auto,Auto" Margin="32" RowSpacing="18">
     <Grid ColumnDefinitions="*,Auto">
@@ -52,36 +53,59 @@
         </StackPanel>
       </Grid>
 
-      <Grid IsVisible="{Binding IsWorkspace}" RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="14">
+      <Grid IsVisible="{Binding IsBrowsingWorkspace}" RowDefinitions="Auto,Auto,Auto,Auto,Auto,*" RowSpacing="14">
         <TextBlock Text="{Binding CurrentCompany}" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap"
                    AutomationProperties.AutomationId="CurrentCompany" />
         <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10">
           <Button Content="Zmień firmę" Click="ChangeCompanyClick" AutomationProperties.AutomationId="ChangeCompany" />
           <Button Content="Wyloguj" Click="LogoutClick" AutomationProperties.AutomationId="LogoutWorkspace" />
+          <Button Content="Nowy (Ctrl+N)" Click="NewContractorClick" IsVisible="{Binding CanEditContractors}" AutomationProperties.AutomationId="NewContractor" />
+          <Button Content="Edytuj (F2)" Click="EditContractorClick" IsVisible="{Binding CanEditContractors}" AutomationProperties.AutomationId="EditContractor" />
         </StackPanel>
         <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
           <TextBlock Text="Kontrahenci" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
           <Button Grid.Column="1" Content="Pokaż kontrahentów / odśwież" Click="ContractorsClick"
                   IsVisible="{Binding CanViewContractors}" AutomationProperties.AutomationId="ShowContractors" />
         </Grid>
-        <TextBlock Grid.Row="3" Text="Brak uprawnień do kartoteki kontrahentów."
+        <Grid Grid.Row="3" IsVisible="{Binding CanBrowse}" ColumnDefinitions="*,100,150,Auto" ColumnSpacing="10">
+          <StackPanel Spacing="4">
+            <TextBlock Text="Szukaj: kod, nazwa lub identyfikator (Ctrl+F)" />
+            <TextBox x:Name="SearchInput" Text="{Binding SearchText, Mode=TwoWay}" MaxLength="128" KeyDown="SearchKeyDown" AutomationProperties.AutomationId="ContractorSearch" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Spacing="4">
+            <TextBlock Text="Kraj (opcjonalnie)" />
+            <TextBox Text="{Binding FilterCountry, Mode=TwoWay}" MaxLength="2" KeyDown="SearchKeyDown" AutomationProperties.AutomationId="FilterCountry" />
+          </StackPanel>
+          <StackPanel Grid.Column="2" Spacing="4">
+            <TextBlock Text="Status" />
+            <ComboBox SelectedIndex="{Binding FilterActivity, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.AutomationId="FilterActivity">
+              <ComboBoxItem Content="Wszyscy" /><ComboBoxItem Content="Aktywni" /><ComboBoxItem Content="Nieaktywni" />
+            </ComboBox>
+          </StackPanel>
+          <Button Grid.Column="3" Content="Szukaj" Click="ContractorsClick" VerticalAlignment="Bottom" AutomationProperties.AutomationId="SearchContractors" />
+        </Grid>
+        <TextBlock Grid.Row="4" Text="Brak uprawnień do kartoteki kontrahentów."
                    IsVisible="{Binding CannotViewContractors}" TextWrapping="Wrap" />
-        <TextBlock Grid.Row="3" Text="{Binding ContractorStatus}" IsVisible="{Binding CanViewContractors}" />
-        <Grid Grid.Row="4" IsVisible="{Binding CanViewContractors}" RowDefinitions="Auto,*" RowSpacing="8">
+        <TextBlock Grid.Row="4" Text="{Binding ContractorStatus}" IsVisible="{Binding CanViewContractors}" />
+        <Grid Grid.Row="5" IsVisible="{Binding CanViewContractors}" RowDefinitions="Auto,*,Auto" RowSpacing="8">
           <Border Background="#182A7DB1" Padding="12,8">
-            <Grid ColumnDefinitions="150,*,70">
+            <Grid ColumnDefinitions="110,*,160,60,100">
               <TextBlock Text="Kod" FontWeight="SemiBold" />
               <TextBlock Grid.Column="1" Text="Nazwa kontrahenta" FontWeight="SemiBold" />
-              <TextBlock Grid.Column="2" Text="Kraj" FontWeight="SemiBold" />
+              <TextBlock Grid.Column="2" Text="Identyfikator podatkowy" FontWeight="SemiBold" />
+              <TextBlock Grid.Column="3" Text="Kraj" FontWeight="SemiBold" />
+              <TextBlock Grid.Column="4" Text="Status" FontWeight="SemiBold" />
             </Grid>
           </Border>
-          <ListBox Grid.Row="1" ItemsSource="{Binding Contractors}" AutomationProperties.AutomationId="Contractors">
+          <ListBox Grid.Row="1" ItemsSource="{Binding Contractors}" SelectedItem="{Binding SelectedContractor, Mode=TwoWay}" DoubleTapped="ContractorDoubleTapped" AutomationProperties.AutomationId="Contractors">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="contracts:ContractorResponse">
-                <Grid ColumnDefinitions="150,*,70" Margin="8" HorizontalAlignment="Stretch">
+                <Grid ColumnDefinitions="110,*,160,60,100" Margin="8" HorizontalAlignment="Stretch">
                   <TextBlock Text="{Binding Code}" TextWrapping="Wrap" />
                   <TextBlock Grid.Column="1" Text="{Binding Name}" TextWrapping="Wrap" Margin="0,0,12,0" />
-                  <TextBlock Grid.Column="2" Text="{Binding CountryCode}" />
+                  <TextBlock Grid.Column="2" Text="{Binding TaxIdentifier}" TextWrapping="Wrap" />
+                  <TextBlock Grid.Column="3" Text="{Binding CountryCode}" />
+                  <TextBlock Grid.Column="4" Text="{Binding ActivityLabel}" />
                 </Grid>
               </DataTemplate>
             </ListBox.ItemTemplate>
@@ -89,14 +113,55 @@
               <Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch" /></Style>
             </ListBox.Styles>
           </ListBox>
+          <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+            <Button Content="Poprzednia" Click="PreviousPageClick" IsEnabled="{Binding HasPreviousPage}" />
+            <TextBlock Text="{Binding PageLabel}" VerticalAlignment="Center" />
+            <Button Content="Następna" Click="NextPageClick" IsEnabled="{Binding HasNextPage}" />
+          </StackPanel>
         </Grid>
       </Grid>
+
+      <ScrollViewer IsVisible="{Binding IsEditing}">
+        <StackPanel Spacing="12" MaxWidth="920" HorizontalAlignment="Stretch">
+          <TextBlock Text="{Binding EditorTitle}" FontSize="24" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding CurrentCompany}" TextWrapping="Wrap" />
+          <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="12" ColumnSpacing="12" IsEnabled="{Binding !HasConflict}">
+            <TextBlock Text="Kod *" VerticalAlignment="Center" />
+            <TextBox Grid.Column="1" x:Name="ContractorCodeInput" Text="{Binding Editor.Code, Mode=TwoWay}" MaxLength="64" AutomationProperties.AutomationId="ContractorCode" />
+            <TextBlock Grid.Row="1" Text="Nazwa *" VerticalAlignment="Center" />
+            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Editor.Name, Mode=TwoWay}" MaxLength="256" AutomationProperties.AutomationId="ContractorName" />
+            <TextBlock Grid.Row="2" Text="Identyfikator podatkowy" VerticalAlignment="Center" />
+            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Editor.TaxIdentifier, Mode=TwoWay}" MaxLength="32" AutomationProperties.AutomationId="ContractorTaxIdentifier" />
+            <TextBlock Grid.Row="3" Text="Kraj *" VerticalAlignment="Center" />
+            <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Editor.CountryCode, Mode=TwoWay}" MaxLength="2" AutomationProperties.AutomationId="ContractorCountry" />
+            <TextBlock Grid.Row="4" Text="Status" VerticalAlignment="Center" />
+            <CheckBox Grid.Row="4" Grid.Column="1" Content="Aktywny" IsChecked="{Binding Editor.IsActive, Mode=TwoWay}" AutomationProperties.AutomationId="ContractorActive" />
+          </Grid>
+          <TextBlock Text="* Pole wymagane. Kraj: dwie litery, np. PL. Identyfikator podatkowy jest opcjonalny. Wyłączenie aktywności zachowuje pozycję i jej historię."
+                     TextWrapping="Wrap" Opacity="0.7" />
+          <Border IsVisible="{Binding HasConflict}" BorderBrush="#B77816" BorderThickness="1" Padding="16">
+            <StackPanel Spacing="12">
+              <TextBlock Text="Konflikt równoczesnej edycji — porównaj dane" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+              <Grid ColumnDefinitions="*,*" ColumnSpacing="24">
+                <StackPanel Spacing="8"><TextBlock Text="Twoje dane" FontWeight="SemiBold" /><TextBlock Text="{Binding LocalVersionSummary}" TextWrapping="Wrap" /></StackPanel>
+                <StackPanel Grid.Column="1" Spacing="8"><TextBlock Text="Aktualna wersja na serwerze" FontWeight="SemiBold" /><TextBlock Text="{Binding ServerVersionSummary}" TextWrapping="Wrap" AutomationProperties.AutomationId="ConflictCurrent" /></StackPanel>
+              </Grid>
+              <Button Content="Wczytaj wersję z serwera (odrzuć moje zmiany)" Click="ReloadConflictClick" AutomationProperties.AutomationId="ReloadConflict" />
+              <Button Content="Zachowaj moje dane do ponownego zapisu" Click="KeepConflictClick" AutomationProperties.AutomationId="KeepConflict" />
+            </StackPanel>
+          </Border>
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <Button Content="Zapisz (Ctrl+S)" Click="SaveContractorClick" IsEnabled="{Binding CanSaveContractor}" AutomationProperties.AutomationId="SaveContractor" />
+            <Button Content="Anuluj zmiany (Esc)" Click="CancelContractorClick" AutomationProperties.AutomationId="CancelContractor" />
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
     </Grid>
     <StackPanel Grid.Row="2" Spacing="8">
       <ProgressBar IsVisible="{Binding IsBusy}" IsIndeterminate="True" Height="4" />
       <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}"
                  AutomationProperties.AutomationId="StatusMessage" />
     </StackPanel>
-    <TextBlock Grid.Row="3" Text="Wersja demonstracyjna · tylko odczyt kartoteki · brak funkcji księgowych" FontSize="12" Opacity="0.65" />
+    <TextBlock Grid.Row="3" Text="Kartoteka kontrahentów · brak funkcji księgowych" FontSize="12" Opacity="0.65" />
   </Grid>
 </Window>

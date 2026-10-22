@@ -14,10 +14,19 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
     public DbSet<CompanyDatabaseRegistration> CompanyDatabases => Set<CompanyDatabaseRegistration>();
     public DbSet<CompanyAccess> CompanyAccesses => Set<CompanyAccess>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
+    public DbSet<InstallationIdentity> InstallationIdentities => Set<InstallationIdentity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<InstallationIdentity>(entity =>
+        {
+            entity.ToTable("Installation", "security", table =>
+                table.HasCheckConstraint("CK_Installation_Singleton", "[SingletonKey] = 1 AND [Id] <> '00000000-0000-0000-0000-000000000000'"));
+            entity.HasKey(x => x.SingletonKey);
+            entity.Property(x => x.SingletonKey).ValueGeneratedNever();
+            entity.HasIndex(x => x.Id).IsUnique();
+        });
         modelBuilder.Entity<ApplicationUser>().ToTable("Users", "security");
         modelBuilder.Entity<IdentityRole<Guid>>().ToTable("Roles", "security");
         modelBuilder.Entity<IdentityUserRole<Guid>>().ToTable("UserRoles", "security");

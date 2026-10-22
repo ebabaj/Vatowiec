@@ -116,6 +116,8 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
                     b.HasIndex("CompanyId", "Code")
                         .IsUnique();
 
+                    b.HasIndex("CompanyId", "IsActive", "Code");
+
                     b.ToTable("Contractors", "core", t =>
                         {
                             t.HasCheckConstraint("CK_Contractors_Code", "LEN(LTRIM(RTRIM([Code]))) > 0");
@@ -130,7 +132,86 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
                         });
                 });
 
+            modelBuilder.Entity("Vatowiec.Core.Domain.ContractorChange", b =>
+                {
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ActorIssuerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActorName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("AfterJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("BeforeJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("ContractorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("SnapshotVersion")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("CompanyId", "Id");
+
+                    b.HasIndex("CompanyId", "ContractorId", "OccurredAtUtc");
+
+                    b.ToTable("ContractorChanges", "audit", t =>
+                        {
+                            t.HasCheckConstraint("CK_ContractorChanges_Actor", "[ActorId] <> '00000000-0000-0000-0000-000000000000' AND [ActorIssuerId] <> '00000000-0000-0000-0000-000000000000'");
+
+                            t.HasCheckConstraint("CK_ContractorChanges_Json", "ISJSON([AfterJson]) = 1 AND ([BeforeJson] IS NULL OR ISJSON([BeforeJson]) = 1)");
+                        });
+                });
+
             modelBuilder.Entity("Vatowiec.Core.Domain.Contractor", b =>
+                {
+                    b.HasOne("Vatowiec.Core.Domain.CompanyProfile", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .HasPrincipalKey("CompanyId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.ContractorChange", b =>
                 {
                     b.HasOne("Vatowiec.Core.Domain.CompanyProfile", null)
                         .WithMany()

@@ -21,7 +21,7 @@ namespace Vatowiec.Tests;
 
 [Collection("LocalSql")]
 [Trait("Category", "SqlIntegration")]
-public sealed class AuthenticationIntegrationTests : IAsyncLifetime
+public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
 {
     private WebApplicationFactory<Program>? application;
     private readonly ManualClock clock = new();
@@ -111,6 +111,7 @@ public sealed class AuthenticationIntegrationTests : IAsyncLifetime
         foreach (var second in new[] { false, true })
         {
             await using var company = Company(second, second ? companyB : companyA);
+            await company.ContractorChanges.ExecuteDeleteAsync();
             await company.Contractors.ExecuteDeleteAsync();
             await company.CompanyProfiles.ExecuteDeleteAsync();
         }

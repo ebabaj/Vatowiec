@@ -10,13 +10,17 @@ public interface IVatowiecApiClient : IDisposable
     Task<SessionResponse> Login(string userName, string password);
     Task<CompanyResponse[]> Companies();
     Task<CompanyProfileResponse> Profile(Guid companyId);
-    Task<ContractorResponse[]> Contractors(Guid companyId);
+    Task<ContractorResponse[]> Contractors(Guid companyId, string? search = null, string? country = null, bool? active = null, int offset = 0, int limit = 50);
+    Task<ContractorResponse> Contractor(Guid companyId, Guid id);
+    Task<ContractorResponse> SaveContractor(Guid companyId, ContractorWriteRequest value, bool isNew);
     Task Logout();
 }
 
 public sealed class ApiException(int statusCode, string message) : Exception(message)
 {
     public int StatusCode { get; } = statusCode;
+    public string? Code { get; init; }
+    public ContractorResponse? Current { get; init; }
 }
 
 public sealed class VatowiecApiClient : IVatowiecApiClient
@@ -67,7 +71,28 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
 
     public Task<CompanyResponse[]> Companies() => Get<CompanyResponse[]>("api/v1/companies");
     public Task<CompanyProfileResponse> Profile(Guid companyId) => Get<CompanyProfileResponse>($"api/v1/companies/{companyId:D}/profile");
-    public Task<ContractorResponse[]> Contractors(Guid companyId) => Get<ContractorResponse[]>($"api/v1/companies/{companyId:D}/contractors");
+    public Task<ContractorResponse[]> Contractors(Guid companyId, string? search = null, string? country = null, bool? active = null, int offset = 0, int limit = 50)
+    {
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(search)) query.Add("q=" + Uri.EscapeDataString(search.Trim()));
+        if (!string.IsNullOrWhiteSpace(country)) query.Add("country=" + Uri.EscapeDataString(country.Trim()));
+        if (active.HasValue) query.Add("active=" + (active.Value ? "true" : "false"));
+        if (offset != 0) query.Add("offset=" + offset);
+        if (limit != 50) query.Add("limit=" + limit);
+        return Get<ContractorResponse[]>($"api/v1/companies/{companyId:D}/contractors" + (query.Count == 0 ? "" : "?" + string.Join("&", query)));
+    }
+
+    public Task<ContractorResponse> Contractor(Guid companyId, Guid id) => Get<ContractorResponse>($"api/v1/companies/{companyId:D}/contractors/{id:D}");
+
+    public async Task<ContractorResponse> SaveContractor(Guid companyId, ContractorWriteRequest value, bool isNew)
+    {
+        var csrf = await Get<CsrfResponse>("api/v1/auth/csrf");
+        using var request = new HttpRequestMessage(isNew ? HttpMethod.Post : HttpMethod.Put,
+            $"api/v1/companies/{companyId:D}/contractors" + (isNew ? "" : $"/{value.Id:D}"));
+        request.Headers.Add("X-CSRF-TOKEN", csrf.Token);
+        request.Content = JsonContent.Create(value);
+        return await Send<ContractorResponse>(request);
+    }
 
     public async Task Logout()
     {
@@ -99,10 +124,13 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         }
     }
 
-    private static Task EnsureSuccess(HttpResponseMessage response, bool login)
+    private static async Task EnsureSuccess(HttpResponseMessage response, bool login)
     {
-        if (response.IsSuccessStatusCode) return Task.CompletedTask;
-        throw new ApiException((int)response.StatusCode, response.StatusCode switch
+        if (response.IsSuccessStatusCode) return;
+        ApiError? error = null;
+        try { error = await response.Content.ReadFromJsonAsync<ApiError>(); }
+        catch (JsonException) { }
+        var message = response.StatusCode switch
         {
             HttpStatusCode.Unauthorized when login => "Nieprawidłowy login lub hasło albo konto jest zablokowane.",
             HttpStatusCode.Unauthorized => "Sesja wygasła lub została unieważniona. Zaloguj się ponownie.",
@@ -110,9 +138,18 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
             HttpStatusCode.BadRequest => "API odrzuciło żądanie. Spróbuj ponownie; sprawdź wersję aplikacji i API.",
             HttpStatusCode.TooManyRequests => "Zbyt wiele prób logowania. Odczekaj minutę i spróbuj ponownie.",
             HttpStatusCode.ServiceUnavailable => "Baza firmy jest niedostępna lub niezgodna. Spróbuj później lub skontaktuj się z administratorem.",
+            HttpStatusCode.NotFound => "Nie znaleziono kontrahenta w tej firmie. Odśwież listę.",
+            HttpStatusCode.Conflict when error?.Code == "contractor_conflict" => "Inna osoba zmieniła kontrahenta. Porównaj wersje i wybierz sposób rozwiązania konfliktu.",
+            HttpStatusCode.Conflict when error?.Code == "contractor_code_exists" => "Ten kod jest już zajęty w tej firmie. Wpisz inny kod.",
+            HttpStatusCode.Conflict => "Pozycja już istnieje. Odśwież listę przed ponowieniem.",
             _ => "API nie może wykonać operacji. Spróbuj ponownie."
-        });
+        };
+        if (response.StatusCode == HttpStatusCode.BadRequest && error?.Code == "validation_failed" && error.Errors is not null)
+            message = string.Join(Environment.NewLine, error.Errors.Values.SelectMany(x => x));
+        throw new ApiException((int)response.StatusCode, message) { Code = error?.Code, Current = error?.Current };
     }
+
+    private sealed record ApiError(string? Code, Dictionary<string, string[]>? Errors, ContractorResponse? Current);
 
     public void Dispose() => http.Dispose();
 }

@@ -38,7 +38,8 @@ public sealed class CompanyModelTests
         Assert.NotNull(system.Model.FindEntityType(typeof(UserSession)));
         Assert.Null(system.Model.FindEntityType(typeof(Contractor)));
         Assert.Null(system.Model.FindEntityType(typeof(CompanyProfile)));
-        Assert.Equal(new[] { typeof(CompanyProfile), typeof(Contractor) },
+        Assert.Null(system.Model.FindEntityType(typeof(ContractorChange)));
+        Assert.Equal(new[] { typeof(CompanyProfile), typeof(Contractor), typeof(ContractorChange) },
             company.Model.GetEntityTypes().Select(x => x.ClrType).OrderBy(x => x.Name));
         var contractor = company.Model.FindEntityType(typeof(Contractor))!;
         Assert.Equal(typeof(CompanyProfile), Assert.Single(contractor.GetForeignKeys()).PrincipalEntityType.ClrType);
@@ -88,9 +89,10 @@ public sealed class CompanyModelTests
     {
         using var system = new SystemDbContextFactory().CreateDbContext([]);
         using var company = new CompanyDbContextFactory().CreateDbContext([]);
-        Assert.Equal(2, system.Database.GetMigrations().Count());
-        Assert.EndsWith("_IdentityAndCompanyAccess", system.Database.GetMigrations().Last());
-        Assert.EndsWith("_InitialCompany", Assert.Single(company.Database.GetMigrations()));
+        Assert.Equal(3, system.Database.GetMigrations().Count());
+        Assert.EndsWith("_InstallationIdentity", system.Database.GetMigrations().Last());
+        Assert.Equal(2, company.Database.GetMigrations().Count());
+        Assert.EndsWith("_ContractorAudit", company.Database.GetMigrations().Last());
         Assert.False(system.Database.HasPendingModelChanges());
         Assert.False(company.Database.HasPendingModelChanges());
         Assert.NotEqual(system.GetService<IMigrationsAssembly>().ModelSnapshot!.GetType(),

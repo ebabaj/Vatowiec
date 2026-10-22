@@ -6,13 +6,18 @@ public sealed record CompanyResponse(Guid CompanyId, string Name, string[] Permi
 {
     [JsonIgnore]
     public bool CanViewContractors => Permissions.Contains("ViewContractors", StringComparer.Ordinal);
+    [JsonIgnore]
+    public bool CanEditContractors => CanViewContractors && Permissions.Contains("EditContractors", StringComparer.Ordinal);
     public override string ToString() => Name;
 }
 
 public sealed record CompanyProfileResponse(Guid CompanyId, string Name, string? Nip, string? Regon);
-public sealed record ContractorResponse(Guid Id, Guid CompanyId, string Code, string Name, string CountryCode)
+public sealed record ContractorResponse(Guid Id, Guid CompanyId, string Code, string Name, string CountryCode,
+    string? TaxIdentifier = null, bool IsActive = true, string RowVersion = "")
 {
     public override string ToString() => $"{Code} — {Name} ({CountryCode})";
+    [JsonIgnore]
+    public string ActivityLabel => IsActive ? "Aktywny" : "Nieaktywny";
 }
 public sealed record SessionResponse(string UserName, DateTimeOffset ExpiresAtUtc);
 public sealed record CsrfResponse(string Token, string HeaderName);

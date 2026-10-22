@@ -32,4 +32,15 @@ public sealed class Contractor : ICompanyEntity
     public byte[] RowVersion { get; private set; } = [];
 
     public void Rename(string name) => Name = EntityText.Required(name, 256, nameof(name));
+
+    public void Update(string code, string name, string? taxIdentifier, string countryCode, bool isActive)
+    {
+        // Waliduj całość przed zmianą stanu encji.
+        var valid = new Contractor(CompanyId, Id, code, name, countryCode, taxIdentifier);
+        Code = valid.Code;
+        Name = valid.Name;
+        TaxIdentifier = valid.TaxIdentifier;
+        CountryCode = valid.CountryCode;
+        IsActive = isActive;
+    }
 }
