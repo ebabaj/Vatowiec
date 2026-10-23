@@ -248,7 +248,7 @@
           <TextBlock IsVisible="{Binding !CanEditContractors}" Text="Tryb tylko do odczytu — brak uprawnienia edycji w tej firmie." Foreground="#8A5A00" TextWrapping="Wrap"/>
           <TextBlock Text="{Binding CurrentContractor}" FontSize="21" FontWeight="SemiBold" TextWrapping="Wrap" AutomationProperties.AutomationId="CurrentContractor"/>
           <TabControl SelectedIndex="{Binding SelectedTab, Mode=TwoWay}" Height="48" AutomationProperties.AutomationId="ContractorTabs">
-            <TabItem Header="Dane główne"/><TabItem Header="Adresy"/><TabItem Header="Kontakty"/><TabItem Header="Rachunki bankowe"/><TabItem Header="Weryfikacje"/>
+            <TabItem Header="Dane główne"/><TabItem Header="Adresy"/><TabItem Header="Kontakty"/><TabItem Header="Rachunki bankowe"/><TabItem Header="Weryfikacje"/><TabItem Header="Finansowe"/>
           </TabControl>
         </StackPanel>
         <ScrollViewer Grid.Row="1" IsVisible="{Binding IsMainTab}" HorizontalScrollBarVisibility="Disabled">
@@ -355,6 +355,55 @@
             </StackPanel>
           </ScrollViewer>
         </Grid>
+        <ScrollViewer Grid.Row="1" IsVisible="{Binding IsFinanceTab}" HorizontalScrollBarVisibility="Disabled" AutomationProperties.AutomationId="FinanceScroll">
+          <StackPanel MaxWidth="860" Spacing="16" Margin="0,0,16,12" AutomationProperties.AutomationId="FinanceForm">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+              <StackPanel Spacing="6">
+                <TextBlock Text="Warunki finansowe" FontSize="21" FontWeight="SemiBold"/>
+                <ComboBox SelectedIndex="{Binding FinanceDirectionIndex, Mode=OneWay}" SelectionChanged="FinanceDirectionSelectionChanged" HorizontalAlignment="Left" MinWidth="320" TabIndex="0" AutomationProperties.AutomationId="FinanceDirection"><ComboBoxItem Content="Sprzedaż — nasze warunki dla klienta"/><ComboBoxItem Content="Zakup — warunki dostawcy dla nas"/></ComboBox>
+              </StackPanel>
+              <Button Grid.Column="1" Content="Odśwież" Click="RefreshFinanceClick" IsEnabled="{Binding HasSavedContractor}" VerticalAlignment="Bottom" TabIndex="99" AutomationProperties.AutomationId="RefreshFinance" ToolTip.Tip="Wczytaj aktualne finanse i słowniki. Niezapisane szkice wymagają potwierdzenia."/>
+            </Grid>
+            <TextBlock Text="Ustawienia do przyszłych dokumentów. Puste pole = brak indywidualnego ustawienia; waluta nie jest automatycznie PLN. Zapis finansów nie zapisuje szkicu danych głównych." TextWrapping="Wrap" Opacity="0.75"/>
+            <TextBlock IsVisible="{Binding !HasSavedContractor}" Text="Najpierw zapisz nowego kontrahenta w zakładce Dane główne." TextWrapping="Wrap" Foreground="#8A5A00"/>
+            <TextBlock IsVisible="{Binding HasUnknownTradeCodes}" Text="{Binding FinanceLookupWarning}" TextWrapping="Wrap" Foreground="#8A5A00" AutomationProperties.AutomationId="FinanceLookupWarning"/>
+            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="24" RowSpacing="14" IsEnabled="{Binding CanEditFinance}">
+              <StackPanel Spacing="5"><TextBlock Text="Termin płatności (dni)"/><TextBox Text="{Binding TradeTermsEditor.Days, Mode=TwoWay}" Width="140" HorizontalAlignment="Left" MaxLength="10" PlaceholderText="0–3650" TabIndex="10" AutomationProperties.AutomationId="TradePaymentDays"/></StackPanel>
+              <StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="Sposób płatności"/><ComboBox ItemsSource="{Binding TradePaymentChoices}" SelectedItem="{Binding SelectedTradePayment, Mode=OneWay}" SelectionChanged="TradePaymentSelectionChanged" HorizontalAlignment="Stretch" TabIndex="20" AutomationProperties.AutomationId="TradePaymentMethod"/></StackPanel>
+              <StackPanel Grid.Row="1" Spacing="5"><TextBlock Text="Domyślna waluta"/><ComboBox ItemsSource="{Binding TradeCurrencyChoices}" SelectedItem="{Binding SelectedTradeCurrency, Mode=OneWay}" SelectionChanged="TradeCurrencySelectionChanged" HorizontalAlignment="Stretch" TabIndex="30" AutomationProperties.AutomationId="TradeCurrency"/></StackPanel>
+              <StackPanel Grid.Row="1" Grid.Column="1" Spacing="5"><TextBlock Text="Domyślny rabat (%)"/><TextBox Text="{Binding TradeTermsEditor.Discount, Mode=TwoWay}" Width="140" HorizontalAlignment="Left" MaxLength="20" PlaceholderText="0–100" TabIndex="40" AutomationProperties.AutomationId="TradeDiscount"/></StackPanel>
+            </Grid>
+            <StackPanel Spacing="6" IsEnabled="{Binding CanEditFinance}">
+              <TextBlock Text="Uwagi handlowe"/><TextBox Text="{Binding TradeTermsEditor.Notes, Mode=TwoWay}" MaxLength="2000" AcceptsReturn="True" MinHeight="76" MaxHeight="140" TabIndex="50" AutomationProperties.AutomationId="TradeNotes"/>
+            </StackPanel>
+            <WrapPanel><Button Content="Zapisz warunki (Ctrl+S)" Click="SaveTermsClick" IsEnabled="{Binding CanSaveTradeTerms}" TabIndex="60" AutomationProperties.AutomationId="SaveTradeTerms"/><Button Content="Anuluj zmiany warunków" Click="CancelTermsClick" IsEnabled="{Binding CanEditFinance}" TabIndex="61" AutomationProperties.AutomationId="CancelTradeTerms"/></WrapPanel>
+            <Border BorderBrush="#D0D5DD" BorderThickness="0,1,0,0" Padding="0,14,0,0">
+            <StackPanel Spacing="8">
+            <TextBlock Text="Limity kupieckie według waluty" FontSize="19" FontWeight="SemiBold"/>
+            <TextBlock Text="Kwoty nie są wykorzystaniem limitu ani saldem. Zapis nie blokuje sprzedaży i nie przelicza walut." TextWrapping="Wrap"/>
+            <Grid ColumnDefinitions="100,*,140" Margin="12,0"><TextBlock Text="Waluta" FontWeight="SemiBold"/><TextBlock Grid.Column="1" Text="Kwota limitu" FontWeight="SemiBold"/><TextBlock Grid.Column="2" Text="Status" FontWeight="SemiBold"/></Grid>
+            <ListBox ItemsSource="{Binding CreditLimits}" SelectedItem="{Binding SelectedCreditLimit, Mode=TwoWay}" MinHeight="70" MaxHeight="180" TabIndex="70" AutomationProperties.AutomationId="CreditLimits">
+              <ListBox.Styles><Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style></ListBox.Styles>
+              <ListBox.ItemTemplate><DataTemplate x:DataType="contracts:CreditLimitResponse"><Grid ColumnDefinitions="100,*,140" Margin="4"><TextBlock Text="{Binding CurrencyCode}"/><TextBlock Grid.Column="1" Text="{Binding Amount, StringFormat='{}{0:0.########}'}"/><TextBlock Grid.Column="2" IsVisible="{Binding IsActive}" Text="Aktywny"/><TextBlock Grid.Column="2" IsVisible="{Binding !IsActive}" Text="Nieaktywny"/></Grid></DataTemplate></ListBox.ItemTemplate>
+            </ListBox>
+            <WrapPanel><Button Content="Poprzednie" Click="PreviousLimitsClick" IsEnabled="{Binding HasPreviousCreditLimits}"/><TextBlock Text="{Binding CreditLimitPage}" VerticalAlignment="Center"/><Button Content="Następne" Click="NextLimitsClick" IsEnabled="{Binding HasNextCreditLimits}"/></WrapPanel>
+            <WrapPanel IsEnabled="{Binding CanEditFinance}"><Button Content="Nowy limit (Ctrl+N)" Click="NewLimitClick" AutomationProperties.AutomationId="NewCreditLimit"/><Button Content="Edytuj limit / dezaktywuj (F2)" Click="EditLimitClick" AutomationProperties.AutomationId="EditCreditLimit"/></WrapPanel>
+            <Border IsVisible="{Binding IsCreditLimitEditing}" BorderBrush="#999999" BorderThickness="1" Padding="12">
+              <StackPanel Spacing="8" IsEnabled="{Binding CanEditFinance}">
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="24"><StackPanel Spacing="5"><TextBlock Text="Waluta limitu"/><ComboBox ItemsSource="{Binding FinanceCurrencies}" SelectedItem="{Binding SelectedLimitCurrency, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.AutomationId="LimitCurrency"/></StackPanel><StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="Kwota limitu"/><TextBox Text="{Binding CreditLimitEditor.Amount, Mode=TwoWay}" Width="200" HorizontalAlignment="Left" MaxLength="32" AutomationProperties.AutomationId="LimitAmount"/></StackPanel></Grid>
+                <CheckBox Content="Limit aktywny" IsChecked="{Binding CreditLimitEditor.IsActive, Mode=TwoWay}" AutomationProperties.AutomationId="LimitActive"/><WrapPanel><Button Content="Zapisz limit" Click="SaveLimitClick" IsEnabled="{Binding CanSaveFinance}" AutomationProperties.AutomationId="SaveCreditLimit"/><Button Content="Anuluj szkic limitu" Click="CancelLimitClick" AutomationProperties.AutomationId="CancelCreditLimit"/></WrapPanel>
+              </StackPanel>
+            </Border>
+            </StackPanel>
+            </Border>
+            <Expander Header="Słownik sposobów płatności">
+              <StackPanel Spacing="8"><ListBox ItemsSource="{Binding PaymentMethods}" SelectedItem="{Binding SelectedPaymentMethod, Mode=TwoWay}" MaxHeight="180" AutomationProperties.AutomationId="PaymentMethods"/><WrapPanel IsEnabled="{Binding CanEditFinance}"><Button Content="Nowy sposób" Click="NewPaymentMethodClick" AutomationProperties.AutomationId="NewPaymentMethod"/><Button Content="Edytuj nazwę / aktywność" Click="EditPaymentMethodClick" AutomationProperties.AutomationId="EditPaymentMethod"/></WrapPanel>
+                <StackPanel IsVisible="{Binding IsPaymentMethodEditing}" IsEnabled="{Binding CanEditFinance}" Spacing="6"><TextBlock Text="Stabilny kod techniczny"/><TextBox Text="{Binding PaymentMethodEditor.Code}" IsReadOnly="True" AutomationProperties.AutomationId="PaymentMethodCode"/><TextBlock Text="Nazwa sposobu płatności"/><TextBox Text="{Binding PaymentMethodEditor.Name, Mode=TwoWay}" MaxLength="100" AutomationProperties.AutomationId="PaymentMethodName"/><CheckBox Content="Aktywny sposób płatności" IsChecked="{Binding PaymentMethodEditor.IsActive, Mode=TwoWay}" AutomationProperties.AutomationId="PaymentMethodActive"/><WrapPanel><Button Content="Zapisz sposób" Click="SavePaymentMethodClick" IsEnabled="{Binding CanSaveFinance}" AutomationProperties.AutomationId="SavePaymentMethod"/><Button Content="Anuluj szkic sposobu" Click="CancelPaymentMethodClick" AutomationProperties.AutomationId="CancelPaymentMethod"/></WrapPanel></StackPanel>
+              </StackPanel>
+            </Expander>
+            <Border IsVisible="{Binding HasFinanceConflict}" BorderBrush="#B77816" BorderThickness="1" Padding="12"><StackPanel Spacing="8"><TextBlock Text="Konflikt finansów — Twoje pola / wersja serwera" FontWeight="SemiBold"/><Grid ColumnDefinitions="*,*"><TextBlock Text="{Binding FinanceLocalSummary}" TextWrapping="Wrap"/><TextBlock Grid.Column="1" Text="{Binding FinanceServerSummary}" TextWrapping="Wrap"/></Grid><WrapPanel><Button Content="Wczytaj wersję serwera" Click="ReloadFinanceConflictClick" AutomationProperties.AutomationId="ReloadFinanceConflict"/><Button Content="Zachowaj moje pola" Click="KeepFinanceConflictClick" AutomationProperties.AutomationId="KeepFinanceConflict"/></WrapPanel></StackPanel></Border>
+          </StackPanel>
+        </ScrollViewer>
         <Grid Grid.Row="1" IsVisible="{Binding IsVerificationsTab}" ColumnDefinitions="340,*" ColumnSpacing="16">
           <ScrollViewer HorizontalScrollBarVisibility="Disabled">
           <StackPanel Spacing="8"><Button Content="Pobierz dane z DataPort" Click="DataPortClick" IsEnabled="{Binding CanVerify}" AutomationProperties.AutomationId="VerifyDataPort"/><TextBlock Text="DataPort (dane GUS) — rzeczywista usługa pośrednika, możliwy cache. Wymaga klucza w ustawieniach firmy. Nie jest bezpośrednią odpowiedzią GUS." TextWrapping="Wrap"/><TextBlock Text="Historia weryfikacji" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="TEST/MOCK nie potwierdzają rzeczywistej rejestracji. Historia jest niezmienna; kolejne ręczne sprawdzenie dodaje nowe zdarzenie." TextWrapping="Wrap"/><Button Content="Odśwież historię" Click="VerificationsClick" IsEnabled="{Binding HasSavedContractor}" AutomationProperties.AutomationId="RefreshVerifications"/>

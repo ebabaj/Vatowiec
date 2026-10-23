@@ -1,6 +1,6 @@
 # Otwarty następca VATowca — specyfikacja produktu i architektury
 
-**Wersja dokumentu:** 0.18 (standardowe identyfikatory kontrahenta, ADR-030)
+**Wersja dokumentu:** 0.19 (warunki finansowe kontrahenta, ADR-031)
 **Data:** 2026-10-23
 **Status:** projekt założeń; nie jest potwierdzeniem zgodności podatkowej gotowego oprogramowania  
 **Nazwa projektu:** robocza „Otwarty następca VATowca”; docelowa nazwa i użycie nazwy „VATowiec” wymagają odrębnej decyzji i sprawdzenia praw  
@@ -300,6 +300,36 @@ surowego audytu pozostaje dostępna tylko wewnątrz bazy, bez endpointu publiczn
 [Decyzja i granice](docs/adr/ADR-030-standardowe-identyfikatory-kontrahenta.md),
 [instrukcja i testy](docs/standard-identifiers.md).
 
+### 3.10.2. Warunki finansowe kontrahenta (ADR-031)
+
+ORG-012 dodaje lokalne ContractorTradeTerms z jedną opcjonalną konfiguracją na
+ContractorId i Direction (Sale = nasza sprzedaż, Purchase = nasz zakup).
+PaymentDays 0–3650, PaymentMethodCode, CurrencyCode, DiscountPercent 0–100 i
+Notes są opcjonalne; NULL oznacza brak indywidualnego ustawienia. Nie podstawiamy
+PLN i nie dziedziczymy warunków z ParentId. ref.PaymentMethods jest otwartym
+słownikiem firmy ze stabilnym Code, edytowalną nazwą i aktywnością; początkowo
+Przelew, Gotówka, Karta, Kompensata, Inny. Użytych pozycji nie usuwamy.
+ContractorCreditLimits mają nieujemną kwotę, kierunek, walutę i IsActive;
+filtrowany unikalny indeks chroni jedną aktywną pozycję na tę kombinację.
+Waluty obu modeli są FK do istniejącego Currencies.Code char(3), z kolacją BIN2.
+Rabat decimal(7,4), limit decimal(24,8), uwagi do 2000 znaków; nadmiar precyzji
+odrzucamy bez cichego zaokrąglania. Nieaktywne odwołanie można zachować, ale
+nowy wybór musi wskazywać aktywną pozycję. Wartość 0 jest odrębna od NULL.
+
+Zakładka Finansowe ma Sprzedaż/Zakup oraz osobne szkice/zapisy warunków, limitu
+oraz słownika. Chronimy przełączanie i opuszczanie niezapisanych szkiców. Zapis
+finansów nie wysyła danych głównych. Odczyt ViewContractors, zapis dodatkowo
+EditContractors, CSRF i rowversion; konflikt wymaga świadomego porównania.
+Tworzenie idempotentne, audyt i zapis atomowe w bazie firmy, trwały aktor/issuer.
+Nie implementujemy dokumentów, sald, wykorzystania limitu, blokad, automatycznych
+rabatów ani wyliczania terminów. Ustawienia są podstawą przyszłych dokumentów,
+nie zmieniają żadnych zapisanych dokumentów. PAY-001 pozostaje szerszym etapem.
+Migracja addytywna w A/B bez resetów, System bez DDL; zachowano stare dane,
+uprawnienia i integracje. Wynik: 383/383 (374 bez SQL i 9 niedestrukcyjnych SQL/API),
+build bez błędów/ostrzeżeń. 103 starszych testów resetujących nie wykonano.
+[ADR-031](docs/adr/ADR-031-warunki-finansowe-kontrahenta.md),
+[instrukcja i weryfikacja](docs/contractor-finance.md).
+
 ### 3.11. DataPort i konfiguracja integracji firmy (ADR-022)
 
 Osobny adapter komercyjnego pośrednika DataPort, obok oficjalnego GUS BIR.
@@ -464,6 +494,7 @@ Legenda: **P0** — fundament wymagany przed udostępnieniem produkcyjnym; **P1*
 | ORG-009 | Automatyczne utworzenie bazy i profilu firmy z aplikacji, migracje, idempotencja i wznowienie po awarii | P0 |
 | ORG-010 | Niezależny backup, samodzielne odtworzenie i przeniesienie jednej firmy przez uprawnionego użytkownika aplikacji | P0 |
 | ORG-011 | Trwała identyfikacja aktora w historii księgowej mimo usunięcia jego konta z bazy systemowej | P0 |
+| ORG-012 | Indywidualne warunki finansowe Sale/Purchase, sposoby płatności i wielowalutowe limity kontrahenta | P1 |
 
 ### 6.2. Dokumenty i fakturowanie
 
@@ -657,6 +688,9 @@ Nie oznacza to przenoszenia firmowych adresów lub kontaktów do bazy systemowej
 | `ref.AddressTypes` — wdrożony schemat | lokalny, otwarty słownik: Adres rejestrowy, Adres korespondencyjny i możliwość dodawania własnych rodzajów w zakładce Adresy (ADR-020) |
 | `core.ContractorContacts` — wdrożony schemat | jeden uniwersalny model kontaktu: obowiązkowe Name, opcjonalna funkcja/telefon/e-mail/adres/uwagi, bez FK do ContractorAddresses; techniczne typy określa ADR-019 |
 | `core.ContractorBankAccounts` — wdrożony schemat | wiele rachunków bez unikalności numeru, CurrencyCode char(3) NULL, IsDefault bit, najwyżej jeden domyślny w grupie ContractorId/waluta, także NULL; brak obowiązku domyślnego; pełne kolumny i typy w ADR-018 §3.9 |
+| `core.ContractorTradeTerms` — wdrożone | opcjonalne warunki ContractorId/Direction Sale/Purchase; dni, sposób, waluta i rabat/uwagi NULL, rowversion; ADR-031 |
+| `ref.PaymentMethods` — wdrożone | lokalny otwarty słownik, niezmienny unikalny Code, edytowalne Name/IsActive, rowversion; FK z warunków; ADR-031 |
+| `core.ContractorCreditLimits` — wdrożone | Amount decimal(24,8), CurrencyCode FK, Direction i IsActive; jeden aktywny na kombinację, rowversion i audyt; ADR-031 |
 | `core.ContractorCreateOperations` — wdrożone | techniczny trwały wynik tworzenia w zakresie aktora, instalacji, OperationKind i operacji; atomowy z rekordem i audytem, szczegóły ADR-019 |
 | `audit.ContractorChanges` | wdrożony audyt SnapshotVersion=3 dla nowych zmian danych głównych (starsze i szczegóły =2) z RecordType, RecordId i WarningJson; atomowe wartości przed/po i trwały wykonawca; świadome odstępstwa rachunków i identyfikatorów ADR-021 |
 | `audit.ExternalVerifications` — wdrożone | niezmienne sprawdzenia zewnętrzne w bazie firmy, niezależne od edycji, snapshot wejścia, środowisko i trwały aktor; zakres informacji w §8.3 i ADR-021 |
@@ -998,6 +1032,7 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | [ADR-019](docs/adr/ADR-019-implementacja-modelu-kontrahentow.md) | Implementacja podstawy kartoteki | int IDENTITY, zabezpieczona hierarchia, lokalne szczegóły, trwała idempotencja, audyt i odtworzenie trzech demonstracyjnych baz; bez walidatorów i nowych ekranów |
 | [ADR-018](docs/adr/ADR-018-docelowy-model-kontrahentow.md) | Docelowy model kontrahentów i niezależne weryfikacje | Uzupełniony o ParentId bez dziedziczenia, nazwy tabel, reguły identyfikatorów i domyślność walutową; ślad rozstrzygnięć K-01–K-09, pozostałe doprecyzowania w §4; podstawa implementacji ADR-019, bez migracji danych demonstracyjnych |
 | [ADR-030](docs/adr/ADR-030-standardowe-identyfikatory-kontrahenta.md) | REGON, KRS, BDO i PESEL | Opcjonalne teksty, kontrola sum/formatu, osobne firmowe prawo PESEL, bezpieczne wyszukiwanie POST, addytywne migracje i audyt wersji 3 |
+| [ADR-031](docs/adr/ADR-031-warunki-finansowe-kontrahenta.md) | Warunki finansowe kontrahenta | Sale/Purchase, opcjonalne warunki, słownik sposobów, limity per waluta, osobne szkice i atomowy audyt bez dokumentów/sald |
 | ADR-006 | Podpisywanie XML i przechowywanie certyfikatów | Przed implementacją wysyłek MF; nie przechowywać sekretów w zwykłej bazie |
 | ADR-007 | API pluginów: manifest, sandbox, granice dostępu | Przed pierwszą wykonywalną wtyczką |
 | ADR-008 | Pełny wykaz typów VAT i deklaracji na 1.0 | Przed M3; uzgodnić precyzyjne scenariusze |

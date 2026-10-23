@@ -51,6 +51,26 @@ public partial class MainWindow : Window
     }
 
     private async void LoginClick(object? sender, RoutedEventArgs e) => await Login();
+    private void FinanceDirectionSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is not ComboBox box || !(box.IsDropDownOpen || box.IsKeyboardFocusWithin)) return;
+        model.FinanceDirectionIndex = box.SelectedIndex;
+        // A guarded/rejected switch must also restore the control's visual value.
+        if (box.SelectedIndex != model.FinanceDirectionIndex)
+            box.SetCurrentValue(Avalonia.Controls.Primitives.SelectingItemsControl.SelectedIndexProperty, model.FinanceDirectionIndex);
+    }
+    // A rebinding ComboBox may temporarily select its placeholder. Only an
+    // interactive choice edits the code; the server snapshot drives presentation.
+    private void TradePaymentSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is ComboBox { SelectedItem: Vatowiec.SharedContracts.PaymentMethodResponse item } box &&
+            (box.IsDropDownOpen || box.IsKeyboardFocusWithin)) model.SelectedTradePayment = item;
+    }
+    private void TradeCurrencySelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is ComboBox { SelectedItem: Vatowiec.SharedContracts.FinanceCurrency item } box &&
+            (box.IsDropDownOpen || box.IsKeyboardFocusWithin)) model.SelectedTradeCurrency = item;
+    }
     private async void PasswordKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter) return;
@@ -137,6 +157,21 @@ public partial class MainWindow : Window
     private async void PreviousVerificationsClick(object? sender, RoutedEventArgs e) => await model.PreviousVerifications();
     private async void NextVerificationsClick(object? sender, RoutedEventArgs e) => await model.NextVerifications();
     private void ApplyGusClick(object? sender, RoutedEventArgs e) => model.ApplyGusSelection();
+    private async void SaveTermsClick(object? sender, RoutedEventArgs e) => await model.SaveTradeTerms();
+    private void CancelTermsClick(object? sender, RoutedEventArgs e) => model.CancelTradeTerms();
+    private void RefreshFinanceClick(object? sender, RoutedEventArgs e) => model.RefreshFinance();
+    private void NewLimitClick(object? sender, RoutedEventArgs e) => model.NewCreditLimit();
+    private void EditLimitClick(object? sender, RoutedEventArgs e) => model.EditCreditLimit();
+    private async void SaveLimitClick(object? sender, RoutedEventArgs e) => await model.SaveCreditLimit();
+    private void CancelLimitClick(object? sender, RoutedEventArgs e) => model.CancelCreditLimit();
+    private async void NextLimitsClick(object? sender, RoutedEventArgs e) => await model.NextCreditLimits();
+    private async void PreviousLimitsClick(object? sender, RoutedEventArgs e) => await model.PreviousCreditLimits();
+    private void NewPaymentMethodClick(object? sender, RoutedEventArgs e) => model.NewPaymentMethod();
+    private void EditPaymentMethodClick(object? sender, RoutedEventArgs e) => model.EditPaymentMethod();
+    private async void SavePaymentMethodClick(object? sender, RoutedEventArgs e) => await model.SavePaymentMethod();
+    private void CancelPaymentMethodClick(object? sender, RoutedEventArgs e) => model.CancelPaymentMethod();
+    private void ReloadFinanceConflictClick(object? sender, RoutedEventArgs e) => model.ResolveFinanceConflict(false);
+    private void KeepFinanceConflictClick(object? sender, RoutedEventArgs e) => model.ResolveFinanceConflict(true);
     private void CancelContractorClick(object? sender, RoutedEventArgs e) => model.CancelEditor();
     private void ReloadConflictClick(object? sender, RoutedEventArgs e) => model.ResolveConflict(false);
     private void KeepConflictClick(object? sender, RoutedEventArgs e) => model.ResolveConflict(true);
@@ -182,6 +217,14 @@ public partial class MainWindow : Window
         }
         if (model.IsEditing && !model.IsMainTab)
         {
+            if (model.IsFinanceTab)
+            {
+                if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.S) { e.Handled = true; await model.SaveTradeTerms(); }
+                else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.N) { e.Handled = true; model.NewCreditLimit(); }
+                else if (e.Key == Key.F2) { e.Handled = true; model.EditCreditLimit(); }
+                else if (e.Key == Key.Escape) { e.Handled = true; model.CancelEditor(); }
+                return;
+            }
             if (model.IsVerificationsTab) { if (e.Key == Key.Escape) model.CancelEditor(); return; }
             if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.S) { e.Handled = true; await model.SaveDetail(); }
             else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.N) { e.Handled = true; model.NewDetail(); }

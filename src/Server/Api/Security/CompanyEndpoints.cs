@@ -32,6 +32,7 @@ public static class CompanyEndpoints
 
         group.MapContractors();
         group.MapContractorDetails();
+        group.MapContractorFinance();
         group.MapVerifications();
         group.MapDataPort();
         group.MapCurrencies();

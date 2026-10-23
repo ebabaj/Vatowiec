@@ -26,6 +26,12 @@ public interface IVatowiecApiClient : IDisposable
     Task<ContractorResponse[]> ParentCandidates(Guid companyId, string search, int excludeId, int offset = 0) => Task.FromResult<ContractorResponse[]>([]);
     Task<ContractorResponse[]> Children(Guid companyId, int parentId, int offset = 0) => Task.FromResult<ContractorResponse[]>([]);
     Task Logout();
+    Task<FinanceLookups> FinanceLookups(Guid companyId) => throw new NotSupportedException();
+    Task<TradeTermsResponse> TradeTerms(Guid companyId, int contractorId, string direction) => throw new NotSupportedException();
+    Task<TradeTermsResponse> SaveTradeTerms(Guid companyId, int contractorId, string direction, TradeTermsRequest value) => throw new NotSupportedException();
+    Task<CreditLimitResponse[]> CreditLimits(Guid companyId, int contractorId, string direction, int offset) => throw new NotSupportedException();
+    Task<CreditLimitResponse> SaveCreditLimit(Guid companyId, int contractorId, CreditLimitRequest value) => throw new NotSupportedException();
+    Task<PaymentMethodResponse> SavePaymentMethod(Guid companyId, PaymentMethodRequest value, bool create) => throw new NotSupportedException();
     Task<GusConfigurationResponse> GusConfiguration() => throw new NotSupportedException();
     Task<RegistryConfigurationResponse[]> RegistryConfigurations() => Task.FromResult<RegistryConfigurationResponse[]>([]);
     Task<RegistryConfigurationResponse> SaveRegistryConfiguration(string source, RegistryConfigurationRequest value) => throw new NotSupportedException();
@@ -50,6 +56,7 @@ public sealed class ApiException(int statusCode, string message) : Exception(mes
     public DetailResponse? DetailCurrent { get; init; }
     public string? WarningHash { get; init; }
     public BankAccountValidationResponse? BankValidation { get; init; }
+    public FinanceConflictResponse? FinanceCurrent { get; init; }
     public Dictionary<string, string[]>? Errors { get; init; }
 }
 
@@ -148,6 +155,12 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         request.Headers.Add("X-CSRF-TOKEN", csrf.Token);
         return await Send<T>(request);
     }
+    public Task<FinanceLookups> FinanceLookups(Guid companyId) => Get<FinanceLookups>($"api/v1/companies/{companyId}/financial-lookups");
+    public Task<TradeTermsResponse> TradeTerms(Guid companyId, int contractorId, string direction) => Get<TradeTermsResponse>($"api/v1/companies/{companyId}/contractors/{contractorId}/trade-terms/{Uri.EscapeDataString(direction)}");
+    public Task<TradeTermsResponse> SaveTradeTerms(Guid companyId, int contractorId, string direction, TradeTermsRequest value) => Write<TradeTermsResponse>($"api/v1/companies/{companyId}/contractors/{contractorId}/trade-terms/{Uri.EscapeDataString(direction)}", value, true);
+    public Task<CreditLimitResponse[]> CreditLimits(Guid companyId, int contractorId, string direction, int offset) => Get<CreditLimitResponse[]>($"api/v1/companies/{companyId}/contractors/{contractorId}/credit-limits?direction={Uri.EscapeDataString(direction)}&offset={offset}&limit=51");
+    public Task<CreditLimitResponse> SaveCreditLimit(Guid companyId, int contractorId, CreditLimitRequest value) => Write<CreditLimitResponse>($"api/v1/companies/{companyId}/contractors/{contractorId}/credit-limits" + (value.Id == 0 ? "" : "/" + value.Id), value, value.Id != 0);
+    public Task<PaymentMethodResponse> SavePaymentMethod(Guid companyId, PaymentMethodRequest value, bool create) => Write<PaymentMethodResponse>($"api/v1/companies/{companyId}/payment-methods" + (create ? "" : "/" + Uri.EscapeDataString(value.Code)), value, !create);
     public Task<CompanyProfileResponse> Profile(Guid companyId) => Get<CompanyProfileResponse>($"api/v1/companies/{companyId:D}/profile");
     public Task<ContractorResponse[]> Contractors(Guid companyId, string? search = null, string? country = null, bool? active = null, int offset = 0, int limit = 50)
         => Post<ContractorResponse[]>($"api/v1/companies/{companyId:D}/contractors/search",
@@ -227,6 +240,7 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         var message = response.StatusCode switch
         {
             _ when error?.Code?.StartsWith("currency_", StringComparison.Ordinal) == true => error.Message ?? "Sprawdź ustawienia, daty i aktualną wersję danych walutowych.",
+            _ when error?.Code?.StartsWith("finance_", StringComparison.Ordinal) == true => error.Message ?? "Sprawdź ustawienia finansowe i bieżącą wersję.",
             HttpStatusCode.Conflict when error?.Code == "configuration_stale" => error.Message ?? "Ustawienia zmieniły się. Odśwież stan i ponownie sprawdź wartości.",
             HttpStatusCode.BadRequest when error?.Code is "dataport_key_invalid" or "confirmation_required" => error.Message ?? "Sprawdź konfigurację DataPort.",
             HttpStatusCode.BadRequest when error?.Code is "verification_unsupported" or "verification_invalid" or "verification_date" => error.Message ?? "Sprawdź dane wejściowe weryfikacji.",
@@ -259,11 +273,11 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         if (response.StatusCode == HttpStatusCode.BadRequest && error?.Code == "validation_failed" && error.Errors is not null)
             message = string.Join(Environment.NewLine, error.Errors.Values.SelectMany(x => x));
         throw new ApiException((int)response.StatusCode, message)
-        { Code = error?.Code, Current = error?.Current, DetailCurrent = error?.DetailCurrent, WarningHash = error?.WarningHash, BankValidation = error?.BankValidation, Errors = error?.Errors };
+        { Code = error?.Code, Current = error?.Current, DetailCurrent = error?.DetailCurrent, WarningHash = error?.WarningHash, BankValidation = error?.BankValidation, Errors = error?.Errors, FinanceCurrent = error?.FinanceCurrent };
     }
 
     private sealed record ApiError(string? Code, Dictionary<string, string[]>? Errors, ContractorResponse? Current,
-        DetailResponse? DetailCurrent, string? WarningHash, string? Message, BankAccountValidationResponse? BankValidation);
+        DetailResponse? DetailCurrent, string? WarningHash, string? Message, BankAccountValidationResponse? BankValidation, FinanceConflictResponse? FinanceCurrent);
 
     public void Dispose() => http.Dispose();
 }

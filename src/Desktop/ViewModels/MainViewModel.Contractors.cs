@@ -21,7 +21,7 @@ public sealed partial class MainViewModel
     public bool CanBrowse => CanViewContractors && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !IsGusSettings;
     public bool IsBrowsingWorkspace => IsWorkspace && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !IsGusSettings;
     public bool IsEditing => editor is not null;
-    public bool CanSaveContractor => IsEditing && !HasConflict && CanEditContractors && DetailEditor is null;
+    public bool CanSaveContractor => IsMainTab && IsEditing && !HasConflict && CanEditContractors && DetailEditor is null;
     public bool HasConflict => conflictCurrent is not null;
     public ContractorEditor? Editor => editor;
     public string EditorTitle => editor?.IsNew == true ? "Nowy kontrahent" : "Edycja kontrahenta";

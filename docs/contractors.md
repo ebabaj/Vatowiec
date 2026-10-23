@@ -2,6 +2,7 @@
 
 Podstawowe zakładki to **Dane główne, Adresy, Kontakty, Rachunki bankowe**;
 ADR-021 dodaje piątą: **Weryfikacje**.
+ADR-031 dodaje szóstą: **Finansowe**, z widokami Sprzedaż/Zakup i osobnym zapisem.
 Korzysta wyłącznie z HTTPS API. Zachowane są logowanie, wybór firmy, uprawnienia,
 rowversion, izolacja fizycznych baz i atomowy audyt.
 Model biznesowy: [ADR-018](adr/ADR-018-docelowy-model-kontrahentow.md).
@@ -14,6 +15,10 @@ ADR-030 rozszerza **Dane główne** o REGON, KRS, BDO i PESEL. Kontrola lokalna,
 ostrzeżenia oraz wyszukiwanie: [instrukcja](standard-identifiers.md).
 PESEL wymaga osobnego firmowego ManageContractorPesel; pełna kartoteka i rola
 administratora instalacji nie przyznają tego prawa automatycznie.
+
+Warunki płatności, rabat, waluta, słownik sposobów płatności i limity kupieckie:
+[Finansowe — instrukcja i zakres](contractor-finance.md). Ustawienia dotyczą
+przyszłych dokumentów; nie ma jeszcze sald ani wykorzystania limitu.
 
 ## Uruchomienie
 

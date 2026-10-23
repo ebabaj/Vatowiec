@@ -205,3 +205,11 @@ maski demonstratora pozostają bez zmian. Bez prawa odpowiedzi API pomijają PES
 edycja innych pól zachowuje jego wartość, a jawne próby zmiany dają 403.
 Dotyczy także konfliktów, wyszukiwania i ponowienia operacji tworzenia.
 Szczegóły: [standardowe identyfikatory](standard-identifiers.md).
+
+ADR-031 udostępnia Finansowe przez istniejące **ViewContractors** (odczyt)
+i dodatkowo **EditContractors** (zapis warunków, limitów i słownika płatności).
+Zapis wymaga CSRF i rowversion; tworzenie ma trwałą idempotencję. Nie są wymagane
+ManageCurrencies ani ViewExchangeRates do samego wyboru waluty w kartotece.
+Nie nadano nowych praw i nie zmieniono przypisań demonstratora. Operator A może
+edytować, operator B tylko przeglądać; konto z samym profilem nie czyta finansów.
+[Instrukcja](contractor-finance.md).

@@ -27,16 +27,18 @@ public sealed partial class MainViewModel
             void Switch()
             {
                 tab = value;
+                ResetFinance();
                 ClearDetailDraft();
                 NewAddressTypeName = "";
                 typeOperation = Guid.NewGuid();
                 DetailRows = [];
                 detailOffset = 0;
                 ChangedAll();
-                if (tab == 4 && HasSavedContractor) _ = LoadVerifications();
-                else if (tab > 0 && HasSavedContractor) _ = LoadDetails();
+                if (tab == 5 && HasSavedContractor) _ = LoadFinance();
+                else if (tab == 4 && HasSavedContractor) _ = LoadVerifications();
+                else if (tab is >= 1 and <= 3 && HasSavedContractor) _ = LoadDetails();
             }
-            if (detailEditor?.IsDirty == true || !string.IsNullOrEmpty(NewAddressTypeName)) RequestDiscard(Switch);
+            if (HasFinanceChanges || detailEditor?.IsDirty == true || !string.IsNullOrEmpty(NewAddressTypeName)) RequestDiscard(Switch);
             else Switch();
         }
     }
@@ -64,7 +66,7 @@ public sealed partial class MainViewModel
     public bool CanAcceptWarnings => selectedCompany?.Permissions.Contains("AcceptWarnings", StringComparer.Ordinal) == true;
     public bool DiscardPrompt => discardAction is not null;
     public bool CanUseForm => !busy && !DiscardPrompt;
-    public bool HasUnsavedChanges => CurrencyEditor?.IsDirty == true || editor?.IsDirty == true || detailEditor?.IsDirty == true || !string.IsNullOrEmpty(NewAddressTypeName);
+    public bool HasUnsavedChanges => HasFinanceChanges || CurrencyEditor?.IsDirty == true || editor?.IsDirty == true || detailEditor?.IsDirty == true || !string.IsNullOrEmpty(NewAddressTypeName);
     public bool HasNextDetails { get; private set; }
     public bool HasPreviousDetails => detailOffset > 0;
     public string DetailPage => $"Strona {detailOffset / 50 + 1} · {DetailRows.Length} pozycji";
@@ -276,6 +278,7 @@ public sealed partial class MainViewModel
     }
     private void ResetDetails()
     {
+        ResetFinance();
         ResetVerifications();
         tab = 0;
         ClearDetailDraft();

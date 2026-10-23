@@ -69,7 +69,7 @@ public sealed class OfficialVatRulesSqlTests
         {
             await using var company = Company(id); await VerifyLocalTarget(company);
             Assert.Equal(id, (await company.CompanyProfiles.SingleAsync()).CompanyId);
-            Assert.Equal(8, (await company.Database.GetAppliedMigrationsAsync()).Count());
+            Assert.Equal(9, (await company.Database.GetAppliedMigrationsAsync()).Count());
         }
     }
 

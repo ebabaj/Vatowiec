@@ -37,7 +37,7 @@ public sealed class SqlServerPersistenceTests
         await b.Seed(idB);
         await using var first = a.Company(idA);
         await using var second = b.Company(idB);
-        Assert.EndsWith("_StandardContractorIdentifiers", (await first.Database.GetAppliedMigrationsAsync()).Last());
+        Assert.EndsWith("_ContractorFinance", (await first.Database.GetAppliedMigrationsAsync()).Last());
         Assert.Empty(await first.Database.GetPendingMigrationsAsync());
         Assert.Equal("KLIENT", (await first.Contractors.SingleAsync()).Code);
         Assert.Equal("KLIENT", (await second.Contractors.SingleAsync()).Code);
@@ -55,10 +55,10 @@ public sealed class SqlServerPersistenceTests
         await using var second = b.Company(null);
         await using var system = s.System();
         using var command = new SqlCommand("DELETE FROM dbo.__EFMigrationsHistory;", a.Connection, a.Transaction);
-        Assert.Equal(8, await command.ExecuteNonQueryAsync());
+        Assert.Equal(9, await command.ExecuteNonQueryAsync());
         Assert.Empty(await first.Database.GetAppliedMigrationsAsync());
-        Assert.Equal(8, (await first.Database.GetPendingMigrationsAsync()).Count());
-        Assert.EndsWith("_StandardContractorIdentifiers", (await second.Database.GetAppliedMigrationsAsync()).Last());
+        Assert.Equal(9, (await first.Database.GetPendingMigrationsAsync()).Count());
+        Assert.EndsWith("_ContractorFinance", (await second.Database.GetAppliedMigrationsAsync()).Last());
         Assert.Empty(await second.Database.GetPendingMigrationsAsync());
         Assert.Equal(11, (await system.Database.GetAppliedMigrationsAsync()).Count());
         Assert.EndsWith("_ContractorPeselPermission", (await system.Database.GetAppliedMigrationsAsync()).Last());
@@ -208,7 +208,7 @@ public sealed class SqlServerPersistenceTests
             await session.Seed(id);
             await using var context = session.Company(id);
             var contractor = await context.Contractors.SingleAsync();
-            Assert.Equal(8, contractor.RowVersion.Length);
+            Assert.Equal(9, contractor.RowVersion.Length);
             Assert.NotEqual(default, contractor.CreatedAtUtc);
             Assert.Equal(contractor.CreatedAtUtc, contractor.UpdatedAtUtc);
         }

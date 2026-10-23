@@ -71,7 +71,8 @@ public sealed class StandardIdentifierTests
         foreach (var field in new[] { "Regon", "Krs", "Bdo", "Pesel" })
         { var property = entity.FindProperty(field)!; Assert.True(property.IsNullable); Assert.Equal(typeof(string), property.ClrType); Assert.Equal(100, property.GetMaxLength()); }
         var names = company.Database.GetMigrations().ToArray();
-        var sql = company.GetService<IMigrator>().GenerateScript(names[^2], names[^1]);
+        var migrationIndex = Array.FindIndex(names, x => x.EndsWith("_StandardContractorIdentifiers", StringComparison.Ordinal));
+        var sql = company.GetService<IMigrator>().GenerateScript(names[migrationIndex - 1], names[migrationIndex]);
         foreach (var field in new[] { "Regon", "Krs", "Bdo", "Pesel" }) Assert.Contains($"ADD [{field}] nvarchar(100) NULL", sql);
         Assert.DoesNotContain("DROP", sql); Assert.DoesNotContain("UPDATE", sql); Assert.DoesNotContain("ParentId", sql);
         var old = new CompanyAccess(Guid.NewGuid(), Guid.NewGuid(), (CompanyPermission)511);

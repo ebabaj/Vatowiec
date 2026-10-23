@@ -2,9 +2,27 @@
 
 Projekt: **Otwarty następca VATowca** (nazwa robocza).  
 Główne źródło wymagań: [`SPECYFIKACJA.md`](./SPECYFIKACJA.md).  
-Status: REGON, KRS, BDO i chroniony PESEL kontrahenta, 2026-10-23; ADR-030.
+Status: standardowe warunki finansowe kontrahenta, 2026-10-23; ADR-031.
 
-**Aktualny etap: standardowe identyfikatory kontrahenta (ADR-030).**
+**Aktualny etap: warunki finansowe kontrahenta (ADR-031).**
+ContractorTradeTerms ma jedną opcjonalną konfigurację ContractorId/Direction
+Sale (nasza sprzedaż) lub Purchase (nasz zakup), z opcjonalnymi dniami 0–3650,
+metodą, walutą, rabatem decimal(7,4) 0–100 i uwagami do 2000 znaków.
+Brak waluty nie oznacza PLN. PaymentMethods jest lokalnym otwartym słownikiem:
+niezmienny Code, edytowalne Name/IsActive, bez fizycznego DELETE. Id int służy
+powiązaniu istniejącego audytu; Code jest unikalnym kluczem referencji warunków.
+ContractorCreditLimits ma nieujemne Amount decimal(24,8), kierunek i walutę;
+filtrowany indeks chroni jeden aktywny limit na ContractorId/Direction/CurrencyCode.
+Waluty są FK do istniejącego Currencies.Code char(3) z tą samą kolacją BIN2;
+nie twórz drugiego słownika i nie zaokrąglaj nadmiarowej precyzji po cichu.
+Odczyt ViewContractors, zapis także EditContractors/CSRF/rowversion; atomowy
+ContractorChanges i trwała idempotencja tworzenia. Osobne szkice/zapisy finansów
+i danych głównych w Avalonia; przełączanie widoków i zamykanie chronią szkice.
+Nie implementuj sald, wykorzystania limitu, blokad sprzedaży ani dokumentów.
+Nie resetuj baz; nowe ContractorFinanceSqlTests stosują rollback/savepoint,
+bez kasowania danych, obok pozostałych niedestrukcyjnych testów poniżej.
+
+Zachowujemy standardowe identyfikatory kontrahenta (ADR-030):
 Dodajemy Regon/Krs/Bdo/Pesel jako opcjonalne teksty nvarchar(100) w bazie firmy,
 z addytywnymi migracjami i zachowaniem istniejących danych oraz ParentId.
 ManageContractorPesel=512 jest osobnym prawem firmy do odczytu i edycji PESEL,

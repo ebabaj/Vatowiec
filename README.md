@@ -5,12 +5,20 @@ Projekt wielostanowiskowej aplikacji dla polskich mikrofirm. Obecny stan to
 wybór firmy, dodawanie/edycja z audytem i konfliktami oraz wyszukiwanie po stronie serwera.
 Osobne SystemDbContext i CompanyDbContext, trzy bazy SQL
 Server oraz dwie fikcyjne firmy. Działają Identity, sesje API i autoryzowany resolver
-bazy firmy. Standardowe identyfikatory ADR-030: **359/359 wykonanych testów**,
-352 bez SQL i 7 niedestrukcyjnych SQL/API. Dawnych 103 SQL/API z resetującym fixture
+bazy firmy. Finanse kontrahenta ADR-031: **383/383 wykonanych testów**,
+374 bez SQL i 9 niedestrukcyjnych SQL/API. Dawnych 103 SQL/API z resetującym fixture
 nie uruchamiano, aby zachować dane. Kompilacja bez ostrzeżeń i błędów.
 Nie jest to jeszcze program do prowadzenia księgowości.
 
-**Aktualny etap: REGON, KRS, BDO i chroniony PESEL (ADR-030).**
+**Aktualny etap: standardowe warunki finansowe kontrahenta (ADR-031).**
+Zakładka Finansowe: niezależne Sprzedaż/Zakup, opcjonalne warunki płatności,
+waluta i rabat oraz wielowalutowe limity. Otwarty słownik sposobów płatności,
+rowversion, idempotencja i atomowy audyt. Zapis finansów zachowuje szkic danych
+głównych. Brak ustawienia waluty nie podstawia PLN. Migracja addytywna bez resetów.
+Nie ma jeszcze dokumentów, sald ani wykorzystania limitu.
+[Instrukcja i wyniki](docs/contractor-finance.md).
+
+REGON, KRS, BDO i chroniony PESEL (ADR-030):
 Opcjonalne teksty w danych głównych, jawna normalizacja i kontrola sum REGON/PESEL,
 ostrzeżenia, rowversion i atomowy audyt. Odczyt/edycja PESEL wymaga osobnego prawa
 firmy ManageContractorPesel; istniejące konta nie otrzymują go automatycznie.

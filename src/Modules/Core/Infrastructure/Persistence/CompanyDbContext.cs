@@ -13,6 +13,9 @@ public sealed class CompanyDbContext(
     public DbSet<CompanyProfile> CompanyProfiles => Set<CompanyProfile>();
     public DbSet<Contractor> Contractors => Set<Contractor>();
     public DbSet<ContractorChange> ContractorChanges => Set<ContractorChange>();
+    public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();
+    public DbSet<ContractorTradeTerms> ContractorTradeTerms => Set<ContractorTradeTerms>();
+    public DbSet<ContractorCreditLimit> ContractorCreditLimits => Set<ContractorCreditLimit>();
     public DbSet<AddressType> AddressTypes => Set<AddressType>();
     public DbSet<ContractorAddress> ContractorAddresses => Set<ContractorAddress>();
     public DbSet<ContractorBankAccount> ContractorBankAccounts => Set<ContractorBankAccount>();
@@ -29,6 +32,12 @@ public sealed class CompanyDbContext(
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfiguration(new CurrencyConfiguration());
+        modelBuilder.ApplyConfiguration(new PaymentMethodConfiguration());
+        modelBuilder.ApplyConfiguration(new TradeTermsConfiguration());
+        modelBuilder.ApplyConfiguration(new CreditLimitConfiguration());
+        modelBuilder.Entity<PaymentMethod>().HasQueryFilter(x => CurrentCompanyId != null && CompanyProfiles.Any(p => p.CompanyId == CurrentCompanyId));
+        modelBuilder.Entity<ContractorTradeTerms>().HasQueryFilter(x => CurrentCompanyId != null && CompanyProfiles.Any(p => p.CompanyId == CurrentCompanyId));
+        modelBuilder.Entity<ContractorCreditLimit>().HasQueryFilter(x => CurrentCompanyId != null && CompanyProfiles.Any(p => p.CompanyId == CurrentCompanyId));
         modelBuilder.ApplyConfiguration(new ExchangeRateConfiguration());
         modelBuilder.ApplyConfiguration(new CurrencyOperationConfiguration());
         modelBuilder.Entity<Currency>().HasQueryFilter(x => CurrentCompanyId != null && CompanyProfiles.Any(p => p.CompanyId == CurrentCompanyId));
@@ -99,7 +108,7 @@ public sealed class CompanyDbContext(
         if (ChangeTracker.Entries<Contractor>().Any(x => x.State == EntityState.Deleted))
             throw new InvalidOperationException("Kontrahenta oznaczamy jako nieaktywnego, bez usuwania.");
         if (ChangeTracker.Entries().Any(x => x.State == EntityState.Deleted &&
-            x.Entity is ContractorAddress or ContractorContact or ContractorBankAccount or AddressType))
+            x.Entity is ContractorAddress or ContractorContact or ContractorBankAccount or AddressType or PaymentMethod or Vatowiec.Core.Domain.ContractorTradeTerms or ContractorCreditLimit))
             throw new InvalidOperationException("Nie usuwamy fizycznie danych kartotekowych.");
         if (ChangeTracker.Entries<CompanyProfile>().Any(x => x.State == EntityState.Deleted))
             throw new InvalidOperationException("Nie można usunąć tożsamości bazy firmy.");
