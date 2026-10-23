@@ -69,6 +69,8 @@ app.MapGet("/api/v1/status", () => new ApiStatusResponse("Vatowiec", "M0-skeleto
     .WithName("GetApiStatus").AllowAnonymous();
 
 app.MapAuthentication();
+app.MapGusConfiguration();
+app.MapRegistryConfiguration();
 app.MapCompanies();
 
 app.Run();

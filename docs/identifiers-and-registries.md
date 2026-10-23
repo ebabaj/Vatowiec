@@ -19,7 +19,8 @@ Operator ma w A ViewProfile/ViewContractors/EditContractors/AcceptWarnings/
 VerifyRegistries (maska 31); w B tylko profil i kartotekę (3), bez zapisów
 i inicjowania weryfikacji. Historia jest dostępna do odczytu kartoteki.
 Czytelnik.m0 nadal widzi tylko profil A. Hasła pozostają poza repozytorium;
-[konfiguracja kont](authentication.md). Nie jest potrzebny produkcyjny klucz GUS.
+[konfiguracja kont](authentication.md). W domyślnym Test nie jest potrzebny
+produkcyjny klucz GUS. [Produkcja i centralny klucz instalacji — ADR-028](production-registries.md).
 
 ## Edycja, normalizacja i ostrzeżenia
 
@@ -94,21 +95,28 @@ appsettings.json zawiera domyślnie **Test** dla każdego adaptera:
 | GUS BIR1.2 | https://wyszukiwarkaregontest.stat.gov.pl/wsBIR/UslugaBIRzewnPubl.svc |
 | VIES SOAP | https://ec.europa.eu/taxation_customs/vies/test-services/checkVatTestService |
 
-Klucze: Registries:MF:Environment, Registries:GUS:Environment,
-Registries:VIES:Environment, odpowiednie BaseUrl oraz MF:Wl2Url. Dozwolone tryby:
-Test, Production, Mock. Zmienne środowiskowe używają __ zamiast :.
-Mock nie wykonuje połączeń i jest oznaczony jako lokalna atrapa.
+Konfiguracja: **Ustawienia instalacji → Integracje zewnętrzne** w Avalonia.
+Administrator instalacji wybiera osobno GUS/MF/VIES, TEST/PRODUKCJA i oficjalne
+URL obu środowisk, dla MF również WL2. Publiczne nastawy są centralnie w
+security.RegistryConfigurations, bez user-secrets i restartu API. Mock pozostaje
+wyłącznie narzędziem jawnych testów, bez połączeń, oznaczonym jako lokalna atrapa.
 
 Testowy klucz GUS jest publiczny: abcde12345abcde12345, używany wyłącznie na
-testowym endpointcie. Klucz produkcyjny, gdy będzie potrzebny, należy umieścić
-w user-secrets lub środowisku serwera jako Registries:GUS:ApiKey, nigdy w repo.
+testowym endpointcie. Produkcyjny klucz administrator wpisuje w Avalonia:
+Ustawienia instalacji → Integracje zewnętrzne → GUS BIR. Jest jeden dla całej
+instalacji, zaszyfrowany w security.GusConfiguration w System. Nie używamy już
+Registries:GUS:ApiKey. Oddzielna centralna rola chroni zmianę, bez praw wynikających
+z samego administrowania firmą. [Instrukcja ADR-028/029](production-registries.md).
 MF i podstawowe checkVat VIES nie wymagają klucza. SID GUS jest tylko w pamięci,
 sesja jest zamykana po próbie. Nie logujemy treści SOAP ani URL identyfikatorów.
 
-Produkcja wymaga **świadomej zmiany** danego Environment, BaseUrl/Wl2Url na dokładny
-oficjalny adres produkcyjny oraz Registries:AllowProduction=true. Brak zgodności
-blokuje adapter. Nie ma fallbacku TEST→PROD ani przyjmowania URL od klienta;
-przekierowania HTTP są wyłączone. W bieżącym demonstratorze nie włączamy produkcji.
+Produkcja wymaga **świadomego potwierdzenia** w UI przez administratora instalacji,
+z CSRF, rowversion i atomowym audytem. Serwer dopuszcza wyłącznie oficjalne URL
+odpowiedniego środowiska, bez dowolnych adresów klienta i przekierowań. Nowe
+żądania widzą zapis od razu; pojedyncza operacja korzysta z jednego snapshotu.
+Nie potrzeba flagi AllowProduction. Istniejących lokalnych sekretów i konfiguracji
+nie usunięto; stare publiczne nastawy nie sterują już normalnym serwerem.
+W tym etapie nie odpytano produkcyjnych rejestrów.
 Zmiana konfiguracji nie przepisuje środowiska dawnych zdarzeń ani nie przenosi
 testowych wyników do produkcyjnych potwierdzeń.
 

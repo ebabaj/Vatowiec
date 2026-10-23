@@ -66,6 +66,7 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
             }));
             builder.ConfigureServices(services =>
             {
+                services.AddScoped(_ => ProductionRegistryTests.Settings("Mock"));
                 services.AddSingleton<TimeProvider>(clock);
                 services.AddDataProtection().UseEphemeralDataProtectionProvider();
                 services.AddSingleton<Vatowiec.Core.Infrastructure.Registries.IDataPortKeyProtector>(

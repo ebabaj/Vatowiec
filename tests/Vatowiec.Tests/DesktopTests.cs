@@ -253,7 +253,7 @@ public sealed partial class DesktopTests
         public DateTimeOffset Now { get; set; } = DateTimeOffset.UtcNow;
         public override DateTimeOffset GetUtcNow() => Now;
     }
-    private sealed class FakeApi : IVatowiecApiClient
+    private sealed partial class FakeApi : IVatowiecApiClient
     {
         public BankAccountValidationResponse? BankCheck { get; set; }
         public Task<BankAccountValidationResponse>? PendingBankCheck { get; set; }
@@ -311,7 +311,7 @@ public sealed partial class DesktopTests
             return Task.FromResult(new DetailResponse(value.Id == 0 ? 1 : value.Id, companyId, contractorId, kind, value.Data, "AAAAAAAAAAE="));
         }
         public (string? Search, string? Country, bool? Active, int Offset, int Limit) LastQuery { get; private set; }
-        public Task<SessionResponse> Login(string userName, string password) => Task.FromResult(new SessionResponse(userName, Expires));
+        public Task<SessionResponse> Login(string userName, string password) => Task.FromResult(new SessionResponse(userName, Expires, InstallationAdmin));
         public Task<CompanyResponse[]> Companies() => CompanyListError ? throw new HttpRequestException() : Task.FromResult<CompanyResponse[]>(
             [new(A, "Firma A", Permissions), new(B, "Firma B", Permissions)]);
         public Task<CompanyProfileResponse> Profile(Guid id) => Task.FromResult(new CompanyProfileResponse(WrongCompany ? B : id, $"Firma {id}", null, null));

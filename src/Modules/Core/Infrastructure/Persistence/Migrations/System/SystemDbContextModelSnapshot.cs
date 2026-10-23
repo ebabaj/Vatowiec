@@ -272,6 +272,29 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                         });
                 });
 
+            modelBuilder.Entity("Vatowiec.Core.Domain.GusConfiguration", b =>
+                {
+                    b.Property<int>("SingletonKey")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProtectedApiKey")
+                        .HasMaxLength(8192)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("SingletonKey");
+
+                    b.ToTable("GusConfiguration", "security", t =>
+                        {
+                            t.HasCheckConstraint("CK_GusConfiguration_Singleton", "[SingletonKey] = 1");
+                        });
+                });
+
             modelBuilder.Entity("Vatowiec.Core.Domain.InstallationIdentity", b =>
                 {
                     b.Property<byte>("SingletonKey")
@@ -289,6 +312,125 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                         {
                             t.HasCheckConstraint("CK_Installation_Singleton", "[SingletonKey] = 1 AND [Id] <> '00000000-0000-0000-0000-000000000000'");
                         });
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.RegistryConfiguration", b =>
+                {
+                    b.Property<string>("Source")
+                        .HasColumnType("varchar(4)");
+
+                    b.Property<string>("Environment")
+                        .IsRequired()
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<string>("ProductionUrl")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
+
+                    b.Property<string>("ProductionWl2Url")
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("TestUrl")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
+
+                    b.Property<string>("TestWl2Url")
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
+
+                    b.HasKey("Source");
+
+                    b.ToTable("RegistryConfigurations", "security", t =>
+                        {
+                            t.HasCheckConstraint("CK_RegistryConfigurations_Environment", "[Environment] IN ('Test','Production')");
+
+                            t.HasCheckConstraint("CK_RegistryConfigurations_Source", "[Source] IN ('GUS','MF','VIES')");
+
+                            t.HasCheckConstraint("CK_RegistryConfigurations_Wl2", "([Source]='MF' AND [TestWl2Url] IS NOT NULL AND [ProductionWl2Url] IS NOT NULL) OR ([Source]<>'MF' AND [TestWl2Url] IS NULL AND [ProductionWl2Url] IS NULL)");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Source = "GUS",
+                            Environment = "Test",
+                            ProductionUrl = "https://wyszukiwarkaregon.stat.gov.pl/wsBIR/UslugaBIRzewnPubl.svc",
+                            RowVersion = new byte[0],
+                            TestUrl = "https://wyszukiwarkaregontest.stat.gov.pl/wsBIR/UslugaBIRzewnPubl.svc"
+                        },
+                        new
+                        {
+                            Source = "MF",
+                            Environment = "Test",
+                            ProductionUrl = "https://wykazpodatnikowvat.mf.gov.pl/api/",
+                            ProductionWl2Url = "https://wykazpodatnikowvat.mf.gov.pl/api2/",
+                            RowVersion = new byte[0],
+                            TestUrl = "https://wykazpodatnikowvat-test.mf.gov.pl/api/",
+                            TestWl2Url = "https://wykazpodatnikowvat-test.mf.gov.pl/api2/"
+                        },
+                        new
+                        {
+                            Source = "VIES",
+                            Environment = "Test",
+                            ProductionUrl = "https://ec.europa.eu/taxation_customs/vies/services/checkVatService",
+                            RowVersion = new byte[0],
+                            TestUrl = "https://ec.europa.eu/taxation_customs/vies/test-services/checkVatTestService"
+                        });
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.RegistryConfigurationChange", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ActorIssuerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActorName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("AfterJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("BeforeJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("varchar(4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Source", "OccurredAtUtc");
+
+                    b.ToTable("RegistryConfigurationChanges", "audit", t =>
+                        {
+                            t.HasTrigger("TR_RegistryConfigurationChanges_Immutable");
+                        });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
                 });
 
             modelBuilder.Entity("Vatowiec.Core.Domain.TaxIdentifierScheme", b =>

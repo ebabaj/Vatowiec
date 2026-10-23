@@ -5,12 +5,21 @@ Projekt wielostanowiskowej aplikacji dla polskich mikrofirm. Obecny stan to
 wybór firmy, dodawanie/edycja z audytem i konfliktami oraz wyszukiwanie po stronie serwera.
 Osobne SystemDbContext i CompanyDbContext, trzy bazy SQL
 Server oraz dwie fikcyjne firmy. Działają Identity, sesje API i autoryzowany resolver
-bazy firmy. Etap VAT UE ADR-027: **285/285 wykonanych testów**,
-282 bez SQL i 3 niedestrukcyjne SQL/API. Dawnych 103 SQL/API z resetującym fixture
+bazy firmy. Ustawienia rejestrów ADR-029: **335/335 wykonanych testów**,
+330 bez SQL i 5 niedestrukcyjnych SQL/API. Dawnych 103 SQL/API z resetującym fixture
 nie uruchamiano, aby zachować dane. Kompilacja bez ostrzeżeń i błędów.
 Nie jest to jeszcze program do prowadzenia księgowości.
 
-**Aktualny etap: urzędowe reguły VAT UE (ADR-027).** Format BE ograniczony do
+**Aktualny etap: ustawienia GUS/MF/VIES w Avalonia (ADR-029).**
+Administrator instalacji wybiera TEST/PRODUKCJA i oficjalne URL obu środowisk
+w Ustawieniach instalacji → Integracje zewnętrzne; MF ma także osobne URL WL2.
+Publiczna konfiguracja jest w System, z rowversion i trwałym audytem. Zapis działa
+bez restartu API i bez user-secrets. Domyślnie TEST; PRODUKCJA wymaga jawnego
+potwierdzenia. Wspólny klucz GUS nadal jest szyfrowany DPAPI/Data Protection.
+MF/VIES/DataPort pozostają niezależne. Nie wykonano
+zapytań produkcyjnych. [Rola administratora, konfiguracja i ręczne próby](docs/production-registries.md).
+
+Urzędowe reguły VAT UE (ADR-027): format BE ograniczony do
 pierwszej cyfry 0/1, nowe sumy FI/HR, pozostałe 25 prefiksów format-only / Unknown.
 Zachowano krajowy PL NIP, EL/XI, API, UI, ostrzeżenia i historię reguł. Nowe wersje
 od 23.10.2026; bez czyszczenia kont i baz. [Źródła, porównanie i testy](docs/tax-rules/vat-eu-2026-10-23.md).

@@ -26,6 +26,11 @@ public interface IVatowiecApiClient : IDisposable
     Task<ContractorResponse[]> ParentCandidates(Guid companyId, string search, int excludeId, int offset = 0) => Task.FromResult<ContractorResponse[]>([]);
     Task<ContractorResponse[]> Children(Guid companyId, int parentId, int offset = 0) => Task.FromResult<ContractorResponse[]>([]);
     Task Logout();
+    Task<GusConfigurationResponse> GusConfiguration() => throw new NotSupportedException();
+    Task<RegistryConfigurationResponse[]> RegistryConfigurations() => Task.FromResult<RegistryConfigurationResponse[]>([]);
+    Task<RegistryConfigurationResponse> SaveRegistryConfiguration(string source, RegistryConfigurationRequest value) => throw new NotSupportedException();
+    Task<GusConfigurationResponse> SaveGusKey(SaveGusKeyRequest value) => throw new NotSupportedException();
+    Task<GusConfigurationResponse> DeleteGusKey(DeleteGusKeyRequest value) => throw new NotSupportedException();
     Task<CurrencyResponse[]> Currencies(Guid companyId) => throw new NotSupportedException();
     Task<CurrencyResponse> SaveCurrency(Guid companyId, string currencyCode, CurrencyWriteRequest value) => throw new NotSupportedException();
     Task<RatePage> Rates(Guid companyId, string? code, string? table, DateOnly? from, DateOnly? to, int offset, bool descending) => throw new NotSupportedException();
@@ -95,6 +100,19 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
     }
 
     public Task<CompanyResponse[]> Companies() => Get<CompanyResponse[]>("api/v1/companies");
+    public Task<GusConfigurationResponse> GusConfiguration() => Get<GusConfigurationResponse>("api/v1/installation/integrations/gus");
+    public Task<RegistryConfigurationResponse[]> RegistryConfigurations() => Get<RegistryConfigurationResponse[]>("api/v1/installation/integrations/registries");
+    public Task<RegistryConfigurationResponse> SaveRegistryConfiguration(string source, RegistryConfigurationRequest value) =>
+        Write<RegistryConfigurationResponse>($"api/v1/installation/integrations/registries/{Uri.EscapeDataString(source)}", value, true);
+    public Task<GusConfigurationResponse> SaveGusKey(SaveGusKeyRequest value) => GusWrite(value, HttpMethod.Put);
+    public Task<GusConfigurationResponse> DeleteGusKey(DeleteGusKeyRequest value) => GusWrite(value, HttpMethod.Delete);
+    private async Task<GusConfigurationResponse> GusWrite(object value, HttpMethod method)
+    {
+        var csrf = await Get<CsrfResponse>("api/v1/auth/csrf");
+        using var request = new HttpRequestMessage(method, "api/v1/installation/integrations/gus") { Content = JsonContent.Create(value) };
+        request.Headers.Add("X-CSRF-TOKEN", csrf.Token);
+        return await Send<GusConfigurationResponse>(request);
+    }
     public Task<CurrencyResponse[]> Currencies(Guid companyId) => Get<CurrencyResponse[]>($"api/v1/companies/{companyId}/currencies");
     public Task<CurrencyResponse> SaveCurrency(Guid companyId, string currencyCode, CurrencyWriteRequest value) => Write<CurrencyResponse>($"api/v1/companies/{companyId}/currencies/{Uri.EscapeDataString(currencyCode)}", value, true);
     public Task<RatePage> Rates(Guid companyId, string? code, string? table, DateOnly? from, DateOnly? to, int offset, bool descending)
@@ -216,12 +234,14 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         var message = response.StatusCode switch
         {
             _ when error?.Code?.StartsWith("currency_", StringComparison.Ordinal) == true => error.Message ?? "Sprawdź ustawienia, daty i aktualną wersję danych walutowych.",
-            HttpStatusCode.Conflict when error?.Code == "configuration_stale" => "Ustawienia zmieniły się. Odśwież stan DataPort i ponownie wpisz klucz.",
+            HttpStatusCode.Conflict when error?.Code == "configuration_stale" => error.Message ?? "Ustawienia zmieniły się. Odśwież stan i ponownie sprawdź wartości.",
             HttpStatusCode.BadRequest when error?.Code is "dataport_key_invalid" or "confirmation_required" => error.Message ?? "Sprawdź konfigurację DataPort.",
             HttpStatusCode.BadRequest when error?.Code is "verification_unsupported" or "verification_invalid" or "verification_date" => error.Message ?? "Sprawdź dane wejściowe weryfikacji.",
             HttpStatusCode.Conflict when error?.Code == "verification_stale" => "Dane zmieniły się. Otwórz aktualną wersję przed sprawdzeniem rejestru.",
             HttpStatusCode.ServiceUnavailable when error?.Code == "verification_history_failed" => "Nie zapisano historii odpowiedzi. Wynik nie został potwierdzony w VATowcu.",
             HttpStatusCode.ServiceUnavailable when error?.Code == "key_protection_unavailable" => "Serwer nie może trwale zabezpieczyć klucza. Sprawdź konfigurację kryptograficzną serwera.",
+            HttpStatusCode.BadRequest when error?.Code == "production_confirmation_required" => error.Message ?? "Potwierdź świadome włączenie PRODUKCJI.",
+            HttpStatusCode.ServiceUnavailable when error?.Code is "configuration_audit_failed" or "registry_configuration_missing" => error.Message ?? "Nie zapisano konfiguracji rejestru.",
             HttpStatusCode.Unauthorized when login => "Nieprawidłowy login lub hasło albo konto jest zablokowane.",
             HttpStatusCode.Unauthorized => "Sesja wygasła lub została unieważniona. Zaloguj się ponownie.",
             HttpStatusCode.Forbidden => "Brak uprawnień do firmy lub kartoteki kontrahentów.",

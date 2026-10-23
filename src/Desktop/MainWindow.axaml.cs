@@ -16,6 +16,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = model;
         model.PropertyChanged += (_, _) => { if (!model.IsDataPortSettings) DataPortKeyInput.Text = ""; };
+        model.PropertyChanged += (_, _) => { if (!model.IsGusSettings || !model.IsGusServiceSelected || model.IsBusy) GusKeyInput.Text = ""; };
         expiryTimer.Tick += (_, _) => model.CheckExpiry();
         expiryTimer.Start();
         Closed += (_, _) => { expiryTimer.Stop(); model.Dispose(); };
@@ -77,6 +78,24 @@ public partial class MainWindow : Window
     private async void GusClick(object? sender, RoutedEventArgs e) => await model.VerifyRegistry("Gus");
     private async void DataPortClick(object? sender, RoutedEventArgs e) => await model.VerifyRegistry("DataPort");
     private async void DataPortSettingsClick(object? sender, RoutedEventArgs e) => await model.OpenDataPortSettings();
+    private async void GusSettingsClick(object? sender, RoutedEventArgs e) => await model.OpenGusSettings();
+    private async void SaveRegistrySettingsClick(object? sender, RoutedEventArgs e) => await model.SaveRegistryConfiguration();
+    private async void RefreshRegistrySettingsClick(object? sender, RoutedEventArgs e) => await model.RefreshRegistryConfigurations();
+    private async void SaveGusKeyClick(object? sender, RoutedEventArgs e)
+    {
+        var key = GusKeyInput.Text ?? ""; GusKeyInput.Text = "";
+        await model.SaveGusKey(key);
+    }
+    private async void RefreshGusStatusClick(object? sender, RoutedEventArgs e) { GusKeyInput.Text = ""; await model.RefreshGusStatus(); }
+    private void RequestGusDeleteClick(object? sender, RoutedEventArgs e) { GusKeyInput.Text = ""; model.RequestGusDelete(); }
+    private async void DeleteGusKeyClick(object? sender, RoutedEventArgs e) => await model.DeleteGusKey();
+    private void CancelGusDeleteClick(object? sender, RoutedEventArgs e) => model.CancelGusDelete();
+    private void CloseGusSettingsClick(object? sender, RoutedEventArgs e) => model.CloseGusSettings();
+    private void GusWebsiteClick(object? sender, RoutedEventArgs e)
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://api.stat.gov.pl/Home/RegonApi") { UseShellExecute = true }); }
+        catch (System.ComponentModel.Win32Exception) { }
+    }
     private async void CurrenciesClick(object? sender, RoutedEventArgs e) => await model.OpenCurrencies();
     private async void CurrencySettingsClick(object? sender, RoutedEventArgs e) => await model.OpenCurrencies(true);
     private void CurrencyRatesTabClick(object? sender, RoutedEventArgs e) => model.ShowCurrencySettings(false);

@@ -472,7 +472,7 @@ internal static class LocalDatabases
         await using var system = SystemContext(SystemDatabase);
         await ShowSchema(system, SystemDatabase, ["core.Companies", "core.CompanyDatabases", "dbo.__EFMigrationsHistory",
             "security.Users", "security.Roles", "security.UserRoles", "security.UserClaims", "security.UserLogins",
-            "security.UserTokens", "security.RoleClaims", "security.CompanyAccess", "security.UserSessions", "security.Installation", "ref.TaxIdentifierSchemes"], "_OfficialVatEuRules");
+            "security.UserTokens", "security.RoleClaims", "security.CompanyAccess", "security.UserSessions", "security.Installation", "security.GusConfiguration", "security.RegistryConfigurations", "audit.RegistryConfigurationChanges", "ref.TaxIdentifierSchemes"], "_InstallationRegistrySettings");
         if (await system.InstallationIdentities.CountAsync() != 1 || (await system.InstallationIdentities.SingleAsync()).Id == Guid.Empty)
             throw new InvalidOperationException("Brak trwałej identyfikacji instalacji.");
         if (await system.Companies.CountAsync() != 2 || await system.CompanyDatabases.CountAsync() != 2)
@@ -553,6 +553,30 @@ internal static class LocalDatabases
 
     public static async Task BackupSystem()
         => await Backup(SystemDatabase);
+
+    public static async Task GrantInstallationAdministrator(string login)
+    {
+        await CheckOwnership(SystemDatabase);
+        await using var system = SystemContext(SystemDatabase);
+        await CheckKnownHistory(system);
+        if ((await system.Database.GetPendingMigrationsAsync()).Any()) throw new InvalidOperationException("Najpierw wykonaj jawną migrację System.");
+        var services = new ServiceCollection().AddLogging().AddSingleton(system);
+        services.AddVatowiecIdentity();
+        await using var provider = services.BuildServiceProvider();
+        var users = provider.GetRequiredService<UserManager<ApplicationUser>>();
+        var roles = provider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
+        var user = await users.FindByNameAsync(login) ?? throw new InvalidOperationException("Nie znaleziono wskazanego istniejącego konta.");
+        await using var transaction = await system.Database.BeginTransactionAsync();
+        if (!await roles.RoleExistsAsync(InstallationRoles.Administrator))
+            Ensure(await roles.CreateAsync(new IdentityRole<Guid>(InstallationRoles.Administrator) { Id = Guid.NewGuid() }));
+        if (!await users.IsInRoleAsync(user, InstallationRoles.Administrator))
+        {
+            Ensure(await users.AddToRoleAsync(user, InstallationRoles.Administrator));
+            Ensure(await users.UpdateSecurityStampAsync(user));
+        }
+        await transaction.CommitAsync();
+        Console.WriteLine($"Nadano centralną rolę administratora instalacji kontu {user.UserName}. Zaloguj się ponownie. Uprawnienia firm bez zmian.");
+    }
 
     private static async Task Backup(string database)
     {

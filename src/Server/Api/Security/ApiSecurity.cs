@@ -23,6 +23,7 @@ public static class ApiSecurity
         services.AddVatowiecIdentity();
         services.AddScoped<CompanyDatabaseResolver>();
         services.AddSingleton<DummyPassword>();
+        services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, InstallationAdministratorHandler>();
         services.AddAuthentication(IdentityConstants.ApplicationScheme).AddCookie(IdentityConstants.ApplicationScheme, options =>
         {
             options.Cookie.Name = "__Host-Vatowiec.Session";
@@ -38,8 +39,11 @@ public static class ApiSecurity
         });
         services.AddOptions<CookieAuthenticationOptions>(IdentityConstants.ApplicationScheme)
             .Configure<TimeProvider>((options, clock) => options.TimeProvider = clock);
-        services.AddAuthorization(options => options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
-            .RequireAuthenticatedUser().Build());
+        services.AddAuthorization(options =>
+        {
+            options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+            options.AddPolicy(InstallationAdministration.Policy, policy => policy.RequireAuthenticatedUser().AddRequirements(new InstallationAdministratorRequirement()));
+        });
         services.AddAntiforgery(options =>
         {
             options.HeaderName = CsrfHeader;

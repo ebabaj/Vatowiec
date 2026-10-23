@@ -16,10 +16,24 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<InstallationIdentity> InstallationIdentities => Set<InstallationIdentity>();
     public DbSet<TaxIdentifierScheme> TaxIdentifierSchemes => Set<TaxIdentifierScheme>();
+    public DbSet<GusConfiguration> GusConfigurations => Set<GusConfiguration>();
+    public DbSet<RegistryConfiguration> RegistryConfigurations => Set<RegistryConfiguration>();
+    public DbSet<RegistryConfigurationChange> RegistryConfigurationChanges => Set<RegistryConfigurationChange>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.ApplyConfiguration(new RegistryConfigurationMapping());
+        modelBuilder.ApplyConfiguration(new RegistryConfigurationChangeMapping());
+        modelBuilder.Entity<GusConfiguration>(entity =>
+        {
+            entity.ToTable("GusConfiguration", "security", table =>
+                table.HasCheckConstraint("CK_GusConfiguration_Singleton", "[SingletonKey] = 1"));
+            entity.HasKey(x => x.SingletonKey);
+            entity.Property(x => x.SingletonKey).ValueGeneratedNever();
+            entity.Property(x => x.ProtectedApiKey).HasMaxLength(8192);
+            entity.Property(x => x.RowVersion).IsRowVersion();
+        });
         modelBuilder.Entity<TaxIdentifierScheme>(b =>
         {
             b.ToTable("TaxIdentifierSchemes", "ref", t => t.HasCheckConstraint("CK_TaxIdentifierSchemes_Dates", "[ValidTo] IS NULL OR [ValidTo]>=[ValidFrom]"));
@@ -61,6 +75,7 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
+        ProtectRegistryAudit();
         TrackedChanges.Prepare(this);
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
@@ -68,7 +83,13 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
     public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken = default)
     {
+        ProtectRegistryAudit();
         TrackedChanges.Prepare(this);
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+    private void ProtectRegistryAudit()
+    {
+        if (ChangeTracker.Entries<RegistryConfigurationChange>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Audyt konfiguracji rejestrów jest niezmienny.");
     }
 }

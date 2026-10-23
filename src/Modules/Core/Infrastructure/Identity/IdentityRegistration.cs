@@ -5,6 +5,11 @@ using Vatowiec.Core.Infrastructure.Persistence;
 
 namespace Vatowiec.Core.Infrastructure.Identity;
 
+public static class InstallationRoles
+{
+    public const string Administrator = "InstallationAdministrator";
+}
+
 public static class IdentityRegistration
 {
     public static IdentityBuilder AddVatowiecIdentity(this IServiceCollection services)

@@ -2,14 +2,15 @@
 
 Projekt: **Otwarty następca VATowca** (nazwa robocza).  
 Główne źródło wymagań: [`SPECYFIKACJA.md`](./SPECYFIKACJA.md).  
-Status: urzędowe reguły VAT UE, 2026-10-23; ADR-027.
+Status: centralna konfiguracja GUS/MF/VIES przez Avalonia, 2026-10-23; ADR-029.
 
-**Aktualny etap: wersjonowana aktualizacja VAT UE (ADR-027).**
+**Aktualny etap: ustawienia rejestrów w instalacji (ADR-029).**
 W tym zadaniu zachowujemy wszystkie istniejące dane, konta i tabele System:
 nie uruchamiaj resetującego runnera `DatabaseTools test` ani jego fixture.
-Używaj osobnych niedestrukcyjnych OfficialVatRulesSqlTests po jawnej migracji
+Używaj niedestrukcyjnych OfficialVatRulesSqlTests/GusConfigurationSqlTests/RegistrySettingsSqlTests po jawnej migracji
 i backupie. Jest to ograniczenie bieżące, nadrzędne wobec historycznych zgód
-na reset demonstratora poniżej. Nie zmieniamy UI ani innych integracji.
+na reset demonstratora poniżej. Rozszerzamy istniejące adaptery i ustawienia Avalonia;
+nie wykonujemy automatycznych zapytań produkcyjnych ani konfiguracji klucza za użytkownika.
 Użytkownik zakończył etap dokumentacyjny. Można odtwarzać wyłącznie lokalne
 Vatowiec_System, Vatowiec_Company_A_Dev i Vatowiec_Company_B_Dev po kontroli
 instancji, dokładnych nazw, znaczników i fikcyjnego przeznaczenia danych.
@@ -18,8 +19,15 @@ Nie migruj dawnych GUID ani danych demonstracyjnych. Nie modyfikuj innych baz.
 techniczne; [ADR-018](docs/adr/ADR-018-docelowy-model-kontrahentow.md) pozostaje
 źródłem decyzji biznesowych. ADR-020 obejmuje cztery zakładki i pełne szczegóły.
 ADR-021 dodaje edycję identyfikatorów, wersjonowane reguły SQL i zakładkę Weryfikacje.
-MF/GUS/VIES domyślnie Test; bieżące próby wyłącznie Test/Mock. Nie włączaj produkcji
-ani nie pytaj produkcyjnych rejestrów w testach. KSeF pozostaje poza zakresem
+MF/GUS/VIES domyślnie Test. ADR-029 zastępuje publiczne nastawy user-secrets
+centralnym security.RegistryConfigurations i konfiguracją Avalonia. Production
+wymaga jawnego potwierdzenia administratora instalacji, nie lokalnej flagi.
+Ustawienia i trwały audit.RegistryConfigurationChanges zapisuj atomowo.
+Nowe żądanie czyta świeży, scoped snapshot z DB; pojedyncza operacja zachowuje
+spójny tryb, URL i środowisko historii bez restartu API. Nie kasuj zastanych
+sekretów ani plików konfiguracji; stare publiczne Registries:* nie sterują
+normalnym serwerem. Automatyczne testy HTTP wyłącznie na atrapach,
+bez zapytań produkcyjnych. Ręczne próby wykona użytkownik. KSeF pozostaje poza zakresem
 poza lokalną kontrolą formatu IDWew. ADR-022 dodaje osobny rzeczywisty DataPort,
 z kluczem każdej firmy szyfrowanym DPAPI/Data Protection poza repozytorium/bazą.
 Nie zmienia trybu oficjalnych adapterów. DataPort odpytuj tylko ręcznie po wpisaniu
@@ -75,7 +83,7 @@ Wielostanowiskową aplikację księgowo-podatkową dla polskich mikrofirm: **KPi
 - Walidacja jest wersjonowana przez ref.TaxIdentifierSchemes w SystemDbContext, bez danych kontrahentów. Application/API sprawdza formaty VAT UE 27 państw i XI oraz NIP mod 11 dla PL. ADR-027 dodaje wyłącznie dla VatEuId sumy FI i HR oraz format BE zaczynający się od 0/1. Pozostałe 25 prefiksów pozostaje format-only-v1 / Unknown. Zagraniczne krajowe TaxId pozostają Unknown; nie stosuj do nich automatycznie algorytmów VAT UE. Poprawny format/suma nie potwierdza nadania lub rejestracji. Zachowuj poprzednie wersje, źródła i okresy; nie usuwaj historii przy downgrade. Źródła i wzorce: docs/tax-rules/vat-eu-2026-10-23.md, ADR-021/027. Bez podatkowych CHECK. „Użytkownik ma zawsze rację”: AcceptWarnings umożliwia świadomy zapis bez uzasadnienia, z atomowym audytem, ale nie obchodzi praw, integralności, rowversion i kontraktów usług zewnętrznych.
 - Tworzenie kontrahenta ma niewidoczną dla użytkownika idempotencję operacji, niezależną od int Id: trwały wynik powiązany z kluczem żądania, chroniony przed równoległym wykonaniem i zapisany atomowo z kartoteką oraz audytem. Utrata odpowiedzi i ponowienie nie mogą utworzyć drugiego rekordu. Przebieg opisuje ADR-018; nie wymaga GUID jako klucza głównego, map starych GUID ani migracji fikcyjnych danych.
 - Zachowaj rozdzielenie ContractorChanges i wdrożonego audit.ExternalVerifications w bazie firmy. Druga historia jest niezmienna (kontekst i trigger), zawiera snapshot faktycznego wejścia, środowisko Test/Production/Mock, status/wynik, referencję, wersje i trwałego aktora bez centralnego FK. Nie zapisuj całych odpowiedzi, SID ani sekretów. Nowe sprawdzenie nie edytuje kontrahenta. Niedostępność nie jest negatywnym wynikiem. TEST/MOCK nie są urzędowym potwierdzeniem produkcyjnym; nie przepisuj ich środowiska. GUS przenosi tylko wybrane wartości do szkicu, nigdy automatycznie nie zapisuje danych.
-- Rejestry wymagają osobnego firmowego VerifyRegistries (16), ViewContractors i CSRF. Endpointy są ograniczone do oficjalnej allowlisty, bez przekierowań/fallbacku i dowolnego URL klienta. Production wymaga świadomej konfiguracji oraz AllowProduction; teraz stosujemy wyłącznie Test/Mock. GUS używa publicznego klucza testowego tylko na testowym hoście, bez potrzeby produkcyjnego klucza. Timeout 12 s, brak automatycznych ponowień, ograniczenie częstotliwości. Rzeczywiste próby TEST uruchamia osobne probe-registries; automatyczne testy używają atrap.
+- Rejestry wymagają osobnego firmowego VerifyRegistries (16), ViewContractors i CSRF. Endpointy są ograniczone do oficjalnej allowlisty, bez przekierowań/fallbacku i dowolnego URL klienta. Production wymaga świadomego potwierdzenia w Ustawieniach instalacji przez InstallationAdministrator (ADR-029); nowe rekordy security.RegistryConfigurations domyślnie Test. Tryby i URL obu środowisk należą wyłącznie do System, z osobnymi adresami MF WL2. API waliduje także nieaktywne URL, wymaga CSRF i rowversion oraz atomowego, niezmiennego audytu; nie używaj user-secrets/klucza firmowego do normalnej konfiguracji publicznych nastaw. Nie zmieniaj trybu w trakcie operacji ani nie stosuj cache procesu. GUS używa publicznego klucza wyłącznie w Test. Produkcyjny klucz jest JEDEN dla całej instalacji: security.GusConfiguration w System, szyfrowany Data Protection + DPAPI z osobnym purpose/ringiem i Installation.Id. Nie kopiuj go do baz firm, nie używaj Registries:GUS:ApiKey, nie zmieniaj ochrony DataPort. Ustawienia instalacji wymagają centralnej roli InstallationAdministrator sprawdzanej w DB przy każdym żądaniu, CSRF/rowversion i potwierdzenia usunięcia. Zmiana klucza pozostawia trwały audyt wyłącznie metadanych obecności/rodzaju operacji; bez klucza, szyfrogramu ani skrótu. ManageCompanyIntegrations nie nadaje tego prawa, rola nie zastępuje CompanyAccess; nadanie pierwszej roli wyłącznie jawne lokalne grant-installation-admin <login>. Brak/utrata sekretu oznacza NotConfigured bez fallbacku i bez blokowania MF/VIES/DataPort. Timeout 12 s, bez ponowień, wspólna bramka GUS obejmuje całą sesję i wszystkie firmy, z 2 s przerwy po zakończeniu. Jeden aktywny proces API; wiele replik wymaga wspólnego budżetu. Automatyczne HTTP wyłącznie na atrapach; produkcyjne próby wykonuje ręcznie użytkownik. Instrukcja: docs/production-registries.md.
 - Logika domenowa nie może zależeć od Avalonia, HTTP, EF Core ani T-SQL.
 - Nie dodawaj mikrousług, event sourcingu ani nowego frameworka tylko ze względu na modę. Uzasadnij zmiany architektoniczne w ADR.
 

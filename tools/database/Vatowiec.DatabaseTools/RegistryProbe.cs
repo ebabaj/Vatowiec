@@ -17,6 +17,7 @@ internal static class RegistryProbe
             ["Registries:AllowProduction"] = "false"
         }).Build();
         var services = new ServiceCollection(); services.AddSingleton<IConfiguration>(configuration); services.AddRegistryAdapters();
+        services.AddSingleton(new RegistrySettings(configuration)); // Explicit Test probe; never installation settings.
         using var provider = services.BuildServiceProvider(); using var scope = provider.CreateScope();
         var adapter = scope.ServiceProvider.GetRequiredService<IRegistryAdapters>();
         (string Op, string? Nip, string? Vat, string? Account)[] probes = [

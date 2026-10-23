@@ -47,6 +47,7 @@
         <ListBox Grid.Row="2" ItemsSource="{Binding Companies}" SelectedItem="{Binding SelectedCompany, Mode=TwoWay}"
                  AutomationProperties.AutomationId="Companies" MinHeight="120" />
         <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="10">
+          <Button Content="Ustawienia instalacji" Click="GusSettingsClick" IsVisible="{Binding IsInstallationAdministrator}" IsEnabled="{Binding CanOpenGusSettings}" AutomationProperties.AutomationId="InstallationSettingsSelection"/>
           <Button Content="Otwórz firmę" Click="OpenCompanyClick" AutomationProperties.AutomationId="OpenCompany" />
           <Button Content="Odśwież listę" Click="RefreshCompaniesClick" />
           <Button Content="Wyloguj" Click="LogoutClick" AutomationProperties.AutomationId="LogoutSelection" />
@@ -56,12 +57,13 @@
       <Grid IsVisible="{Binding IsBrowsingWorkspace}" RowDefinitions="Auto,Auto,Auto,Auto,Auto,*" RowSpacing="14">
         <TextBlock Text="{Binding CurrentCompany}" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap"
                    AutomationProperties.AutomationId="CurrentCompany" />
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10">
+        <WrapPanel Grid.Row="1">
           <Button Content="Słowniki → Waluty i kursy NBP" Click="CurrenciesClick" IsVisible="{Binding CanViewRates}" AutomationProperties.AutomationId="OpenCurrencies"/><Button Content="Ustawienia firmy" Click="DataPortSettingsClick" AutomationProperties.AutomationId="CompanySettings"/><Button Content="Zmień firmę" Click="ChangeCompanyClick" AutomationProperties.AutomationId="ChangeCompany" />
+          <Button Content="Ustawienia instalacji" Click="GusSettingsClick" IsVisible="{Binding IsInstallationAdministrator}" IsEnabled="{Binding CanOpenGusSettings}" AutomationProperties.AutomationId="InstallationSettings"/>
           <Button Content="Wyloguj" Click="LogoutClick" AutomationProperties.AutomationId="LogoutWorkspace" />
           <Button Content="Nowy (Ctrl+N)" Click="NewContractorClick" IsVisible="{Binding CanEditContractors}" AutomationProperties.AutomationId="NewContractor" />
           <Button Content="Otwórz (F2)" Click="EditContractorClick" IsVisible="{Binding CanViewContractors}" AutomationProperties.AutomationId="EditContractor" />
-        </StackPanel>
+        </WrapPanel>
         <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
           <TextBlock Text="Kontrahenci" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
           <Button Grid.Column="1" Content="Pokaż kontrahentów / odśwież" Click="ContractorsClick"
@@ -173,6 +175,50 @@
           <Expander Header="Historia operacji walutowych"><StackPanel><WrapPanel><Button Content="Odśwież historię" Click="CurrencyHistoryClick"/><Button Content="Poprzednie" Click="PreviousCurrencyHistoryClick" IsEnabled="{Binding HasPreviousCurrencyHistory}"/><Button Content="Następne" Click="NextCurrencyHistoryClick" IsEnabled="{Binding HasNextCurrencyHistory}"/></WrapPanel><ListBox ItemsSource="{Binding CurrencyHistoryRows}" SelectedItem="{Binding SelectedCurrencyHistory, Mode=TwoWay}" MaxHeight="150" AutomationProperties.AutomationId="CurrencyHistory"/></StackPanel></Expander>
         </StackPanel></ScrollViewer>
       </Grid>
+      <ScrollViewer IsVisible="{Binding IsGusSettings}">
+        <StackPanel Spacing="12" MaxWidth="740" HorizontalAlignment="Left">
+          <TextBlock Text="Ustawienia instalacji → Integracje zewnętrzne" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>
+          <ComboBox SelectedIndex="{Binding RegistryServiceIndex, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.AutomationId="RegistryService">
+            <ComboBoxItem Content="GUS BIR1.2"/><ComboBoxItem Content="MF — wykaz VAT i WL2"/><ComboBoxItem Content="VIES"/>
+          </ComboBox>
+          <StackPanel DataContext="{Binding RegistrySettingsEditor}" x:DataType="vm:RegistryConfigurationEditor" Spacing="8">
+            <TextBlock Text="{Binding Name}" FontSize="20"/>
+            <TextBlock Text="Środowisko usługi"/>
+            <ComboBox SelectedIndex="{Binding SelectedEnvironment, Mode=TwoWay}" AutomationProperties.AutomationId="RegistryMode"><ComboBoxItem Content="TEST"/><ComboBoxItem Content="PRODUKCJA"/></ComboBox>
+            <TextBlock Text="Adres API — TEST"/><TextBox Text="{Binding TestUrl, Mode=TwoWay}" MaxLength="1024" AutomationProperties.AutomationId="RegistryTestUrl"/>
+            <TextBlock Text="Adres API — PRODUKCJA"/><TextBox Text="{Binding ProductionUrl, Mode=TwoWay}" MaxLength="1024" AutomationProperties.AutomationId="RegistryProductionUrl"/>
+            <StackPanel IsVisible="{Binding IsMf}" Spacing="8">
+              <TextBlock Text="Adres WL2 — TEST"/><TextBox Text="{Binding TestWl2Url, Mode=TwoWay}" MaxLength="1024" AutomationProperties.AutomationId="RegistryTestWl2Url"/>
+              <TextBlock Text="Adres WL2 — PRODUKCJA"/><TextBox Text="{Binding ProductionWl2Url, Mode=TwoWay}" MaxLength="1024" AutomationProperties.AutomationId="RegistryProductionWl2Url"/>
+            </StackPanel>
+            <CheckBox IsVisible="{Binding IsProduction}" IsChecked="{Binding ConfirmProduction, Mode=TwoWay}" AutomationProperties.AutomationId="ConfirmRegistryProduction">
+              <TextBlock Text="Świadomie zatwierdzam PRODUKCJĘ. Kolejne zapytania tej usługi będą kierowane do rzeczywistego rejestru." TextWrapping="Wrap"/>
+            </CheckBox>
+          </StackPanel>
+          <TextBlock Text="Dozwolone są wyłącznie oficjalne adresy HTTPS danej usługi i środowiska. Zapis nie odpytuje rejestru. Zmiana obowiązuje dla nowych żądań bez restartu API." TextWrapping="Wrap"/>
+          <WrapPanel><Button Content="Zapisz ustawienia usługi" Click="SaveRegistrySettingsClick" IsEnabled="{Binding CanSaveRegistryConfiguration}" AutomationProperties.AutomationId="SaveRegistrySettings"/><Button Content="Odśwież / porzuć zmiany ustawień" Click="RefreshRegistrySettingsClick" AutomationProperties.AutomationId="RefreshRegistrySettings"/></WrapPanel>
+          <StackPanel IsVisible="{Binding IsGusServiceSelected}" Spacing="12">
+          <TextBlock Text="GUS BIR — wspólny produkcyjny klucz API" FontSize="20"/>
+          <TextBlock Text="Jeden produkcyjny klucz GUS BIR1.2 dla całej instalacji i wszystkich jej firm. Administrator uzyskuje własny klucz; VATowiec nie udostępnia klucza autora. Zapis nie zmienia środowiska ani nie odpytuje rejestru." TextWrapping="Wrap"/>
+          <Button Content="https://api.stat.gov.pl/Home/RegonApi — jak uzyskać własny klucz" Click="GusWebsiteClick"/>
+          <TextBlock Text="{Binding GusEnvironment}" TextWrapping="Wrap" AutomationProperties.AutomationId="GusEnvironment"/>
+          <TextBlock Text="{Binding GusStatus}" FontSize="20" AutomationProperties.AutomationId="GusStatus"/>
+          <TextBlock Text="Nowy produkcyjny klucz GUS (zapisany sekret nie jest nigdy wyświetlany)" TextWrapping="Wrap"/>
+          <TextBox x:Name="GusKeyInput" PasswordChar="●" MaxLength="4096" IsEnabled="{Binding CanManageGus}" AutomationProperties.AutomationId="GusKey"/>
+          <WrapPanel>
+            <Button Content="Zapisz / zastąp klucz" Click="SaveGusKeyClick" IsEnabled="{Binding CanManageGus}" AutomationProperties.AutomationId="SaveGusKey"/>
+            <Button Content="Usuń klucz…" Click="RequestGusDeleteClick" IsEnabled="{Binding CanDeleteGusKey}" AutomationProperties.AutomationId="DeleteGusKey"/>
+            <Button Content="Odśwież stan" Click="RefreshGusStatusClick" AutomationProperties.AutomationId="RefreshGusStatus"/>
+          </WrapPanel>
+          <StackPanel IsVisible="{Binding ConfirmGusDelete}" Spacing="8">
+            <TextBlock Text="Czy usunąć wspólny klucz produkcyjny GUS? Dotyczy to wszystkich firm tej instalacji. MF, VIES i DataPort nadal działają niezależnie." TextWrapping="Wrap"/>
+            <WrapPanel><Button Content="Potwierdzam usunięcie" Click="DeleteGusKeyClick" AutomationProperties.AutomationId="ConfirmDeleteGusKey"/><Button Content="Anuluj" Click="CancelGusDeleteClick"/></WrapPanel>
+          </StackPanel>
+          <TextBlock Text="Po przeniesieniu instalacji lub utracie ochrony kryptograficznej wpisz klucz ponownie. Sama kopia bazy SQL nie wystarcza do odszyfrowania sekretu." TextWrapping="Wrap"/>
+          </StackPanel>
+          <WrapPanel><Button Content="Wróć" Click="CloseGusSettingsClick" AutomationProperties.AutomationId="CloseGusSettings"/><Button Content="Wyloguj" Click="LogoutClick"/></WrapPanel>
+        </StackPanel>
+      </ScrollViewer>
       <ScrollViewer IsVisible="{Binding IsDataPortSettings}">
         <StackPanel Spacing="12" MaxWidth="740" HorizontalAlignment="Left">
           <Button Content="Ustawienia firmy → Waluty i kursy NBP" Click="CurrencySettingsClick" IsVisible="{Binding CanViewRates}" AutomationProperties.AutomationId="CurrencySettings"/><TextBlock Text="Ustawienia firmy → Integracje zewnętrzne → DataPort" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>

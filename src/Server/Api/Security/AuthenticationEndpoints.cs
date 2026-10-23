@@ -60,7 +60,12 @@ public static class AuthenticationEndpoints
                 ExpiresUtc = session.ExpiresAtUtc
             });
             logger.LogInformation("Login succeeded: user {UserId}, session {SessionId}; correlation {CorrelationId}", user.Id, session.Id, context.TraceIdentifier);
-            return Results.Ok(new { userName = user.UserName, expiresAtUtc = session.ExpiresAtUtc });
+            return Results.Ok(new
+            {
+                userName = user.UserName,
+                expiresAtUtc = session.ExpiresAtUtc,
+                isInstallationAdministrator = await InstallationAdministration.IsAdministrator(system, user.Id, context.RequestAborted)
+            });
         }).AllowAnonymous().RequireRateLimiting("login");
 
         group.MapPost("/logout", async (HttpContext context, IAntiforgery csrf, SystemDbContext system, TimeProvider clock, ILoggerFactory loggers) =>
@@ -82,7 +87,13 @@ public static class AuthenticationEndpoints
             var user = (await users.GetUserAsync(context.User))!;
             var sessionId = Guid.Parse(context.User.FindFirstValue(ApiSecurity.SessionClaim)!);
             var expiry = await system.UserSessions.Where(x => x.Id == sessionId).Select(x => x.ExpiresAtUtc).SingleAsync();
-            return Results.Ok(new { userName = user.UserName, roles = await users.GetRolesAsync(user), expiresAtUtc = expiry });
+            return Results.Ok(new
+            {
+                userName = user.UserName,
+                roles = await users.GetRolesAsync(user),
+                expiresAtUtc = expiry,
+                isInstallationAdministrator = await InstallationAdministration.IsAdministrator(system, user.Id, context.RequestAborted)
+            });
         }).RequireAuthorization();
     }
 

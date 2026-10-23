@@ -17,8 +17,8 @@ public sealed partial class MainViewModel
     public string FilterCountry { get; set; } = "";
     public int FilterActivity { get; set; }
     public bool CanEditContractors => CanViewContractors && selectedCompany?.CanEditContractors == true;
-    public bool CanBrowse => CanViewContractors && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen;
-    public bool IsBrowsingWorkspace => IsWorkspace && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen;
+    public bool CanBrowse => CanViewContractors && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !IsGusSettings;
+    public bool IsBrowsingWorkspace => IsWorkspace && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !IsGusSettings;
     public bool IsEditing => editor is not null;
     public bool CanSaveContractor => IsEditing && !HasConflict && CanEditContractors && DetailEditor is null;
     public bool HasConflict => conflictCurrent is not null;
@@ -40,7 +40,7 @@ public sealed partial class MainViewModel
 
     public void NewContractor()
     {
-        if (busy || !CanEditContractors || IsEditing || IsDataPortSettings || IsCurrencyScreen) return;
+        if (busy || !CanEditContractors || IsEditing || IsDataPortSettings || IsCurrencyScreen || IsGusSettings) return;
         editor = new ContractorEditor();
         ObserveIdentifierEdits();
         conflictCurrent = null;

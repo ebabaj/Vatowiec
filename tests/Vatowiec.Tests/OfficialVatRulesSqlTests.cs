@@ -64,7 +64,7 @@ public sealed class OfficialVatRulesSqlTests
         await using var system = System(); await VerifyLocalTarget(system);
         var stored = await system.TaxIdentifierSchemes.AsNoTracking().OrderBy(x => x.Id).ToArrayAsync();
         Assert.Equal(JsonSerializer.Serialize(TaxSchemeSeed.Rules().OrderBy(x => x.Id)), JsonSerializer.Serialize(stored));
-        Assert.Equal(8, (await system.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(10, (await system.Database.GetAppliedMigrationsAsync()).Count());
         foreach (var id in new[] { CompanyA, CompanyB })
         {
             await using var company = Company(id); await VerifyLocalTarget(company);
@@ -112,6 +112,7 @@ public sealed class OfficialVatRulesSqlTests
             builder.ConfigureServices(services =>
             {
                 services.AddSingleton<TimeProvider>(new DayClock(23));
+                services.AddScoped(_ => ProductionRegistryTests.Settings("Mock"));
                 services.AddDataProtection().UseEphemeralDataProtectionProvider();
             });
         });

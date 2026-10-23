@@ -145,12 +145,13 @@ public sealed class OfficialVatRulesTests
     {
         using var system = new SystemDbContextFactory().CreateDbContext([]);
         var migrations = system.Database.GetMigrations().ToArray();
+        var index = Array.FindIndex(migrations, x => x.EndsWith("_OfficialVatEuRules", StringComparison.Ordinal));
         var migrator = system.GetService<IMigrator>();
-        var script = migrator.GenerateScript(migrations[^2], migrations[^1]);
+        var script = migrator.GenerateScript(migrations[index - 1], migrations[index]);
         Assert.DoesNotContain("DELETE", script, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("DROP", script, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("[security]", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("[ref].[TaxIdentifierSchemes]", script);
-        Assert.Throws<NotSupportedException>(() => migrator.GenerateScript(migrations[^1], migrations[^2]));
+        Assert.Throws<NotSupportedException>(() => migrator.GenerateScript(migrations[index], migrations[index - 1]));
     }
 }

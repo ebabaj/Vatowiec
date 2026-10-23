@@ -1,6 +1,6 @@
 # Otwarty następca VATowca — specyfikacja produktu i architektury
 
-**Wersja dokumentu:** 0.15 (urzędowe reguły VAT UE, ADR-027)
+**Wersja dokumentu:** 0.17 (ustawienia rejestrów w instalacji, ADR-029)
 **Data:** 2026-10-23
 **Status:** projekt założeń; nie jest potwierdzeniem zgodności podatkowej gotowego oprogramowania  
 **Nazwa projektu:** robocza „Otwarty następca VATowca”; docelowa nazwa i użycie nazwy „VATowiec” wymagają odrębnej decyzji i sprawdzenia praw  
@@ -229,9 +229,9 @@ usługi i wynik, wersje, referencję oraz trwałą tożsamość wykonawcy bez ce
 Osobne VerifyRegistries=16 i CSRF chronią ręczne MF/WL2, GUS BIR1.2 i VIES.
 Nie ma automatycznego pobierania przy edycji ani nadpisywania danych GUS.
 
-Demonstrator używa wyłącznie TEST/MOCK. Serwer ogranicza adresy do oficjalnych
+Demonstrator domyślnie używa TEST/MOCK. Serwer ogranicza adresy do oficjalnych
 endpointów odpowiedniego środowiska; nie ma przekierowań ani fallbacku do produkcji.
-Produkcja wymaga późniejszej świadomej konfiguracji i AllowProduction. TEST/MOCK
+Produkcja wymaga świadomego potwierdzenia administratora w Avalonia (ADR-029). TEST/MOCK
 nie stanowią potwierdzeń produkcyjnych; historia nie jest konwertowana między
 środowiskami. Timeout, awaria i brak obsługi nie oznaczają wyniku negatywnego.
 Szczegóły, ograniczenia algorytmów i konfiguracja: [instrukcja](docs/identifiers-and-registries.md),
@@ -245,6 +245,40 @@ historia nie jest usuwana przy downgrade. Nowa reguła zmienia WarningHash
 i wymaga ponownego potwierdzenia ostrzeżenia. API i UI pozostają zgodne.
 [Porównanie 28 reguł, algorytmy, źródła i wyniki](docs/tax-rules/vat-eu-2026-10-23.md).
 W tym etapie testy SQL są niedestrukcyjne; nie stosujemy runnera czyszczącego dane.
+
+ADR-028 dodaje jedną centralną security.GusConfiguration (SingletonKey=1,
+ProtectedApiKey, RowVersion) i rolę InstallationAdministrator. Każda instalacja
+uzyskuje własny klucz GUS, wspólny dla wszystkich jej firm. Szyfrowanie ma osobny
+purpose/ring Data Protection + Windows DPAPI, związany z Installation.Id.
+Administrator wpisuje klucz w Avalonia: Ustawienia instalacji → Integracje
+zewnętrzne → GUS BIR, także przed wyborem firmy. Serwer odczytuje rolę z DB,
+sprawdza CSRF/rowversion i potwierdzenie usunięcia; nie zwraca sekretu/szyfrogramu.
+Brak ochrony po przeniesieniu instalacji wymaga ponownego wpisania klucza.
+Rola instalacji nie nadaje praw firmowych ani odwrotnie. Klucz GUS nie trafia
+do baz firm, DataPort zachowuje odrębne klucze i ochronę. MF/VIES bez kluczy.
+Brak jednego dostawcy nie blokuje pozostałych i nie wywołuje fallbacku.
+Domyślne Test oraz oznaczenia historii pozostają. Produkcyjne HTTP w testach
+zastępują atrapy, rzeczywiste próby wykonuje ręcznie użytkownik.
+[Konfiguracja, ochrona i instrukcja prób](docs/production-registries.md).
+
+ADR-029 zastępuje ręczne publiczne nastawy rejestrów przez centralne
+security.RegistryConfigurations: osobny tryb Test/Production i URL obu środowisk
+dla GUS/MF/VIES, dodatkowe dwa URL WL2 dla MF, rowversion. Nowa instalacja oraz
+aktualizacja dodają trzy rekordy Test, bez importowania dawnych nadpisań Production.
+Ustawienia instalacji → Integracje zewnętrzne w Avalonia pozwalają na zmianę
+przez InstallationAdministrator, z CSRF, rowversion i jawnym potwierdzeniem
+każdego zapisu Production. Serwer sprawdza HTTPS i dokładną oficjalną allowlistę
+hostów/ścieżek dla wszystkich URL, także nieaktywnych.
+Konfiguracja i audit.RegistryConfigurationChanges (wartości przed/po, trwały
+aktor z issuerem i historyczną nazwą, czas) zapisują się atomowo. Audyt jest
+niezmienny; zmiany klucza GUS zapisują wyłącznie metadane, nigdy sekret.
+Nowe żądanie odczytuje jeden scoped snapshot z DB, bez restartu API; trwająca
+operacja zachowuje tryb, adresy i właściwe środowisko historii. Publiczne nastawy
+user-secrets nie sterują normalnym serwerem, ale istniejących lokalnych plików
+ani sekretów nie usuwamy. Ochrona GUS, DataPort i firmowe prawa pozostają.
+Weryfikacja: build bez błędów/ostrzeżeń, 335/335 (330 bez SQL, 5 niedestrukcyjnych
+SQL/API), bez zapytań produkcyjnych i resetów. 103 starszych testów z resetującymi
+fixture nie uruchamiano. [Decyzja ADR-029](docs/adr/ADR-029-ustawienia-rejestrow-w-instalacji.md).
 
 ### 3.11. DataPort i konfiguracja integracji firmy (ADR-022)
 
@@ -587,7 +621,7 @@ Bez rekompilacji aplikacji użytkownik tworzy nową definicję formularza: wybie
 
 Model jest rozdzielony na bazę systemową i bazy firmowe. W modelu docelowym ADR-018 nie powielamy zbędnego `CompanyId` w tabelach danych wyłącznie jednej firmy. Tożsamość bazy oraz centralny katalog i autoryzacja nadal używają `CompanyId`. Rekordy mają identyfikatory, a tam, gdzie właściwe, daty i znacznik konkurencyjności. Poniższe nazwy są robocze poza elementami wyraźnie zatwierdzonymi w §8.3; model logiczny nie jest opisem wdrożenia.
 
-W `Vatowiec_System`: `Company` (katalog, nazwa wyświetlana, status), `CompanyDatabaseRegistration` (firma, serwer, baza, klucz serwerowego profilu połączenia), Identity `User`/`Role` i tabele towarzyszące, `CompanyAccess` oraz `UserSession`. Profil połączenia odsyła do konfiguracji/sekretów na serwerze; tabela nie zawiera haseł SQL. Identity przechowuje wyłącznie hashe haseł użytkowników. Trwały proces provisioningu i pełny audyt administracyjny pozostają kolejnymi etapami; rejestr sesji nie jest audytem księgowym.
+W `Vatowiec_System`: `Company` (katalog, nazwa wyświetlana, status), `CompanyDatabaseRegistration` (firma, serwer, baza, klucz serwerowego profilu połączenia), Identity `User`/`Role` i tabele towarzyszące, `CompanyAccess` oraz `UserSession`. Profil połączenia odsyła do konfiguracji/sekretów na serwerze; tabela nie zawiera haseł SQL. Identity przechowuje wyłącznie hashe haseł użytkowników. Wdrożono centralne ustawienia rejestrów i ich niezmienny audyt administracyjny (ADR-029). Trwały proces provisioningu i audyt pozostałych operacji administracyjnych pozostają kolejnymi etapami; rejestr sesji nie jest audytem księgowym.
 
 W bazie jednej firmy: `CompanyProfile`, kontrahenci i wszystkie encje księgowe poniżej. Centralne `Company.Name` jest etykietą katalogową; źródłem nazwy prawnej i NIP/REGON jest lokalny profil. Wdrożony profil ma PK `SingletonKey` z CHECK `= 1` i unikalny `CompanyId`, a tożsamość firmy weryfikuje resolver i dodatkowo kontekst przy zapisie. Contractors i pozostałe lokalne dane nie zawierają CompanyId; relacje wskazują lokalne int Id. ADR-019 opisuje wykonanie modelu ADR-018. Nie ma relacji SQL między bazami; zarejestrowane połączenie nadal trzeba zweryfikować względem rzeczywistego profilu i wersji schematu przed dopuszczeniem operacji.
 
@@ -607,6 +641,9 @@ Nie oznacza to przenoszenia firmowych adresów lub kontaktów do bazy systemowej
 | `audit.ContractorChanges` | wdrożony audyt SnapshotVersion=2 z RecordType, RecordId i WarningJson; atomowe wartości przed/po i trwały wykonawca; świadome odstępstwa rachunków i identyfikatorów ADR-021 |
 | `audit.ExternalVerifications` — wdrożone | niezmienne sprawdzenia zewnętrzne w bazie firmy, niezależne od edycji, snapshot wejścia, środowisko i trwały aktor; zakres informacji w §8.3 i ADR-021 |
 | `ref.TaxIdentifierSchemes` — wdrożone w System | państwo/typ/prefiks, regex, klucz algorytmu, wersja, okres, aktywność i URL źródła, bez danych kontrahentów |
+| `security.GusConfiguration` — wdrożone w System | singleton szyfrowanego produkcyjnego klucza GUS całej instalacji, rowversion, bez CompanyId; ADR-028 |
+| `security.RegistryConfigurations` — wdrożone w System | GUS/MF/VIES, tryb i oba zestawy oficjalnych URL, MF WL2, rowversion, domyślnie Test; ADR-029 |
+| `audit.RegistryConfigurationChanges` — wdrożone w System | niezmienne zmiany ustawień i bezsekretowe metadane operacji klucza GUS, trwały aktor, czas, przed/po; ADR-029 |
 | `Document` | `Id`, typ, numer/seria, kontrahent, daty, waluta, status, wersja, `SourceSystem`, `ExternalId`, `RowVersion`; kontekst bazy firmy |
 | `DocumentLine` | dokument, rodzaj towar/usługa, ilość, cena, podatki, kategorie, kwoty |
 | `DocumentCorrection` | dokument oryginalny / korygujący, powód i rodzaj korekty |
@@ -934,6 +971,8 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | [ADR-024](docs/adr/ADR-024-kod-iso-jako-klucz-waluty.md) | ISO 4217 jako jedyny identyfikator waluty | Code char(3) PK, CurrencyCode FK, brak numerycznego Id waluty; odtworzenie wyłącznie demonstracyjnego modułu walut i kursów |
 | [ADR-025](docs/adr/ADR-025-walidacja-rachunkow-ibannet.md) | Walidacja rachunków | IbanNet 6.2.0 za interfejsem Application, NRB/IBAN, wersjonowane potwierdzenie ostrzeżeń, wynik w Avalonia, licencja i kontrolowane aktualizacje |
 | [ADR-026](docs/adr/ADR-026-ewib-i-normalizacja-rachunkow.md) | Normalizacja i dane banku EWIB | Wspólne separatory, wersja v3, odrębny adapter NBP, bezpieczne propozycje nazwy/BIC tylko do szkicu, bez nowych tabel |
+| [ADR-028](docs/adr/ADR-028-centralny-klucz-gus-i-produkcja.md) | Centralny klucz GUS i produkcyjne adaptery | Wspólny sekret instalacji chroniony DPAPI/Data Protection, centralna rola, zachowane firmy i niezależność rejestrów; publiczną konfigurację zastępuje ADR-029 |
+| [ADR-029](docs/adr/ADR-029-ustawienia-rejestrow-w-instalacji.md) | Publiczna konfiguracja rejestrów w instalacji | Ustawienia TEST/PRODUKCJA i URL GUS/MF/VIES w System i Avalonia, jawne potwierdzenie, scoped snapshot bez restartu, niezmienny atomowy audyt |
 | [ADR-021](docs/adr/ADR-021-identyfikatory-i-rejestry-testowe.md) | Identyfikatory i rejestry TEST | Wersjonowane reguły, ostrzeżenia, osobna niezmienna historia i środowiska Test/Production/Mock; ręczne oficjalne MF/WL2, GUS BIR1.2 i VIES |
 | [ADR-020](docs/adr/ADR-020-kompletna-kartoteka-avalonia.md) | Kompletna kartoteka Avalonia | Cztery zakładki, grupy, CRUD szczegółów, typowany audyt, idempotencja, atomowe preferencje i osobne uprawnienie do ostrzeżeń rachunków; bez walidatorów podatkowych/integracji |
 | [ADR-019](docs/adr/ADR-019-implementacja-modelu-kontrahentow.md) | Implementacja podstawy kartoteki | int IDENTITY, zabezpieczona hierarchia, lokalne szczegóły, trwała idempotencja, audyt i odtworzenie trzech demonstracyjnych baz; bez walidatorów i nowych ekranów |

@@ -7,6 +7,8 @@ using System.Xml;
 using System.Xml.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
+using Vatowiec.Core.Infrastructure.Persistence;
 using Vatowiec.SharedContracts;
 
 namespace Vatowiec.Core.Infrastructure.Registries;
@@ -20,7 +22,7 @@ public interface IRegistryAdapters
     Task<RegistryReply> Execute(string operation, string? nip, string? vat, string? account, DateOnly date, CancellationToken cancellationToken);
 }
 
-public sealed class RegistrySettings(IConfiguration configuration)
+public sealed class RegistrySettings(IConfiguration configuration, bool requireStoredSource = false)
 {
     public const string MfTest = "https://wykazpodatnikowvat-test.mf.gov.pl/api/";
     public const string MfProduction = "https://wykazpodatnikowvat.mf.gov.pl/api/";
@@ -28,17 +30,44 @@ public sealed class RegistrySettings(IConfiguration configuration)
     public const string GusProduction = "https://wyszukiwarkaregon.stat.gov.pl/wsBIR/UslugaBIRzewnPubl.svc";
     public const string ViesTest = "https://ec.europa.eu/taxation_customs/vies/test-services/checkVatTestService";
     public const string ViesProduction = "https://ec.europa.eu/taxation_customs/vies/services/checkVatService";
+    public static RegistrySettings ReadDatabase(SystemDbContext system)
+        => FromRows(system.RegistryConfigurations.AsNoTracking().ToArray());
+    public static RegistrySettings FromRows(IEnumerable<Vatowiec.Core.Domain.RegistryConfiguration> rows)
+    {
+        // One SQL statement, copied into a private in-memory snapshot for this request.
+        // No user-secrets fallback and no shared mutable process cache.
+        var values = new Dictionary<string, string?>();
+        foreach (var row in rows)
+        {
+            values[$"Registries:{row.Source}:Environment"] = row.Environment;
+            values[$"Registries:{row.Source}:BaseUrl"] = row.Environment == "Production" ? row.ProductionUrl : row.TestUrl;
+            values[$"Registries:{row.Source}:Wl2Url"] = row.Environment == "Production" ? row.ProductionWl2Url : row.TestWl2Url;
+        }
+        return new(new ConfigurationBuilder().AddInMemoryCollection(values).Build(), requireStoredSource: true);
+    }
     public string Mode(string source)
     {
+        if (requireStoredSource && configuration[$"Registries:{source}:Environment"] == null)
+            throw new InvalidOperationException("Brak centralnej konfiguracji tej usługi. Nie wykonano zapytania.");
         var mode = configuration[$"Registries:{source}:Environment"] ?? "Test";
         if (mode is not ("Test" or "Production" or "Mock")) throw new InvalidOperationException("Nieznane środowisko adaptera.");
-        if (mode == "Production" && !configuration.GetValue<bool>("Registries:AllowProduction"))
+        // Legacy standalone test/probe construction retains its explicit safety gate.
+        // The running server uses the database mode, already confirmed and audited in UI.
+        if (!requireStoredSource && mode == "Production" && !configuration.GetValue<bool>("Registries:AllowProduction"))
             throw new InvalidOperationException("Produkcja rejestrów wymaga jawnego AllowProduction.");
         return mode;
     }
     public Uri Endpoint(string source, bool wl2 = false)
     {
         var mode = Mode(source);
+        var expected = OfficialUrl(source, mode, wl2);
+        var configured = configuration[$"Registries:{source}:{(wl2 ? "Wl2Url" : "BaseUrl")}"] ?? expected;
+        if (!IsAllowedUrl(source, mode, configured, wl2))
+            throw new InvalidOperationException("Adres nie pasuje do oficjalnej listy i środowiska adaptera.");
+        return new Uri(expected);
+    }
+    public static string OfficialUrl(string source, string mode, bool wl2 = false)
+    {
         var expected = source switch
         {
             "MF" => mode == "Production" ? MfProduction : MfTest,
@@ -47,12 +76,17 @@ public sealed class RegistrySettings(IConfiguration configuration)
             _ => throw new InvalidOperationException()
         };
         if (wl2) expected = expected.Replace("/api/", "/api2/");
-        var configured = configuration[$"Registries:{source}:{(wl2 ? "Wl2Url" : "BaseUrl")}"] ?? expected;
-        if (!Uri.TryCreate(configured, UriKind.Absolute, out var uri) || configured.TrimEnd('/') != expected.TrimEnd('/') || uri.AbsoluteUri.TrimEnd('/') != expected.TrimEnd('/'))
-            throw new InvalidOperationException("Adres nie pasuje do oficjalnej listy i środowiska adaptera.");
-        return uri;
+        return expected;
     }
-    public string GusKey => Mode("GUS") == "Test" ? "abcde12345abcde12345" : configuration["Registries:GUS:ApiKey"] ?? "";
+    public static bool IsAllowedUrl(string source, string mode, string? value, bool wl2 = false)
+    {
+        if (source is not ("GUS" or "MF" or "VIES") || mode is not ("Test" or "Production" or "Mock") || (wl2 && source != "MF")) return false;
+        var expected = OfficialUrl(source, mode, wl2);
+        return value?.Length <= 1024 && Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
+            uri.Scheme == "https" && uri.IsDefaultPort && uri.UserInfo.Length == 0 && uri.Query.Length == 0 && uri.Fragment.Length == 0 &&
+            value.TrimEnd('/') == expected.TrimEnd('/') && uri.AbsoluteUri.TrimEnd('/') == expected.TrimEnd('/');
+    }
+    public const string GusTestApiKey = "abcde12345abcde12345";
 }
 
 // Globalna bramka na proces ogranicza także równoległe żądania różnych użytkowników.
@@ -61,6 +95,7 @@ public sealed class RegistryThrottle
 {
     private readonly object sync = new();
     private readonly Dictionary<string, (DateTimeOffset At, DateOnly Day, int Count)> entries = [];
+    private bool gusInFlight;
     public bool TryEnter(string source, string environment, string operation, DateTimeOffset now)
     {
         lock (sync)
@@ -72,13 +107,23 @@ public sealed class RegistryThrottle
             var count = old.Day == day ? old.Count : 0;
             var limit = source == "MF" ? operation == "MfTaxpayer" ? 100 : operation == "MfStatus" ? 50000 : 5000 : 10000;
             var last = entries.Where(x => x.Key.StartsWith(prefix, StringComparison.Ordinal)).Select(x => x.Value.At).DefaultIfEmpty(DateTimeOffset.MinValue).Max();
-            if (now - last < TimeSpan.FromSeconds(2) || count >= limit) return false;
+            if (now - last < TimeSpan.FromSeconds(2) || count >= limit || (source == "GUS" && gusInFlight)) return false;
+            if (source == "GUS") gusInFlight = true;
             entries[key] = (now, day, count + 1); return true;
+        }
+    }
+    public void CompleteGus(string environment, DateTimeOffset now)
+    {
+        lock (sync)
+        {
+            gusInFlight = false;
+            var key = "GUS|" + environment + "|";
+            if (entries.TryGetValue(key, out var old)) entries[key] = (now, old.Day, old.Count);
         }
     }
 }
 
-public sealed class RegistryAdapters(IHttpClientFactory clients, RegistrySettings settings, RegistryThrottle throttle) : IRegistryAdapters
+public sealed class RegistryAdapters(IHttpClientFactory clients, RegistrySettings settings, RegistryThrottle throttle, IGusApiKeyProvider? gusKeys = null) : IRegistryAdapters
 {
     public static string Source(string operation) => operation switch
     { "DataPort" => "DataPort", "Vies" => "VIES", "Gus" => "GUS", "MfTaxpayer" or "MfAccount" or "MfStatus" => "MF", _ => throw new ArgumentException("Nieznana operacja.") };
@@ -86,7 +131,7 @@ public sealed class RegistryAdapters(IHttpClientFactory clients, RegistrySetting
     public async Task<RegistryReply> Execute(string operation, string? nip, string? vat, string? account, DateOnly date, CancellationToken cancellationToken)
     {
         var source = Source(operation); var mode = EnvironmentFor(operation);
-        var adapter = source switch { "MF" => "mf-1.6.1-v1", "GUS" => "bir1.2-v1", _ => "vies-soap-v1" };
+        var adapter = source switch { "MF" => "mf-1.6.1-v2", "GUS" => "bir1.2-v2", _ => "vies-soap-v1" };
         if (mode == "Mock") return new(mode, "Unknown", "Mock", null, "MOCK — lokalna atrapa, nie wykonano urzędowego sprawdzenia.", null,
             source == "GUS" ? new(Name: "Fikcyjny podmiot MOCK", Street: "Fikcyjna", BuildingNo: "1", City: "Miasto testowe", CountryCode: "PL") : new(), adapter, false);
         if (!throttle.TryEnter(source, mode, operation, DateTimeOffset.UtcNow))
@@ -107,6 +152,7 @@ public sealed class RegistryAdapters(IHttpClientFactory clients, RegistrySetting
         catch (HttpRequestException) { return Failure(mode, adapter, "Unavailable", "network", "Usługa zewnętrzna niedostępna; nie jest to wynik negatywny."); }
         catch (Exception error) when (error is XmlException or JsonException or InvalidDataException or InvalidOperationException or KeyNotFoundException)
         { return Failure(mode, adapter, "Error", "invalid_response", "Nie można bezpiecznie odczytać odpowiedzi usługi; nie jest to wynik negatywny."); }
+        finally { if (source == "GUS") throttle.CompleteGus(mode, DateTimeOffset.UtcNow); }
     }
     private static RegistryReply Failure(string mode, string adapter, string status, string code, string message) => new(mode, "Unknown", status, code, message, null, new(), adapter);
     private async Task<RegistryReply> Mf(HttpClient http, string mode, string op, string nip, string? account, DateOnly date, string adapter, CancellationToken ct)
@@ -123,14 +169,28 @@ public sealed class RegistryAdapters(IHttpClientFactory clients, RegistrySetting
             var assigned = Text(result, "accountAssigned");
             if (assigned is not ("TAK" or "NIE")) throw new InvalidDataException();
             return new(mode, assigned == "TAK" ? "Positive" : "Negative", "Completed", null,
-                "Przypisanie rachunku do NIP na wybrany dzień: " + assigned, Text(result, "requestId"), new(), adapter);
+                "Przypisanie rachunku do NIP na wybrany dzień: " + assigned, Text(result, "requestId") ?? throw new InvalidDataException(), new(), adapter);
         }
-        if (!result.TryGetProperty("subject", out var subject) || subject.ValueKind == JsonValueKind.Null)
+        if (!result.TryGetProperty("subject", out var subject)) throw new InvalidDataException();
+        if (subject.ValueKind == JsonValueKind.Null)
+        {
+            if (op == "MfStatus" || Text(result, "requestId") == null) throw new InvalidDataException();
             return new(mode, "Negative", "Completed", null, "Nie znaleziono podmiotu w odpowiedzi wykazu na wskazany dzień.", Text(result, "requestId"), new(), adapter);
+        }
         if (Text(subject, "nip") != nip) throw new InvalidDataException();
         var status = Text(subject, "statusVat") ?? throw new InvalidDataException();
-        return new(mode, "Information", "Completed", null, "Status VAT: " + status + ". Nie potwierdza przypisania rachunku.",
-            Text(result, "requestId") ?? Text(subject, "requestId"), new(Name: Text(subject, "name"),
+        var reference = Text(result, "requestId") ?? Text(subject, "requestId") ?? throw new InvalidDataException();
+        var message = "Status VAT: " + status + ". Nie potwierdza przypisania rachunku.";
+        if (op == "MfStatus")
+        {
+            if (status is not ("Czynny" or "Zwolniony" or "Niezarejestrowany") ||
+                !DateOnly.TryParseExact(Text(subject, "requestedDate"), ["dd-MM-yyyy", "yyyy-MM-dd"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var returnedDate) || returnedDate != date ||
+                !DateTime.TryParseExact(Text(subject, "responseDateTime"), "dd-MM-yyyy HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+                throw new InvalidDataException();
+            message += $" Dzień stanu: {returnedDate:yyyy-MM-dd}. Czas odpowiedzi MF: {Text(subject, "responseDateTime")}.";
+        }
+        return new(mode, "Information", "Completed", null, message,
+            reference, new(Name: Text(subject, "name"),
             Address: Text(subject, "workingAddress") ?? Text(subject, "residenceAddress"), Regon: Text(subject, "regon"), VatStatus: status), adapter);
     }
     private async Task<RegistryReply> Vies(HttpClient http, string mode, string vat, string adapter, CancellationToken ct)
@@ -148,8 +208,11 @@ public sealed class RegistryAdapters(IHttpClientFactory clients, RegistrySetting
     }
     private async Task<RegistryReply> Gus(HttpClient http, string mode, string nip, string adapter, CancellationToken ct)
     {
-        var key = settings.GusKey;
-        if (string.IsNullOrWhiteSpace(key)) return new(mode, "Unknown", "NotConfigured", "gus_key_missing", "Brak konfiguracji klucza GUS. Nie wykonano zapytania.", null, new(), adapter, false);
+        string? key;
+        try { key = mode == "Test" ? RegistrySettings.GusTestApiKey : gusKeys == null ? null : await gusKeys.Read(ct); }
+        catch (Exception error) when (error is System.Security.Cryptography.CryptographicException or InvalidOperationException or IOException or UnauthorizedAccessException)
+        { return new(mode, "Unknown", "NotConfigured", "gus_key_unavailable", "Nie można odczytać klucza GUS. Administrator instalacji musi wpisać go ponownie w Ustawieniach instalacji.", null, new(), adapter, false); }
+        if (string.IsNullOrWhiteSpace(key) || (mode == "Production" && key == RegistrySettings.GusTestApiKey)) return new(mode, "Unknown", "NotConfigured", "gus_key_missing", "Brak klucza GUS. Administrator instalacji: Ustawienia instalacji → Integracje zewnętrzne → GUS BIR. Nie wykonano zapytania.", null, new(), adapter, false);
         XNamespace ns = "http://CIS/BIR/PUBL/2014/07";
         XNamespace data = "http://CIS/BIR/PUBL/2014/07/DataContract";
         var uri = settings.Endpoint("GUS");
@@ -159,8 +222,11 @@ public sealed class RegistryAdapters(IHttpClientFactory clients, RegistrySetting
         try
         {
             var response = await Soap(http, uri, new XElement(ns + "DaneSzukajPodmioty", new XElement(ns + "pParametryWyszukiwania", new XElement(data + "Nip", nip))), true, "DaneSzukajPodmioty", sid, ct);
-            var body = Value(response, "DaneSzukajPodmiotyResult");
-            if (body is null) throw new InvalidDataException();
+            // This is a nested XML document, not a scalar field. Do not truncate it
+            // with Value's 2000-character display limit before parsing.
+            var body = response.Descendants().FirstOrDefault(x => x.Name.LocalName == "DaneSzukajPodmiotyResult")?.Value;
+            if (string.IsNullOrWhiteSpace(body)) throw new InvalidDataException();
+            if (body.Contains(key, StringComparison.Ordinal) || body.Contains(sid, StringComparison.Ordinal)) throw new InvalidDataException();
             var found = ParseXml(body).Descendants().Where(x => x.Name.LocalName == "dane").ToArray();
             if (found.Length == 0) return new(mode, "Negative", "Completed", null, "GUS: nie znaleziono danych dla NIP.", null, new(), adapter);
             if (found.Length > 1) return new(mode, "Unknown", "Ambiguous", "gus_multiple", "GUS zwrócił kilka podmiotów; nie wybrano automatycznie danych do przeniesienia.", null, new(), adapter);
@@ -169,7 +235,11 @@ public sealed class RegistryAdapters(IHttpClientFactory clients, RegistrySetting
             if (Value(row, "Nip")?.Trim() != nip) throw new InvalidDataException();
             var result = new RegistryData(Name: Value(row, "Nazwa"), Regon: Value(row, "Regon"), Street: Value(row, "Ulica"),
                 BuildingNo: Value(row, "NrNieruchomosci"), ApartmentNo: Value(row, "NrLokalu"), PostalCode: Value(row, "KodPocztowy"), City: Value(row, "Miejscowosc"), CountryCode: "PL");
-            return new(mode, "Information", "Completed", null, "GUS: pobrano dane. TEST zawiera stare/częściowo zanonimizowane dane, nie aktualne dane przedsiębiorcy.", null, result, adapter);
+            var serialized = JsonSerializer.Serialize(result);
+            if (serialized.Contains(key, StringComparison.Ordinal) || serialized.Contains(sid, StringComparison.Ordinal)) throw new InvalidDataException();
+            return new(mode, "Information", "Completed", null, mode == "Test"
+                ? "GUS: pobrano dane. TEST zawiera stare/częściowo zanonimizowane dane, nie aktualne dane przedsiębiorcy."
+                : "GUS BIR1.2: pobrano dane z produkcyjnego rejestru REGON. Przeniesienie do szkicu wymaga świadomego wyboru.", null, result, adapter);
         }
         finally
         {
@@ -213,6 +283,8 @@ public static class RegistryRegistration
 {
     public static IServiceCollection AddRegistryAdapters(this IServiceCollection services)
     {
+        services.AddSingleton<IGusKeyProtector, PersistentGusKeyProtector>();
+        services.AddScoped<IGusApiKeyProvider, SystemGusApiKeyProvider>();
         services.AddSingleton<IDataPortKeyProtector, PersistentDataPortKeyProtector>();
         services.AddScoped<IDataPortClient, DataPortClient>();
         services.AddHttpClient("dataport", http => { http.Timeout = TimeSpan.FromSeconds(12); http.MaxResponseContentBufferSize = 2_000_000; })
@@ -222,7 +294,8 @@ public static class RegistryRegistration
         services.AddHttpClient("nbp", http => { http.Timeout = TimeSpan.FromSeconds(12); http.MaxResponseContentBufferSize = 8_000_000; })
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })
             .RemoveAllLoggers();
-        services.AddSingleton<RegistrySettings>(); services.AddSingleton<RegistryThrottle>();
+        services.AddScoped(provider => RegistrySettings.ReadDatabase(provider.GetRequiredService<SystemDbContext>()));
+        services.AddSingleton<RegistryThrottle>();
         services.AddScoped<IRegistryAdapters, RegistryAdapters>();
         services.AddHttpClient("registries", http => { http.Timeout = TimeSpan.FromSeconds(12); http.MaxResponseContentBufferSize = 2_000_000; })
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })

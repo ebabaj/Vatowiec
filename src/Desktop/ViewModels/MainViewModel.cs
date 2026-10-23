@@ -35,7 +35,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
     public bool IsBusy => busy;
     public bool CanInteract => !busy;
     public bool IsLogin => session is null;
-    public bool IsCompanySelection => session is not null && profile is null;
+    public bool IsCompanySelection => session is not null && profile is null && !gusSettings;
     public bool IsWorkspace => session is not null && profile is not null;
     public string CurrentUser => session?.UserName ?? "";
     public string CurrentCompany => profile?.Name ?? "";
@@ -157,6 +157,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             if (ex.StatusCode == 401) ResetSession();
             if (ex.StatusCode == 403) ClearCompanyData();
+            if (ex.StatusCode == 403 && gusSettings)
+            {
+                if (session != null) session = session with { IsInstallationAdministrator = false };
+                ResetGusSettings();
+            }
             message = ex.Message;
         }
         catch (ArgumentException ex) { message = ex.Message; }
@@ -188,6 +193,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         api?.Dispose();
         api = null;
         session = null;
+        ResetGusSettings();
         companies = [];
         selectedCompany = null;
         ClearCompanyData();
