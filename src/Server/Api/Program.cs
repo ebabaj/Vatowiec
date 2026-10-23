@@ -15,6 +15,8 @@ builder.Services.AddApiSecurity(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration,
     builder.Environment.IsDevelopment());
 builder.Services.AddSingleton<Vatowiec.Core.Application.IIdentifierChecksum, Vatowiec.Core.Application.PolishNipChecksum>();
+builder.Services.AddSingleton<Vatowiec.Core.Application.IIdentifierChecksum, Vatowiec.Core.Application.FinnishVatChecksum>();
+builder.Services.AddSingleton<Vatowiec.Core.Application.IIdentifierChecksum, Vatowiec.Core.Application.CroatianVatChecksum>();
 builder.Services.AddScoped<Vatowiec.Core.Application.TaxIdentifierValidator>();
 builder.Services.AddScoped<IdentifierChecks>();
 Vatowiec.Core.Infrastructure.Registries.RegistryRegistration.AddRegistryAdapters(builder.Services);

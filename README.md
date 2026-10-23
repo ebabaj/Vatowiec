@@ -5,11 +5,17 @@ Projekt wielostanowiskowej aplikacji dla polskich mikrofirm. Obecny stan to
 wybór firmy, dodawanie/edycja z audytem i konfliktami oraz wyszukiwanie po stronie serwera.
 Osobne SystemDbContext i CompanyDbContext, trzy bazy SQL
 Server oraz dwie fikcyjne firmy. Działają Identity, sesje API i autoryzowany resolver
-bazy firmy. Pełny zestaw po integracji EWIB ADR-026: **323/323**,
-bez pominięć — 103 SQL/API i 220 bez SQL. Kompilacja bez ostrzeżeń i błędów.
+bazy firmy. Etap VAT UE ADR-027: **285/285 wykonanych testów**,
+282 bez SQL i 3 niedestrukcyjne SQL/API. Dawnych 103 SQL/API z resetującym fixture
+nie uruchamiano, aby zachować dane. Kompilacja bez ostrzeżeń i błędów.
 Nie jest to jeszcze program do prowadzenia księgowości.
 
-**Aktualny etap: IbanNet i podgląd banku z NBP EWIB (ADR-026).** W zakładce
+**Aktualny etap: urzędowe reguły VAT UE (ADR-027).** Format BE ograniczony do
+pierwszej cyfry 0/1, nowe sumy FI/HR, pozostałe 25 prefiksów format-only / Unknown.
+Zachowano krajowy PL NIP, EL/XI, API, UI, ostrzeżenia i historię reguł. Nowe wersje
+od 23.10.2026; bez czyszczenia kont i baz. [Źródła, porównanie i testy](docs/tax-rules/vat-eu-2026-10-23.md).
+
+IbanNet i podgląd banku z NBP EWIB (ADR-026): w zakładce
 Rachunki bankowe przycisk **Sprawdź numer** pokazuje kontrolę NRB/IBAN lub
 niezweryfikowany format spoza IBAN, normalizuje spacje/myślniki w polu i dla
 poprawnego polskiego numeru pobiera propozycje banku/BIC z EWIB przez API.

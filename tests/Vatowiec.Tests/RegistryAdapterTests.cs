@@ -34,7 +34,7 @@ public sealed class RegistryAdapterTests
     [Fact]
     public void Rules_All27CountriesPlusXiAreVersionedAndMissingAlgorithmIsNeverValid()
     {
-        var rules = TaxSchemeSeed.Rules();
+        var rules = TaxSchemeSeed.Rules().Where(x => x.ValidFrom <= Date && (x.ValidTo == null || x.ValidTo >= Date)).ToArray();
         Assert.Equal(28, rules.Count(x => x.IdentifierType == "VatEuId"));
         Assert.Equal(27, rules.Where(x => x.VatPrefix is not null && x.VatPrefix != "XI").Select(x => x.CountryCode).Distinct().Count());
         Assert.Contains(rules, x => x.CountryCode == "GR" && x.VatPrefix == "EL");

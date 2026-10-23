@@ -375,6 +375,7 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                             IsActive = true,
                             SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
                             ValidFrom = new DateOnly(2026, 10, 22),
+                            ValidTo = new DateOnly(2026, 10, 22),
                             VatPrefix = "BE",
                             Version = "2026-10-22.1"
                         },
@@ -401,6 +402,7 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                             IsActive = true,
                             SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
                             ValidFrom = new DateOnly(2026, 10, 22),
+                            ValidTo = new DateOnly(2026, 10, 22),
                             VatPrefix = "HR",
                             Version = "2026-10-22.1"
                         },
@@ -466,6 +468,7 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                             IsActive = true,
                             SourceUrl = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/",
                             ValidFrom = new DateOnly(2026, 10, 22),
+                            ValidTo = new DateOnly(2026, 10, 22),
                             VatPrefix = "FI",
                             Version = "2026-10-22.1"
                         },
@@ -727,6 +730,45 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                             SourceUrl = "https://github.com/CIRFMF/ksef-client-csharp/blob/main/KSeF.Client.Tests.Utils/MiscellaneousUtils.cs",
                             ValidFrom = new DateOnly(2026, 10, 22),
                             Version = "2026-10-22.1"
+                        },
+                        new
+                        {
+                            Id = 30,
+                            AlgorithmKey = "format-only-v1",
+                            CountryCode = "BE",
+                            FormatPattern = "^BE[01][0-9]{9}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://news.economie.fgov.be/228779-les-numeros-d-entreprise-passent-au-1/",
+                            ValidFrom = new DateOnly(2026, 10, 23),
+                            VatPrefix = "BE",
+                            Version = "2026-10-23.1"
+                        },
+                        new
+                        {
+                            Id = 31,
+                            AlgorithmKey = "fi-vat-mod11-v1",
+                            CountryCode = "FI",
+                            FormatPattern = "^FI[0-9]{8}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://www.vero.fi/globalassets/tietoa-verohallinnosta/ohjelmistokehittajille/finnish-tax-administration_the-control-character-for-verifying-the-authenticity-of-finnish-business-ids-and-personal-identity-codes.pdf",
+                            ValidFrom = new DateOnly(2026, 10, 23),
+                            VatPrefix = "FI",
+                            Version = "2026-10-23.1"
+                        },
+                        new
+                        {
+                            Id = 32,
+                            AlgorithmKey = "hr-vat-iso7064-mod11-10-v1",
+                            CountryCode = "HR",
+                            FormatPattern = "^HR[0-9]{11}$",
+                            IdentifierType = "VatEuId",
+                            IsActive = true,
+                            SourceUrl = "https://regos.hr/app/uploads/2018/07/KONTROLA-OIB-a.pdf",
+                            ValidFrom = new DateOnly(2026, 10, 23),
+                            VatPrefix = "HR",
+                            Version = "2026-10-23.1"
                         });
                 });
 

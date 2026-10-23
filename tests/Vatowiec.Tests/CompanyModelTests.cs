@@ -114,8 +114,8 @@ public sealed class CompanyModelTests
     {
         using var system = new SystemDbContextFactory().CreateDbContext([]);
         using var company = new CompanyDbContextFactory().CreateDbContext([]);
-        Assert.Equal(7, system.Database.GetMigrations().Count());
-        Assert.EndsWith("_CurrencyPermissions", system.Database.GetMigrations().Last());
+        Assert.Equal(8, system.Database.GetMigrations().Count());
+        Assert.EndsWith("_OfficialVatEuRules", system.Database.GetMigrations().Last());
         Assert.Equal(7, company.Database.GetMigrations().Count());
         Assert.EndsWith("_CurrencyIsoCodePrimaryKey", company.Database.GetMigrations().Last());
         Assert.False(system.Database.HasPendingModelChanges());

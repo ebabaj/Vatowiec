@@ -16,8 +16,8 @@ public sealed class SqlServerPersistenceTests
     {
         await using var session = await Session.Open("Vatowiec_System", "ConnectionStrings__VatowiecSystemTest");
         await using var context = session.System();
-        Assert.Equal(7, (await context.Database.GetAppliedMigrationsAsync()).Count());
-        Assert.EndsWith("_CurrencyPermissions", (await context.Database.GetAppliedMigrationsAsync()).Last());
+        Assert.Equal(8, (await context.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.EndsWith("_OfficialVatEuRules", (await context.Database.GetAppliedMigrationsAsync()).Last());
         Assert.Empty(await context.Database.GetPendingMigrationsAsync());
         using var command = new SqlCommand("SELECT COUNT(*) FROM sys.tables WHERE schema_id = SCHEMA_ID('core')", session.Connection, session.Transaction);
         Assert.Equal(2, (int)(await command.ExecuteScalarAsync())!);
@@ -60,8 +60,8 @@ public sealed class SqlServerPersistenceTests
         Assert.Equal(7, (await first.Database.GetPendingMigrationsAsync()).Count());
         Assert.EndsWith("_CurrencyIsoCodePrimaryKey", (await second.Database.GetAppliedMigrationsAsync()).Last());
         Assert.Empty(await second.Database.GetPendingMigrationsAsync());
-        Assert.Equal(7, (await system.Database.GetAppliedMigrationsAsync()).Count());
-        Assert.EndsWith("_CurrencyPermissions", (await system.Database.GetAppliedMigrationsAsync()).Last());
+        Assert.Equal(8, (await system.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.EndsWith("_OfficialVatEuRules", (await system.Database.GetAppliedMigrationsAsync()).Last());
         Assert.Empty(await system.Database.GetPendingMigrationsAsync());
         // Usunięcie wpisu historii w A jest wycofywane przez Session.DisposeAsync.
     }

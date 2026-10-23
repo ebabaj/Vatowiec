@@ -44,6 +44,8 @@ public sealed class TaxIdentifierValidator(IEnumerable<IIdentifierChecksum> chec
                 ? "Format IDWew zgodny. Nie sprawdzono nadania identyfikatora w KSeF."
                 : "IDWew: NIP podatnika, myślnik i pięć cyfr. Nie generujemy identyfikatora.", "ksef-internalid-2026-10-22", true, false);
         }
+        if (field == "TaxId" && country != "PL")
+            return new(field, normalized, "Unknown", "Krajowy identyfikator poza Polską nie jest sprawdzany w tym zakresie.", "unsupported-v1", false, false);
         if (field == "VatEuId" || country == "PL")
         {
             normalized = string.Concat(normalized.Where(c => !char.IsWhiteSpace(c) && c != '-' && c != '.'));
@@ -71,7 +73,12 @@ public sealed class TaxIdentifierValidator(IEnumerable<IIdentifierChecksum> chec
 
 public static class TaxSchemeSeed
 {
-    public const string Version = "2026-10-22.1";
+    public const string LegacyVersion = "2026-10-22.1";
+    public const string Version = "2026-10-23.1";
+    public static readonly DateOnly UpdatedFrom = new(2026, 10, 23);
+    public const string BelgianFormatSource = "https://news.economie.fgov.be/228779-les-numeros-d-entreprise-passent-au-1/";
+    public const string FinnishChecksumSource = "https://www.vero.fi/globalassets/tietoa-verohallinnosta/ohjelmistokehittajille/finnish-tax-administration_the-control-character-for-verifying-the-authenticity-of-finnish-business-ids-and-personal-identity-codes.pdf";
+    public const string CroatianChecksumSource = "https://regos.hr/app/uploads/2018/07/KONTROLA-OIB-a.pdf";
     public const string FormatSource = "https://www.vero.fi/en/businesses-and-corporations/taxes-and-charges/vat/international-commerce/vat-number/vat-numbers-issued-by-different-eu-countries/";
     public static TaxIdentifierScheme[] Rules()
     {
@@ -95,7 +102,7 @@ public static class TaxSchemeSeed
             VatPrefix = x.Prefix,
             FormatPattern = "^" + x.Prefix + x.Pattern + "$",
             AlgorithmKey = x.Prefix == "PL" ? "pl-nip-mod11-v1" : "format-only-v1",
-            Version = Version,
+            Version = LegacyVersion,
             ValidFrom = new(2026, 10, 22),
             SourceUrl = FormatSource
         }).ToList();
@@ -106,10 +113,30 @@ public static class TaxSchemeSeed
             IdentifierType = "TaxId",
             FormatPattern = "^[0-9]{10}$",
             AlgorithmKey = "pl-nip-mod11-v1",
-            Version = Version,
+            Version = LegacyVersion,
             ValidFrom = new(2026, 10, 22),
             SourceUrl = "https://github.com/CIRFMF/ksef-client-csharp/blob/main/KSeF.Client.Tests.Utils/MiscellaneousUtils.cs"
         });
+        void Revise(string prefix, string? format, string algorithm, string source)
+        {
+            var previous = rules.Single(x => x.IdentifierType == "VatEuId" && x.VatPrefix == prefix && x.Version == LegacyVersion);
+            previous.ValidTo = UpdatedFrom.AddDays(-1);
+            rules.Add(new()
+            {
+                Id = rules.Count + 1,
+                CountryCode = previous.CountryCode,
+                IdentifierType = previous.IdentifierType,
+                VatPrefix = prefix,
+                FormatPattern = format ?? previous.FormatPattern,
+                AlgorithmKey = algorithm,
+                Version = Version,
+                ValidFrom = UpdatedFrom,
+                SourceUrl = source
+            });
+        }
+        Revise("BE", "^BE[01][0-9]{9}$", "format-only-v1", BelgianFormatSource);
+        Revise("FI", null, "fi-vat-mod11-v1", FinnishChecksumSource);
+        Revise("HR", null, "hr-vat-iso7064-mod11-10-v1", CroatianChecksumSource);
         return rules.ToArray();
     }
 }

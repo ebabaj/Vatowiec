@@ -132,15 +132,25 @@ typ, prefiks, regex, klucz algorytmu, wersja, okres, aktywność i URL źródła
 | TaxId / PL | format 10 cyfr, pl-nip-mod11-v1: wagi 6,5,7,2,3,4,5,6,7; reszta mod 11 równa ostatniej cyfrze; reszta 10 odrzucana |
 | TaxId / pozostałe państwa | brak algorytmu krajowego; wynik Unknown, bez zgadywania z formatu VAT UE |
 | VatEuId / PL | prefiks PL + kontrola NIP jak wyżej |
-| VatEuId / AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PT RO SE SK SI ES oraz XI | formaty wszystkich 27 państw UE i Irlandii Północnej, z EL dla Grecji; format-only-v1, **brak kontroli sumy**, jawny wynik Unknown po zgodnym formacie |
+| VatEuId / FI | od 23.10.2026: FI + 8 cyfr, fi-vat-mod11-v1 według Verohallinto |
+| VatEuId / HR | od 23.10.2026: HR + 11 cyfr, hr-vat-iso7064-mod11-10-v1 według REGOS/Porezna |
+| VatEuId / AT BE BG CY CZ DK EE FR DE EL HU IE IT LV LT LU MT NL PT RO SE SK SI ES XI | format-only-v1, **brak kontroli sumy**, jawny wynik Unknown po zgodnym formacie; BE od 23.10.2026 zaczyna część cyfrową od 0/1 |
 | KsefIdWew | ksef-internalid-2026-10-22: oficjalny format NIP–5 cyfr; brak kontroli nadania, generowania i integracji KSeF |
 
 Przykłady testów: normalizacja PL 324-517-45-04 → 3245174504 (numer z publicznej
 listy testowej MF); błąd sumy 3245174505; litery w AB-12.3 pozostają; formaty
 EL123456789 i XI123456789 nie stają się automatycznie wynikiem „poprawny”.
 Pełne regexy są w tabeli i TaxSchemeSeed; źródła i ograniczenia w
-[ADR-021](adr/ADR-021-identyfikatory-i-rejestry-testowe.md). Nie wdrożono innych
-algorytmów sum, ContractorTaxIdentifiers, nadawania IDWew, faktur ani księgowań.
+[ADR-021](adr/ADR-021-identyfikatory-i-rejestry-testowe.md) oraz
+[przeglądzie urzędowym ADR-027](tax-rules/vat-eu-2026-10-23.md).
+Nie wdrożono innych algorytmów sum poza PL/FI/HR, ContractorTaxIdentifiers,
+nadawania IDWew, faktur ani księgowań. Zagranicznych krajowych TaxId nie sprawdzamy.
+
+Migracja 20261023080602_OfficialVatEuRules dodaje trzy wersje od 23.10.2026,
+zamyka poprzednie BE/FI/HR dzień wcześniej i zachowuje ich definicje/źródła.
+Razem 32 rekordy historyczne i bieżące; nadal 28 reguł VatEuId dla danego dnia.
+WarningHash zmienia się wraz z wybraną regułą. Format lub suma nie potwierdzają
+ważności VIES. API, uprawnienia i UI bez zmian.
 
 ## SQL, API i sprawdzanie
 
@@ -163,7 +173,10 @@ W obrębie /api/v1/companies/{companyId}:
   BankRowVersion i StateDate. Bez możliwości podania dowolnego URL/identyfikatora.
 - GET /contractors/{id}/verifications — historia SQL z offset/limit, ViewContractors.
 
-Pełne testy (zatrzymaj API i desktop; runner czyści fikcyjne dane):
+W etapie ADR-027 stosuj niedestrukcyjne polecenia z
+[przeglądu reguł](tax-rules/vat-eu-2026-10-23.md#wersje-i-wdrożenie).
+Poniższy historyczny runner usuwa dane i konta — nie uruchamiaj go przy wymaganiu
+zachowania istniejących danych. Wcześniejszy pełny przebieg ADR-021:
 
 ```powershell
 dotnet build Vatowiec.slnx --no-restore

@@ -1,6 +1,6 @@
 # Otwarty następca VATowca — specyfikacja produktu i architektury
 
-**Wersja dokumentu:** 0.14 (normalizacja rachunków i NBP EWIB, ADR-026)
+**Wersja dokumentu:** 0.15 (urzędowe reguły VAT UE, ADR-027)
 **Data:** 2026-10-23
 **Status:** projekt założeń; nie jest potwierdzeniem zgodności podatkowej gotowego oprogramowania  
 **Nazwa projektu:** robocza „Otwarty następca VATowca”; docelowa nazwa i użycie nazwy „VATowiec” wymagają odrębnej decyzji i sprawdzenia praw  
@@ -216,7 +216,10 @@ Wdrożono edycję trzech opcjonalnych identyfikatorów, podgląd normalizacji,
 wersjonowane reguły i duplikaty w firmie. AcceptWarnings/WarningHash z ADR-020
 wiążą potwierdzenie z danymi, rowversion, wersją reguły i duplikatami. Zapis
 i audyt ostrzeżenia są atomowe. NIP ma format/sumę mod 11; dla VAT UE 27 państw
-i XI wdrożono formaty, ale poza PL brak sum kontrolnych jest jawnie Unknown.
+i XI wdrożono formaty. ADR-027 rozszerza kontrolę sumy VatEuId o FI i HR;
+pozostałe 25 prefiksów ma format-only-v1 / Unknown. Format BE wymaga pierwszej
+cyfry 0 lub 1. EL i XI pozostają bez zmiany. Poprawny format i suma nie oznaczają
+ważności numeru w VIES. Zagraniczne krajowe TaxId nadal nie są sprawdzane.
 IDWew ma kontrolę formatu, bez nadawania i potwierdzania istnienia w KSeF.
 
 ref.TaxIdentifierSchemes jest wspólnym słownikiem w Vatowiec_System, bez kartotek
@@ -233,6 +236,15 @@ nie stanowią potwierdzeń produkcyjnych; historia nie jest konwertowana między
 środowiskami. Timeout, awaria i brak obsługi nie oznaczają wyniku negatywnego.
 Szczegóły, ograniczenia algorytmów i konfiguracja: [instrukcja](docs/identifiers-and-registries.md),
 [ADR-021](docs/adr/ADR-021-identyfikatory-i-rejestry-testowe.md).
+
+Aktualizacja ADR-027 zachowuje wszystkie 29 wcześniejszych rekordów reguł,
+zamyka okresy BE/FI/HR na 22.10.2026 i dodaje trzy wersje od 23.10.2026,
+z urzędowymi SourceUrl. Są to daty stosowania polityki aplikacji.
+Jawna migracja EF Core nie usuwa tabel, kont ani danych użytkowników;
+historia nie jest usuwana przy downgrade. Nowa reguła zmienia WarningHash
+i wymaga ponownego potwierdzenia ostrzeżenia. API i UI pozostają zgodne.
+[Porównanie 28 reguł, algorytmy, źródła i wyniki](docs/tax-rules/vat-eu-2026-10-23.md).
+W tym etapie testy SQL są niedestrukcyjne; nie stosujemy runnera czyszczącego dane.
 
 ### 3.11. DataPort i konfiguracja integracji firmy (ADR-022)
 
@@ -639,7 +651,7 @@ Załączniki mogą być przechowywane w katalogu kontrolowanym przez serwer lub 
 
 **Hierarchia i własne dane:** Contractors przechowuje samodzielne podmioty, grupy i jednostki organizacyjne. ParentId służy przede wszystkim grupowaniu i nie wyznacza automatycznie zależności podatkowej. Nie ma dziedziczenia żadnych danych: każdy rekord ma własną nazwę, identyfikatory, adresy, rachunki i kontakty. W przyszłej fakturze wybranie grupy bez identyfikatora podatkowego wyświetla powiązane podmioty do wyboru. Samodzielny podmiot z odpowiednim identyfikatorem może być nabywcą; jednostka niebędąca samodzielnym nabywcą może wystąpić jako Podmiot3 według roli i kontraktu KSeF. Faktur ani integracji teraz nie implementujemy.
 
-**Identyfikatory:** TaxId i VatEuId są dwoma opcjonalnymi polami tekstowymi, każde do 100 znaków; VatEuId zawiera cały numer VAT UE wraz z prefiksem. Dopuszczamy duplikaty po ostrzeżeniu i świadomym zatwierdzeniu z AcceptWarnings. Nie tworzymy ContractorTaxIdentifiers. ADR-021 wdraża ref.TaxIdentifierSchemes, normalizację i kontrolę w Application/API: formaty VAT UE wszystkich 27 państw i XI oraz NIP mod 11 dla PL. Brak pozostałych algorytmów lub krajowej reguły TaxId jest jawnie Unknown, nie poprawnością. Źródła, wersje i zakresy dat są identyfikowalne.
+**Identyfikatory:** TaxId i VatEuId są dwoma opcjonalnymi polami tekstowymi, każde do 100 znaków; VatEuId zawiera cały numer VAT UE wraz z prefiksem. Dopuszczamy duplikaty po ostrzeżeniu i świadomym zatwierdzeniu z AcceptWarnings. Nie tworzymy ContractorTaxIdentifiers. ADR-021/027 wdrażają ref.TaxIdentifierSchemes, normalizację i kontrolę w Application/API: formaty VAT UE wszystkich 27 państw i XI, NIP mod 11 dla PL oraz sumy VatEuId FI i HR. Brak pozostałych algorytmów lub krajowej reguły TaxId jest jawnie Unknown, nie poprawnością. Źródła, wersje i zakresy dat są identyfikowalne.
 
 **KsefIdWew:** odrębny, opcjonalny pełny identyfikator jednostki wewnętrznej KSeF (IDWew/InternalId), nie NIP samodzielnego podatnika ani int Id kartoteki. Oficjalny format to dziesięć cyfr NIP podatnika, łącznik i pięć dodatkowych cyfr, razem 16 znaków. Przeznaczenie, źródła MF i rozróżnienie Podmiot3 od nabywcy są w ADR-018 §3.3.1. ADR-021 kontroluje format i usuwa odstępy; nie generuje identyfikatora, nie potwierdza nadania ani zgodności z własnym TaxId jednostki i nie integruje KSeF. [Źródło formatu: oficjalne OpenAPI KSeF PR v2](https://api.ksef.mf.gov.pl/docs/v2/openapi.json).
 
