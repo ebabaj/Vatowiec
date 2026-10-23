@@ -74,6 +74,27 @@ Wielostanowiskową aplikację księgowo-podatkową dla polskich mikrofirm: **KPi
 - Logika domenowa nie może zależeć od Avalonia, HTTP, EF Core ani T-SQL.
 - Nie dodawaj mikrousług, event sourcingu ani nowego frameworka tylko ze względu na modę. Uzasadnij zmiany architektoniczne w ADR.
 
+### Wspólna walidacja rachunków bankowych
+
+We wszystkich modułach VATowca obowiązuje jeden wspólny mechanizm walidacji
+rachunków bankowych, oparty na bibliotece IbanNet i istniejącym interfejsie
+`IBankAccountValidator`.
+
+Dotyczy to w szczególności:
+
+- kartoteki kontrahentów,
+- importu wyciągów bankowych,
+- generowania przelewów ISO 20022,
+- wszystkich przyszłych funkcjonalności obsługujących numery rachunków.
+
+Nie wolno tworzyć niezależnych implementacji walidacji IBAN/NRB ani powielać
+algorytmów sum kontrolnych w poszczególnych modułach.
+
+Nowe funkcjonalności muszą korzystać z istniejącego wspólnego walidatora.
+Jeżeli potrzebna będzie nowa reguła, należy rozszerzyć wspólny mechanizm i jego
+testy, zachowując rozdzielenie walidacji numeru od potwierdzania właściciela
+rachunku.
+
 ## 3. Nienaruszalne zasady danych
 
 1. Każda operacja dotyczy uprawnionej firmy (`CompanyId`). **Sprawdzenie uprawnienia następuje na serwerze**.
