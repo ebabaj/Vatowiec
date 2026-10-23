@@ -74,6 +74,24 @@ public partial class MainWindow : Window
     private async void GusClick(object? sender, RoutedEventArgs e) => await model.VerifyRegistry("Gus");
     private async void DataPortClick(object? sender, RoutedEventArgs e) => await model.VerifyRegistry("DataPort");
     private async void DataPortSettingsClick(object? sender, RoutedEventArgs e) => await model.OpenDataPortSettings();
+    private async void CurrenciesClick(object? sender, RoutedEventArgs e) => await model.OpenCurrencies();
+    private async void CurrencySettingsClick(object? sender, RoutedEventArgs e) => await model.OpenCurrencies(true);
+    private void CurrencyRatesTabClick(object? sender, RoutedEventArgs e) => model.ShowCurrencySettings(false);
+    private void CurrencySettingsTabClick(object? sender, RoutedEventArgs e) => model.ShowCurrencySettings(true);
+    private void CloseCurrenciesClick(object? sender, RoutedEventArgs e) => model.CloseCurrencies();
+    private async void SaveCurrencyClick(object? sender, RoutedEventArgs e) => await model.SaveCurrencySettings();
+    private async void RefreshCurrenciesClick(object? sender, RoutedEventArgs e) => await model.RefreshCurrencies();
+    private void CancelCurrencyClick(object? sender, RoutedEventArgs e) => model.CancelCurrencyChanges();
+    private async void ImportNbpClick(object? sender, RoutedEventArgs e) => await model.ImportNbpRates();
+    private async void FilterRatesClick(object? sender, RoutedEventArgs e) => await model.LoadRates();
+    private async void PreviousRatesClick(object? sender, RoutedEventArgs e) => await model.PreviousRates();
+    private async void NextRatesClick(object? sender, RoutedEventArgs e) => await model.NextRates();
+    private async void ClearRateFiltersClick(object? sender, RoutedEventArgs e) { model.ClearRateFilters(); await model.LoadRates(); }
+    private async void KeepRateClick(object? sender, RoutedEventArgs e) => await model.ResolveNbpConflict(false);
+    private async void AcceptRateClick(object? sender, RoutedEventArgs e) => await model.ResolveNbpConflict(true);
+    private async void CurrencyHistoryClick(object? sender, RoutedEventArgs e) => await model.LoadCurrencyHistory();
+    private async void PreviousCurrencyHistoryClick(object? sender, RoutedEventArgs e) => await model.PreviousCurrencyHistory();
+    private async void NextCurrencyHistoryClick(object? sender, RoutedEventArgs e) => await model.NextCurrencyHistory();
     private async void SaveDataPortKeyClick(object? sender, RoutedEventArgs e)
     {
         var key = DataPortKeyInput.Text ?? "";
@@ -134,6 +152,12 @@ public partial class MainWindow : Window
     {
         if (model.IsBusy) return;
         if (model.DiscardPrompt) { if (e.Key == Key.Escape) model.KeepEditing(); e.Handled = true; return; }
+        if (model.IsCurrencyScreen)
+        {
+            if (e.Key == Key.Escape) { e.Handled = true; model.CloseCurrencies(); }
+            else if (model.IsCurrencySettings && e.KeyModifiers == KeyModifiers.Control && e.Key == Key.S) { e.Handled = true; await model.SaveCurrencySettings(); }
+            return;
+        }
         if (model.IsEditing && !model.IsMainTab)
         {
             if (model.IsVerificationsTab) { if (e.Key == Key.Escape) model.CancelEditor(); return; }

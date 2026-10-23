@@ -30,6 +30,7 @@ public static class DependencyInjection
         bool isDevelopment)
     {
         services.TryAddScoped<ICompanyContext>(_ => new CompanyContext(null));
+        services.AddScoped<IExchangeRateReader, ExchangeRateReader>();
         services.AddDbContext<SystemDbContext>((provider, options) =>
         {
             // Odczyt po złożeniu konfiguracji hosta, w tym nadpisań testowych.

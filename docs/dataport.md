@@ -107,7 +107,7 @@ Start API nigdy nie migruje. `seed-users` nadaje operatorowi A maskę 63, B mask
 czytelnikowi A maskę 1; hasła nadal tylko lokalne user-secrets/środowisko.
 
 Pełny runner `… -- test` czyści demonstracyjne fixture i ponownie inicjalizuje
-konta/dane. **Blokuje czyszczenie, jeśli zastanie zapisany klucz DataPort**:
+konta/dane. Samodzielne **prepare-tests blokuje czyszczenie, jeśli zastanie zapisany klucz DataPort**:
 usuń go świadomie w ustawieniach przed takim przebiegiem. Domyślnie nieznane
 nazwy/numery też blokują testy. Wyłącznie po wyraźnym potwierdzeniu właściciela,
 że bieżące dane są demonstracyjne i mogą zniknąć, lokalny proces administracyjny
@@ -150,3 +150,9 @@ zapisanych kluczy. API i desktop uruchomiono; klucz rzeczywisty należy wpisać
 samodzielnie. Zrzuty lokalne: TestResults/avalonia-dataport-settings.png oraz
 TestResults/avalonia-dataport-final.png. Formatowanie rozwiązania i git diff --check
 przeszły. Bez Commit i Push.
+
+Aktualizacja ADR-023: pełny runner test zabezpiecza zastany szyfrogram w pamięci
+i zweryfikowanych kopiach trzech baz, a po inicjalizacji przywraca do zgodnego
+profilu. Nie trzeba usuwać rzeczywistego klucza przed pełnym test. Nie jest
+on odszyfrowywany ani logowany. Samodzielne prepare-tests nadal odmawia jego
+czyszczenia. [Przebieg i odzyskanie po przerwaniu](currencies-and-nbp.md).

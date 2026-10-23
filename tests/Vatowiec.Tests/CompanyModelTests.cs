@@ -43,7 +43,7 @@ public sealed class CompanyModelTests
         Assert.Null(system.Model.FindEntityType(typeof(ExternalVerification)));
         Assert.Null(company.Model.FindEntityType(typeof(TaxIdentifierScheme)));
         Assert.Equal(new[] { typeof(AddressType), typeof(CompanyProfile), typeof(Contractor), typeof(ContractorAddress),
-                typeof(ContractorBankAccount), typeof(ContractorChange), typeof(ContractorContact), typeof(ContractorCreateOperation), typeof(DataPortConfiguration), typeof(ExternalVerification) },
+                typeof(ContractorBankAccount), typeof(ContractorChange), typeof(ContractorContact), typeof(ContractorCreateOperation), typeof(Currency), typeof(CurrencyOperation), typeof(DataPortConfiguration), typeof(ExchangeRate), typeof(ExternalVerification) },
             company.Model.GetEntityTypes().Select(x => x.ClrType).OrderBy(x => x.Name));
         var contractor = company.Model.FindEntityType(typeof(Contractor))!;
         Assert.Equal(typeof(Contractor), Assert.Single(contractor.GetForeignKeys()).PrincipalEntityType.ClrType);
@@ -91,14 +91,33 @@ public sealed class CompanyModelTests
     }
 
     [Fact]
+    public void CurrencyModel_UsesOnlyImmutableIsoCodeAndRatesKeepTheirOwnIdentity()
+    {
+        using var company = new CompanyDbContextFactory().CreateDbContext([]);
+        var currency = company.Model.FindEntityType(typeof(Currency))!;
+        Assert.Equal("Code", Assert.Single(currency.FindPrimaryKey()!.Properties).Name);
+        Assert.Null(currency.FindProperty("Id"));
+        Assert.Equal("char(3)", currency.FindProperty("Code")!.GetColumnType());
+        Assert.Equal(Microsoft.EntityFrameworkCore.Metadata.ValueGenerated.Never, currency.FindProperty("Code")!.ValueGenerated);
+        var rate = company.Model.FindEntityType(typeof(ExchangeRate))!;
+        Assert.Null(rate.FindProperty("CurrencyId"));
+        Assert.Equal("Id", Assert.Single(rate.FindPrimaryKey()!.Properties).Name);
+        Assert.Equal(typeof(long), rate.FindProperty("Id")!.ClrType);
+        var foreignKey = rate.GetForeignKeys().Single(x => x.PrincipalEntityType == currency);
+        Assert.Equal("CurrencyCode", Assert.Single(foreignKey.Properties).Name);
+        Assert.Equal("Code", Assert.Single(foreignKey.PrincipalKey.Properties).Name);
+        Assert.Null(typeof(Vatowiec.SharedContracts.CurrencyResponse).GetProperty("Id"));
+    }
+
+    [Fact]
     public void MigrationSets_ContainOnlyTheirOwnTablesAndMatchSnapshots()
     {
         using var system = new SystemDbContextFactory().CreateDbContext([]);
         using var company = new CompanyDbContextFactory().CreateDbContext([]);
-        Assert.Equal(6, system.Database.GetMigrations().Count());
-        Assert.EndsWith("_CompanyIntegrationPermission", system.Database.GetMigrations().Last());
-        Assert.Equal(4, company.Database.GetMigrations().Count());
-        Assert.EndsWith("_DataPortConfiguration", company.Database.GetMigrations().Last());
+        Assert.Equal(7, system.Database.GetMigrations().Count());
+        Assert.EndsWith("_CurrencyPermissions", system.Database.GetMigrations().Last());
+        Assert.Equal(7, company.Database.GetMigrations().Count());
+        Assert.EndsWith("_CurrencyIsoCodePrimaryKey", company.Database.GetMigrations().Last());
         Assert.False(system.Database.HasPendingModelChanges());
         Assert.False(company.Database.HasPendingModelChanges());
         Assert.NotEqual(system.GetService<IMigrationsAssembly>().ModelSnapshot!.GetType(),

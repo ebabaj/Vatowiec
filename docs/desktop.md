@@ -119,3 +119,15 @@ zarządzać kluczem; B i czytelnik widzą tylko stan. Zakładka Weryfikacje ma
 osobny przycisk DataPort obok zachowanego oficjalnego GUS. Dane pośrednika
 mogą pochodzić z cache, nie są bezpośrednim potwierdzeniem GUS TEST.
 [Instrukcja i granice prób](dataport.md).
+
+## Waluty i kursy NBP (ADR-023)
+
+W głównej nawigacji jest **Słowniki → Waluty i kursy NBP**. Ten sam ekran
+ustawień otwiera przycisk **Ustawienia firmy → Waluty i kursy NBP**.
+Operator A może zaznaczać aktywne waluty i typy A/B/C, zapisywać ustawienia
+oraz ręcznie pobierać najnowsze publikacje lub okres. B i czytelnik mają odczyt.
+PLN nie wymaga kursu. Otwarcie ekranu i zapis ustawień nie odpytują NBP.
+Lista kursów jest filtrowana/stronicowana przez SQL; daty i liczby są polskie.
+Konflikt innej wartości wymaga jawnej decyzji z kontrolą wersji i audytem.
+Ctrl+S zapisuje ustawienie, Esc wraca; niezapisany szkic wymaga decyzji.
+[Pełna instrukcja, struktura i wyniki](currencies-and-nbp.md).

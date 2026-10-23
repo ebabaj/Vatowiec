@@ -181,6 +181,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         contractorsLoaded = false;
         ClearContractorState();
         ResetDataPortSettings();
+        ResetCurrencyState();
     }
     private void ResetSession()
     {

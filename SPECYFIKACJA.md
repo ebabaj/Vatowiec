@@ -1,7 +1,7 @@
 # Otwarty następca VATowca — specyfikacja produktu i architektury
 
-**Wersja dokumentu:** 0.11.0 (DataPort i konfiguracja firmy, ADR-022)
-**Data:** 2026-10-22
+**Wersja dokumentu:** 0.12.1 (jedyny identyfikator waluty: kod ISO 4217, ADR-024)
+**Data:** 2026-10-23
 **Status:** projekt założeń; nie jest potwierdzeniem zgodności podatkowej gotowego oprogramowania  
 **Nazwa projektu:** robocza „Otwarty następca VATowca”; docelowa nazwa i użycie nazwy „VATowiec” wymagają odrębnej decyzji i sprawdzenia praw  
 **Główna platforma:** Windows; klient i serwer projektowane także z myślą o Linux  
@@ -234,6 +234,31 @@ Brak nowych kolumn kartoteki/REGON ani oddzielnej historii. Selektywny import
 wyłącznie do szkicu; zwykły zapis zachowuje ostrzeżenia, prawa, rowversion i audyt.
 Limit dzienny należy do konta, także kilku kluczy; reset 00:00 UTC, brak fikcyjnego
 salda. Niedostępność nie jest wynikiem negatywnym. [Konfiguracja i próby](docs/dataport.md).
+
+### 3.12. Waluty i ręczne kursy NBP (ADR-023)
+
+Podstawa DOC-006: lokalny słownik 149 pozycji, ustawienia aktywności/pobierania
+A/B/C i stronicowana kartoteka kursów w każdej bazie firmy. Domyślnie EUR/USD/GBP/CHF
+z A; PLN jako waluta podstawowa bez kursu NBP. Trzy nowe tabele ref.Currencies,
+core.ExchangeRates i audit.CurrencyOperations, bez powielonego CompanyId i GUID PK.
+ADR-024 zastępuje numeryczny klucz waluty: ref.Currencies ma wyłącznie
+niezmienne Code char(3) jako PRIMARY KEY, wielkie litery, bez Id. Kursy wskazują
+CurrencyCode char(3) przez lokalny FK; ich własne bigint IDENTITY pozostaje.
+Ustawienia, API i klient używają kodu. Nie mapujemy starych CurrencyId:
+demonstracyjne trzy tabele walutowe są jawnie odtwarzane z seedem, bez zmian
+pozostałych danych firm i konfiguracji integracji. Historyczne ADR/migracje
+pozostają zapisem poprzedniego modelu.
+Wartości decimal(24,12), Mid dla A/B, Bid/Ask dla C, daty publikacji i opcjonalnego
+notowania, oryginalny numer tabeli i UTC pobrania. Odczyt/zarządzanie/import mają
+osobne prawa firmowe 64/128/256 oraz CSRF dla mutacji; B pozostaje tylko do odczytu.
+
+Publiczny NBP HTTPS/JSON jest pobierany wyłącznie ręcznie: najnowsze publikacje
+lub zakres dzielony po 93 dni włącznie. Nie ma automatyzacji, uzupełniania dni bez
+publikacji ani fikcyjnych kursów brakującej waluty. Ponowienia deduplikują dane,
+a rozbieżności wymagają jawnej decyzji z wersją kursu i atomowym audytem przed/po.
+Historia importu zachowuje propozycje bez ponownego HTTP. Application.IExchangeRateReader
+udostępnia dokładną publikację lub ostatnią ściśle przed datą, z numerem/źródłem.
+Bez faktur, reguł podatkowych i różnic kursowych. [Obsługa i struktura](docs/currencies-and-nbp.md).
 
 ## 4. Decyzje technologiczne
 
@@ -871,6 +896,9 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | [ADR-015](docs/adr/ADR-015-identity-i-autoryzowany-wybor-bazy.md) | Identity, sesje i autoryzowany wybór bazy | Wdrożone API logowania, uprawnienia do firm, resolver i sprawdzanie rzeczywistego profilu; bez UI Avalonia |
 | [ADR-016](docs/adr/ADR-016-desktop-logowanie-i-kontekst-firmy.md) | Avalonia: logowanie i kontekst firmy | Wdrożony scenariusz desktopowy, odczyt kontrahentów, zmiana firmy i wylogowanie |
 | [ADR-017](docs/adr/ADR-017-kartoteka-kontrahentow-i-audyt.md) | Edycja kontrahentów, filtry, rowversion i atomowy audyt | Wdrożony formularz, serwerowe filtrowanie/strony i autoryzowany zapis; jawne migracje systemowa i firmowa |
+| [ADR-022](docs/adr/ADR-022-dataport-i-sekrety-firmy.md) | DataPort i ustawienia firmy | Osobny adapter pośrednika, szyfrowany lokalny klucz, kontrola uprawnień i selektywny import do szkicu; bez zmiany oficjalnych adapterów TEST |
+| [ADR-023](docs/adr/ADR-023-waluty-i-reczne-kursy-nbp.md) | Waluty i ręczne kursy NBP | Lokalny słownik/ustawienia A/B/C, kursy decimal, jawne konflikty i audyt, stronicowany ekran Avalonia; bez harmonogramu i reguł faktur |
+| [ADR-024](docs/adr/ADR-024-kod-iso-jako-klucz-waluty.md) | ISO 4217 jako jedyny identyfikator waluty | Code char(3) PK, CurrencyCode FK, brak numerycznego Id waluty; odtworzenie wyłącznie demonstracyjnego modułu walut i kursów |
 | [ADR-021](docs/adr/ADR-021-identyfikatory-i-rejestry-testowe.md) | Identyfikatory i rejestry TEST | Wersjonowane reguły, ostrzeżenia, osobna niezmienna historia i środowiska Test/Production/Mock; ręczne oficjalne MF/WL2, GUS BIR1.2 i VIES |
 | [ADR-020](docs/adr/ADR-020-kompletna-kartoteka-avalonia.md) | Kompletna kartoteka Avalonia | Cztery zakładki, grupy, CRUD szczegółów, typowany audyt, idempotencja, atomowe preferencje i osobne uprawnienie do ostrzeżeń rachunków; bez walidatorów podatkowych/integracji |
 | [ADR-019](docs/adr/ADR-019-implementacja-modelu-kontrahentow.md) | Implementacja podstawy kartoteki | int IDENTITY, zabezpieczona hierarchia, lokalne szczegóły, trwała idempotencja, audyt i odtworzenie trzech demonstracyjnych baz; bez walidatorów i nowych ekranów |

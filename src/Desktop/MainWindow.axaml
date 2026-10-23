@@ -57,7 +57,7 @@
         <TextBlock Text="{Binding CurrentCompany}" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap"
                    AutomationProperties.AutomationId="CurrentCompany" />
         <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10">
-          <Button Content="Ustawienia firmy" Click="DataPortSettingsClick" AutomationProperties.AutomationId="CompanySettings"/><Button Content="Zmień firmę" Click="ChangeCompanyClick" AutomationProperties.AutomationId="ChangeCompany" />
+          <Button Content="Słowniki → Waluty i kursy NBP" Click="CurrenciesClick" IsVisible="{Binding CanViewRates}" AutomationProperties.AutomationId="OpenCurrencies"/><Button Content="Ustawienia firmy" Click="DataPortSettingsClick" AutomationProperties.AutomationId="CompanySettings"/><Button Content="Zmień firmę" Click="ChangeCompanyClick" AutomationProperties.AutomationId="ChangeCompany" />
           <Button Content="Wyloguj" Click="LogoutClick" AutomationProperties.AutomationId="LogoutWorkspace" />
           <Button Content="Nowy (Ctrl+N)" Click="NewContractorClick" IsVisible="{Binding CanEditContractors}" AutomationProperties.AutomationId="NewContractor" />
           <Button Content="Otwórz (F2)" Click="EditContractorClick" IsVisible="{Binding CanViewContractors}" AutomationProperties.AutomationId="EditContractor" />
@@ -121,9 +121,61 @@
         </Grid>
       </Grid>
 
+      <Grid IsVisible="{Binding IsCurrencyScreen}" RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="8">
+        <StackPanel Spacing="5">
+          <TextBlock Text="{Binding CurrencyScreenTitle}" FontSize="23" FontWeight="SemiBold" TextWrapping="Wrap"/>
+          <TextBlock Text="{Binding CurrentCompany}" TextWrapping="Wrap"/>
+          <WrapPanel><Button Content="Kursy zapisane" Click="CurrencyRatesTabClick" AutomationProperties.AutomationId="RatesTab"/><Button Content="Odśwież słownik" Click="RefreshCurrenciesClick" AutomationProperties.AutomationId="RefreshCurrencies"/><Button Content="Ustawienia pobierania" Click="CurrencySettingsTabClick" AutomationProperties.AutomationId="CurrencySettingsTab"/><Button Content="Wróć do kontrahentów" Click="CloseCurrenciesClick" AutomationProperties.AutomationId="CloseCurrencies"/></WrapPanel>
+        </StackPanel>
+        <WrapPanel Grid.Row="1" IsEnabled="{Binding CanImportRates}">
+          <ComboBox SelectedIndex="{Binding ImportMode, Mode=TwoWay}" AutomationProperties.AutomationId="NbpImportMode"><ComboBoxItem Content="Najnowsze kursy"/><ComboBoxItem Content="Za okres publikacji"/></ComboBox>
+          <DatePicker SelectedDate="{Binding ImportFrom, Mode=TwoWay}" AutomationProperties.AutomationId="NbpFrom"/>
+          <TextBlock Text="do" VerticalAlignment="Center" Margin="8"/>
+          <DatePicker SelectedDate="{Binding ImportTo, Mode=TwoWay}" AutomationProperties.AutomationId="NbpTo"/>
+          <Button Content="Pobierz kursy z NBP" Click="ImportNbpClick" AutomationProperties.AutomationId="ImportNbp"/>
+        </WrapPanel>
+        <ScrollViewer Grid.Row="2" MaxHeight="125"><StackPanel><TextBlock Text="Daty od/do są używane tylko w trybie „Za okres”; to daty publikacji, nie dokumentów. A/B: średni. C: kupna i sprzedaży. NBP nie wymaga klucza. PLN nie jest pobierany." TextWrapping="Wrap" Opacity="0.75"/><TextBlock Text="{Binding RateImportSummary}" TextWrapping="Wrap" AutomationProperties.AutomationId="NbpSummary"/></StackPanel></ScrollViewer>
+        <Grid Grid.Row="3" IsVisible="{Binding IsCurrencySettings}" ColumnDefinitions="*,*" ColumnSpacing="18">
+          <Grid RowDefinitions="Auto,*" RowSpacing="6"><TextBox Text="{Binding CurrencySearch, Mode=TwoWay}" PlaceholderText="Szukaj kodu lub nazwy waluty" AutomationProperties.AutomationId="CurrencySearch"/><ListBox Grid.Row="1" ItemsSource="{Binding VisibleCurrencyRows}" SelectedItem="{Binding SelectedCurrency, Mode=TwoWay}" AutomationProperties.AutomationId="CurrencyList"/></Grid>
+          <ScrollViewer Grid.Column="1"><StackPanel Spacing="10">
+            <TextBlock Text="{Binding CurrencyEditor.Label}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"/>
+            <StackPanel IsEnabled="{Binding CanConfigureCurrencies}" Spacing="7">
+              <CheckBox Content="Waluta aktywna" IsChecked="{Binding CurrencyEditor.IsActive, Mode=TwoWay}" IsEnabled="{Binding !CurrencyEditor.IsPln}" AutomationProperties.AutomationId="CurrencyActive"/>
+              <StackPanel IsEnabled="{Binding CanChooseCurrencyTables}">
+                <CheckBox Content="Tabela A — kurs średni" IsChecked="{Binding CurrencyEditor.DownloadA, Mode=TwoWay}" AutomationProperties.AutomationId="CurrencyA"/>
+                <CheckBox Content="Tabela B — kurs średni (rzadsze publikacje)" IsChecked="{Binding CurrencyEditor.DownloadB, Mode=TwoWay}" AutomationProperties.AutomationId="CurrencyB"/>
+                <CheckBox Content="Tabela C — kurs kupna i sprzedaży" IsChecked="{Binding CurrencyEditor.DownloadC, Mode=TwoWay}" AutomationProperties.AutomationId="CurrencyC"/>
+              </StackPanel>
+              <WrapPanel><Button Content="Zapisz ustawienia waluty" Click="SaveCurrencyClick" AutomationProperties.AutomationId="SaveCurrency"/><Button Content="Porzuć zmiany" Click="CancelCurrencyClick" AutomationProperties.AutomationId="CancelCurrency"/></WrapPanel>
+            </StackPanel>
+            <TextBlock Text="Zapis dotyczy wybranej waluty i nie pobiera kursów. Wyłączenie waluty zachowuje jej historię i usuwa wybór pobierania. PLN zawsze pozostaje aktywny, bez kursu NBP. Dostępność waluty zależy od tabeli; brak jest raportowany, bez fikcyjnego kursu." TextWrapping="Wrap"/>
+          </StackPanel></ScrollViewer>
+        </Grid>
+        <Grid Grid.Row="3" IsVisible="{Binding IsRateList}" RowDefinitions="Auto,Auto,*,Auto,Auto" RowSpacing="6">
+          <WrapPanel>
+            <ComboBox Width="200" ItemsSource="{Binding CurrencyRows}" SelectedItem="{Binding RateCurrencyFilter, Mode=TwoWay}" PlaceholderText="Wszystkie waluty" AutomationProperties.AutomationId="RateCurrencyFilter"/>
+            <ComboBox SelectedIndex="{Binding RateTableFilter, Mode=TwoWay}" AutomationProperties.AutomationId="RateTableFilter"><ComboBoxItem Content="Wszystkie tabele"/><ComboBoxItem Content="A — średni"/><ComboBoxItem Content="B — średni"/><ComboBoxItem Content="C — kupna/sprzedaży"/></ComboBox>
+            <DatePicker SelectedDate="{Binding RateFromFilter, Mode=TwoWay}" AutomationProperties.AutomationId="RateFilterFrom"/><DatePicker SelectedDate="{Binding RateToFilter, Mode=TwoWay}" AutomationProperties.AutomationId="RateFilterTo"/>
+            <CheckBox Content="Najnowsze najpierw" IsChecked="{Binding RateDescending, Mode=TwoWay}"/>
+            <Button Content="Filtruj" Click="FilterRatesClick" AutomationProperties.AutomationId="FilterRates"/><Button Content="Wyczyść filtry" Click="ClearRateFiltersClick"/>
+          </WrapPanel>
+          <Grid Grid.Row="1" ColumnDefinitions="100,65,50,170,115,*" Margin="6,0,16,0"><TextBlock Text="Publikacja"/><TextBlock Grid.Column="1" Text="Waluta"/><TextBlock Grid.Column="2" Text="Tabela"/><TextBlock Grid.Column="3" Text="Numer NBP"/><TextBlock Grid.Column="4" Text="Notowanie"/><TextBlock Grid.Column="5" Text="Kurs PLN za jednostkę waluty"/></Grid>
+          <ListBox Grid.Row="2" ItemsSource="{Binding RateRows}" AutomationProperties.AutomationId="RateList"><ListBox.ItemTemplate><DataTemplate x:DataType="contracts:RateResponse"><Grid ColumnDefinitions="100,65,50,170,115,*"><TextBlock Text="{Binding DateLabel}"/><TextBlock Grid.Column="1" Text="{Binding CurrencyCode}"/><TextBlock Grid.Column="2" Text="{Binding TableType}"/><TextBlock Grid.Column="3" Text="{Binding TableNumber}"/><TextBlock Grid.Column="4" Text="{Binding TradingDateLabel}"/><TextBlock Grid.Column="5" Text="{Binding Values}" TextWrapping="Wrap"/></Grid></DataTemplate></ListBox.ItemTemplate></ListBox>
+          <WrapPanel Grid.Row="3"><Button Content="Poprzednie kursy" Click="PreviousRatesClick" IsEnabled="{Binding HasPreviousRates}"/><Button Content="Następne kursy" Click="NextRatesClick" IsEnabled="{Binding HasNextRates}"/><TextBlock Text="{Binding RatePageLabel}" VerticalAlignment="Center"/></WrapPanel>
+          <TextBlock Grid.Row="4" Text="{Binding StoredRateDates}" TextWrapping="Wrap" Opacity="0.75"/>
+        </Grid>
+        <ScrollViewer Grid.Row="4" MaxHeight="230"><StackPanel Spacing="8">
+          <Expander Header="Konflikty — wymagają świadomej decyzji" IsVisible="{Binding HasRateConflicts}"><StackPanel Spacing="6">
+            <ListBox ItemsSource="{Binding RateConflicts}" SelectedItem="{Binding SelectedRateConflict, Mode=TwoWay}" MaxHeight="100" AutomationProperties.AutomationId="RateConflicts"/>
+            <TextBlock Text="{Binding RateConflictComparison}" TextWrapping="Wrap"/>
+            <StackPanel IsEnabled="{Binding CanResolveRates}"><CheckBox Content="Świadomie potwierdzam wybrany sposób rozstrzygnięcia" IsChecked="{Binding ConfirmRateResolution, Mode=TwoWay}" AutomationProperties.AutomationId="ConfirmRateResolution"/><WrapPanel><Button Content="Zachowaj zapisany kurs" Click="KeepRateClick" AutomationProperties.AutomationId="KeepRate"/><Button Content="Przyjmij propozycję NBP" Click="AcceptRateClick" AutomationProperties.AutomationId="AcceptRate"/></WrapPanel></StackPanel>
+          </StackPanel></Expander>
+          <Expander Header="Historia operacji walutowych"><StackPanel><WrapPanel><Button Content="Odśwież historię" Click="CurrencyHistoryClick"/><Button Content="Poprzednie" Click="PreviousCurrencyHistoryClick" IsEnabled="{Binding HasPreviousCurrencyHistory}"/><Button Content="Następne" Click="NextCurrencyHistoryClick" IsEnabled="{Binding HasNextCurrencyHistory}"/></WrapPanel><ListBox ItemsSource="{Binding CurrencyHistoryRows}" SelectedItem="{Binding SelectedCurrencyHistory, Mode=TwoWay}" MaxHeight="150" AutomationProperties.AutomationId="CurrencyHistory"/></StackPanel></Expander>
+        </StackPanel></ScrollViewer>
+      </Grid>
       <ScrollViewer IsVisible="{Binding IsDataPortSettings}">
         <StackPanel Spacing="12" MaxWidth="740" HorizontalAlignment="Left">
-          <TextBlock Text="Ustawienia firmy → Integracje zewnętrzne → DataPort" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>
+          <Button Content="Ustawienia firmy → Waluty i kursy NBP" Click="CurrencySettingsClick" IsVisible="{Binding CanViewRates}" AutomationProperties.AutomationId="CurrencySettings"/><TextBlock Text="Ustawienia firmy → Integracje zewnętrzne → DataPort" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>
           <TextBlock Text="{Binding CurrentCompany}" TextWrapping="Wrap"/>
           <TextBlock Text="DataPort to komercyjny pośrednik danych GUS. Samodzielnie załóż konto i uzyskaj klucz. Zapytania są ręczne, a limit dzienny wspólny dla całego konta (reset 00:00 UTC). Dane mogą pochodzić z cache." TextWrapping="Wrap"/>
           <Button Content="https://dataport.pl/api — dokumentacja i konto" Click="DataPortWebsiteClick"/>

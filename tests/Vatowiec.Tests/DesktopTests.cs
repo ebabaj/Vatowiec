@@ -255,6 +255,18 @@ public sealed partial class DesktopTests
     }
     private sealed class FakeApi : IVatowiecApiClient
     {
+        public List<CurrencyWriteRequest> CurrencyWrites { get; } = [];
+        public int NbpImports { get; private set; }
+        public CurrencyHistoryResponse[] CurrencyHistoryData { get; set; } = [];
+        public Task<CurrencyResponse[]> Currencies(Guid companyId) => Task.FromResult<CurrencyResponse[]>([
+            new(companyId, "PLN", "złoty", true, false, false, false, "AAAAAAAAAAE="),
+            new(companyId, "EUR", "euro", true, true, false, false, "AAAAAAAAAAE=")]);
+        public Task<CurrencyResponse> SaveCurrency(Guid companyId, string currencyCode, CurrencyWriteRequest value)
+        { CurrencyWrites.Add(value); return Task.FromResult(new CurrencyResponse(companyId, currencyCode, "euro", value.IsActive, value.DownloadA, value.DownloadB, value.DownloadC, "AAAAAAAAAAI=")); }
+        public Task<RatePage> Rates(Guid companyId, string? code, string? table, DateOnly? from, DateOnly? to, int offset, bool descending) => Task.FromResult(new RatePage(companyId, [], null, null, null));
+        public Task<RateImportResponse> ImportRates(Guid companyId, RateImportRequest value)
+        { NbpImports++; return Task.FromResult(new RateImportResponse(1, companyId, 0, 0, 0, [], [], [], value.From, value.To, null, null, null)); }
+        public Task<CurrencyHistoryResponse[]> CurrencyHistory(Guid companyId, int offset) => Task.FromResult(CurrencyHistoryData);
         private bool keyConfigured;
         private int keyVersion;
         public int KeySaves { get; private set; }

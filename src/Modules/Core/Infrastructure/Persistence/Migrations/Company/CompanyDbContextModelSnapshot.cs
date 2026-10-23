@@ -495,6 +495,1441 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
                     b.ToTable("ContractorCreateOperations", "core");
                 });
 
+            modelBuilder.Entity("Vatowiec.Core.Domain.Currency", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasColumnType("char(3)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<bool>("DownloadA")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("DownloadB")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("DownloadC")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Code");
+
+                    b.ToTable("Currencies", "ref", t =>
+                        {
+                            t.HasCheckConstraint("CK_Currencies_Active", "[IsActive]=1 OR ([DownloadA]=0 AND [DownloadB]=0 AND [DownloadC]=0)");
+
+                            t.HasCheckConstraint("CK_Currencies_Code", "[Code] COLLATE Latin1_General_100_BIN2 NOT LIKE '%[^A-Z]%' AND LEN([Code])=3");
+
+                            t.HasCheckConstraint("CK_Currencies_PLN", "[Code] <> 'PLN' OR ([IsActive]=1 AND [DownloadA]=0 AND [DownloadB]=0 AND [DownloadC]=0)");
+                        });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
+
+                    b.HasData(
+                        new
+                        {
+                            Code = "PLN",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "złoty polski"
+                        },
+                        new
+                        {
+                            Code = "THB",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "bat tajlandzki"
+                        },
+                        new
+                        {
+                            Code = "USD",
+                            DownloadA = true,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar amerykański"
+                        },
+                        new
+                        {
+                            Code = "AUD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar australijski"
+                        },
+                        new
+                        {
+                            Code = "HKD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar Hongkongu"
+                        },
+                        new
+                        {
+                            Code = "CAD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar kanadyjski"
+                        },
+                        new
+                        {
+                            Code = "NZD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar nowozelandzki"
+                        },
+                        new
+                        {
+                            Code = "SGD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar singapurski"
+                        },
+                        new
+                        {
+                            Code = "EUR",
+                            DownloadA = true,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "euro"
+                        },
+                        new
+                        {
+                            Code = "HUF",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "forint węgierski"
+                        },
+                        new
+                        {
+                            Code = "CHF",
+                            DownloadA = true,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "frank szwajcarski"
+                        },
+                        new
+                        {
+                            Code = "GBP",
+                            DownloadA = true,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "funt szterling"
+                        },
+                        new
+                        {
+                            Code = "UAH",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "hrywna ukraińska"
+                        },
+                        new
+                        {
+                            Code = "JPY",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "jen japoński"
+                        },
+                        new
+                        {
+                            Code = "CZK",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "korona czeska"
+                        },
+                        new
+                        {
+                            Code = "DKK",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "korona duńska"
+                        },
+                        new
+                        {
+                            Code = "ISK",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "korona islandzka"
+                        },
+                        new
+                        {
+                            Code = "NOK",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "korona norweska"
+                        },
+                        new
+                        {
+                            Code = "SEK",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "korona szwedzka"
+                        },
+                        new
+                        {
+                            Code = "RON",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "lej rumuński"
+                        },
+                        new
+                        {
+                            Code = "TRY",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "lira turecka"
+                        },
+                        new
+                        {
+                            Code = "ILS",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "szekel izraelski"
+                        },
+                        new
+                        {
+                            Code = "CLP",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "peso chilijskie"
+                        },
+                        new
+                        {
+                            Code = "PHP",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "peso filipińskie"
+                        },
+                        new
+                        {
+                            Code = "MXN",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "peso meksykańskie"
+                        },
+                        new
+                        {
+                            Code = "ZAR",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "rand południowoafrykański"
+                        },
+                        new
+                        {
+                            Code = "BRL",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "real brazylijski"
+                        },
+                        new
+                        {
+                            Code = "MYR",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "ringgit malezyjski"
+                        },
+                        new
+                        {
+                            Code = "IDR",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "rupia indonezyjska"
+                        },
+                        new
+                        {
+                            Code = "INR",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "rupia indyjska"
+                        },
+                        new
+                        {
+                            Code = "KRW",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "won południowokoreański"
+                        },
+                        new
+                        {
+                            Code = "CNY",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "juan chiński"
+                        },
+                        new
+                        {
+                            Code = "XDR",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "SDR — jednostka rozrachunkowa MFW"
+                        },
+                        new
+                        {
+                            Code = "AFN",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "afgani afgańskie"
+                        },
+                        new
+                        {
+                            Code = "MGA",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "ariary malgaski"
+                        },
+                        new
+                        {
+                            Code = "PAB",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "balboa panamska"
+                        },
+                        new
+                        {
+                            Code = "ETB",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "birr etiopski"
+                        },
+                        new
+                        {
+                            Code = "VES",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "boliwar wenezuelski"
+                        },
+                        new
+                        {
+                            Code = "BOB",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "boliwiano boliwijskie"
+                        },
+                        new
+                        {
+                            Code = "CRC",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "colon kostarykański"
+                        },
+                        new
+                        {
+                            Code = "SVC",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "colon salwadorski"
+                        },
+                        new
+                        {
+                            Code = "NIO",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "cordoba nikaraguańska"
+                        },
+                        new
+                        {
+                            Code = "GMD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dalasi gambijskie"
+                        },
+                        new
+                        {
+                            Code = "MKD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "denar macedoński"
+                        },
+                        new
+                        {
+                            Code = "DZD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dinar algierski"
+                        },
+                        new
+                        {
+                            Code = "BHD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dinar bahrajski"
+                        },
+                        new
+                        {
+                            Code = "IQD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dinar iracki"
+                        },
+                        new
+                        {
+                            Code = "JOD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dinar jordański"
+                        },
+                        new
+                        {
+                            Code = "KWD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dinar kuwejcki"
+                        },
+                        new
+                        {
+                            Code = "LYD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dinar libijski"
+                        },
+                        new
+                        {
+                            Code = "RSD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dinar serbski"
+                        },
+                        new
+                        {
+                            Code = "TND",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dinar tunezyjski"
+                        },
+                        new
+                        {
+                            Code = "MAD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dirham marokański"
+                        },
+                        new
+                        {
+                            Code = "AED",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dirham Zjednoczonych Emiratów Arabskich"
+                        },
+                        new
+                        {
+                            Code = "STN",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dobra Wysp Świętego Tomasza i Książęcej"
+                        },
+                        new
+                        {
+                            Code = "BSD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar bahamski"
+                        },
+                        new
+                        {
+                            Code = "BBD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar barbadoski"
+                        },
+                        new
+                        {
+                            Code = "BZD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar belizeński"
+                        },
+                        new
+                        {
+                            Code = "BND",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar brunejski"
+                        },
+                        new
+                        {
+                            Code = "FJD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar Fidżi"
+                        },
+                        new
+                        {
+                            Code = "GYD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar gujański"
+                        },
+                        new
+                        {
+                            Code = "JMD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar jamajski"
+                        },
+                        new
+                        {
+                            Code = "LRD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar liberyjski"
+                        },
+                        new
+                        {
+                            Code = "NAD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar namibijski"
+                        },
+                        new
+                        {
+                            Code = "SRD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar surinamski"
+                        },
+                        new
+                        {
+                            Code = "TTD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar Trynidadu i Tobago"
+                        },
+                        new
+                        {
+                            Code = "XCD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar wschodniokaraibski"
+                        },
+                        new
+                        {
+                            Code = "SBD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar Wysp Salomona"
+                        },
+                        new
+                        {
+                            Code = "VND",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dong wietnamski"
+                        },
+                        new
+                        {
+                            Code = "AMD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dram armeński"
+                        },
+                        new
+                        {
+                            Code = "CVE",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "escudo Zielonego Przylądka"
+                        },
+                        new
+                        {
+                            Code = "AWG",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "florin arubański"
+                        },
+                        new
+                        {
+                            Code = "BIF",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "frank burundyjski"
+                        },
+                        new
+                        {
+                            Code = "XOF",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "frank CFA BCEAO"
+                        },
+                        new
+                        {
+                            Code = "XAF",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "frank CFA BEAC"
+                        },
+                        new
+                        {
+                            Code = "XPF",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "frank CFP"
+                        },
+                        new
+                        {
+                            Code = "DJF",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "frank Dżibuti"
+                        },
+                        new
+                        {
+                            Code = "GNF",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "frank gwinejski"
+                        },
+                        new
+                        {
+                            Code = "KMF",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "frank Komorów"
+                        },
+                        new
+                        {
+                            Code = "CDF",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "frank kongijski"
+                        },
+                        new
+                        {
+                            Code = "RWF",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "frank rwandyjski"
+                        },
+                        new
+                        {
+                            Code = "EGP",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "funt egipski"
+                        },
+                        new
+                        {
+                            Code = "GIP",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "funt gibraltarski"
+                        },
+                        new
+                        {
+                            Code = "LBP",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "funt libański"
+                        },
+                        new
+                        {
+                            Code = "SSP",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "funt południowosudański"
+                        },
+                        new
+                        {
+                            Code = "SDG",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "funt sudański"
+                        },
+                        new
+                        {
+                            Code = "SYP",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "funt syryjski"
+                        },
+                        new
+                        {
+                            Code = "GHS",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "cedi ghański"
+                        },
+                        new
+                        {
+                            Code = "HTG",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "gourde haitańskie"
+                        },
+                        new
+                        {
+                            Code = "PYG",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "guarani paragwajskie"
+                        },
+                        new
+                        {
+                            Code = "XCG",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "gulden karaibski"
+                        },
+                        new
+                        {
+                            Code = "PGK",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "kina papuaska"
+                        },
+                        new
+                        {
+                            Code = "LAK",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "kip laotański"
+                        },
+                        new
+                        {
+                            Code = "MWK",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "kwacha malawijska"
+                        },
+                        new
+                        {
+                            Code = "ZMW",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "kwacha zambijska"
+                        },
+                        new
+                        {
+                            Code = "AOA",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "kwanza angolska"
+                        },
+                        new
+                        {
+                            Code = "MMK",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "kiat birmański"
+                        },
+                        new
+                        {
+                            Code = "GEL",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "lari gruzińskie"
+                        },
+                        new
+                        {
+                            Code = "MDL",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "lej mołdawski"
+                        },
+                        new
+                        {
+                            Code = "ALL",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "lek albański"
+                        },
+                        new
+                        {
+                            Code = "HNL",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "lempira honduraska"
+                        },
+                        new
+                        {
+                            Code = "SLE",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "leone Sierra Leone"
+                        },
+                        new
+                        {
+                            Code = "SZL",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "lilangeni Eswatini"
+                        },
+                        new
+                        {
+                            Code = "LSL",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "loti Lesotho"
+                        },
+                        new
+                        {
+                            Code = "AZN",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "manat azerbejdżański"
+                        },
+                        new
+                        {
+                            Code = "MZN",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "metical mozambicki"
+                        },
+                        new
+                        {
+                            Code = "NGN",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "naira nigeryjska"
+                        },
+                        new
+                        {
+                            Code = "ERN",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "nakfa erytrejska"
+                        },
+                        new
+                        {
+                            Code = "TWD",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "dolar tajwański"
+                        },
+                        new
+                        {
+                            Code = "TMT",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "manat turkmeński"
+                        },
+                        new
+                        {
+                            Code = "MRU",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "ouguiya mauretańska"
+                        },
+                        new
+                        {
+                            Code = "TOP",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "paʻanga tongijska"
+                        },
+                        new
+                        {
+                            Code = "MOP",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "pataca Makau"
+                        },
+                        new
+                        {
+                            Code = "ARS",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "peso argentyńskie"
+                        },
+                        new
+                        {
+                            Code = "DOP",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "peso dominikańskie"
+                        },
+                        new
+                        {
+                            Code = "COP",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "peso kolumbijskie"
+                        },
+                        new
+                        {
+                            Code = "CUP",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "peso kubańskie"
+                        },
+                        new
+                        {
+                            Code = "UYU",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "peso urugwajskie"
+                        },
+                        new
+                        {
+                            Code = "BWP",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "pula botswańska"
+                        },
+                        new
+                        {
+                            Code = "GTQ",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "quetzal gwatemalski"
+                        },
+                        new
+                        {
+                            Code = "IRR",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "rial irański"
+                        },
+                        new
+                        {
+                            Code = "YER",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "rial jemeński"
+                        },
+                        new
+                        {
+                            Code = "QAR",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "rial katarski"
+                        },
+                        new
+                        {
+                            Code = "OMR",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "rial omański"
+                        },
+                        new
+                        {
+                            Code = "SAR",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "rial saudyjski"
+                        },
+                        new
+                        {
+                            Code = "KHR",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "riel kambodżański"
+                        },
+                        new
+                        {
+                            Code = "BYN",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "rubel białoruski"
+                        },
+                        new
+                        {
+                            Code = "RUB",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "rubel rosyjski"
+                        },
+                        new
+                        {
+                            Code = "LKR",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "rupia lankijska"
+                        },
+                        new
+                        {
+                            Code = "MVR",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "rupia malediwska"
+                        },
+                        new
+                        {
+                            Code = "MUR",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "rupia Mauritiusu"
+                        },
+                        new
+                        {
+                            Code = "NPR",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "rupia nepalska"
+                        },
+                        new
+                        {
+                            Code = "PKR",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "rupia pakistańska"
+                        },
+                        new
+                        {
+                            Code = "SCR",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "rupia seszelska"
+                        },
+                        new
+                        {
+                            Code = "PEN",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "sol peruwiański"
+                        },
+                        new
+                        {
+                            Code = "KGS",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "som kirgiski"
+                        },
+                        new
+                        {
+                            Code = "TJS",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "somoni tadżyckie"
+                        },
+                        new
+                        {
+                            Code = "UZS",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "sum uzbecki"
+                        },
+                        new
+                        {
+                            Code = "KES",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "szyling kenijski"
+                        },
+                        new
+                        {
+                            Code = "SOS",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "szyling somalijski"
+                        },
+                        new
+                        {
+                            Code = "TZS",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "szyling tanzański"
+                        },
+                        new
+                        {
+                            Code = "UGX",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "szyling ugandyjski"
+                        },
+                        new
+                        {
+                            Code = "BDT",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "taka bengalska"
+                        },
+                        new
+                        {
+                            Code = "WST",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "tala samoańska"
+                        },
+                        new
+                        {
+                            Code = "KZT",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "tenge kazachskie"
+                        },
+                        new
+                        {
+                            Code = "MNT",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "tugrik mongolski"
+                        },
+                        new
+                        {
+                            Code = "VUV",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "vatu Vanuatu"
+                        },
+                        new
+                        {
+                            Code = "BAM",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "marka zamienna Bośni i Hercegowiny"
+                        },
+                        new
+                        {
+                            Code = "ZWG",
+                            DownloadA = false,
+                            DownloadB = false,
+                            DownloadC = false,
+                            IsActive = true,
+                            Name = "złoto Zimbabwe"
+                        });
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.CurrencyOperation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ActorIssuerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActorName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("DetailsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorId", "ActorIssuerId", "OperationId")
+                        .IsUnique();
+
+                    b.ToTable("CurrencyOperations", "audit");
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
+                });
+
             modelBuilder.Entity("Vatowiec.Core.Domain.DataPortConfiguration", b =>
                 {
                     b.Property<int>("SingletonKey")
@@ -514,6 +1949,74 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
                     b.ToTable("DataPortConfiguration", "security", t =>
                         {
                             t.HasCheckConstraint("CK_DataPort_Singleton", "[SingletonKey] = 1");
+                        });
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.ExchangeRate", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal?>("Ask")
+                        .HasPrecision(24, 12)
+                        .HasColumnType("decimal(24,12)");
+
+                    b.Property<decimal?>("Bid")
+                        .HasPrecision(24, 12)
+                        .HasColumnType("decimal(24,12)");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasColumnType("char(3)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<DateOnly>("EffectiveDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal?>("Mid")
+                        .HasPrecision(24, 12)
+                        .HasColumnType("decimal(24,12)");
+
+                    b.Property<DateTimeOffset>("RetrievedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(8)");
+
+                    b.Property<string>("TableNumber")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("TableType")
+                        .IsRequired()
+                        .HasColumnType("char(1)");
+
+                    b.Property<DateOnly?>("TradingDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EffectiveDate");
+
+                    b.HasIndex("CurrencyCode", "Source", "TableType", "EffectiveDate")
+                        .IsUnique();
+
+                    b.ToTable("ExchangeRates", "core", t =>
+                        {
+                            t.HasCheckConstraint("CK_ExchangeRates_Values", "[Source]='NBP' AND (([TableType] IN ('A','B') AND [Mid]>0 AND [Mid] IS NOT NULL AND [Bid] IS NULL AND [Ask] IS NULL AND [TradingDate] IS NULL) OR ([TableType]='C' AND [Mid] IS NULL AND [Bid]>0 AND [Ask]>0 AND [Bid] IS NOT NULL AND [Ask] IS NOT NULL AND [Bid]<=[Ask] AND ([TradingDate] IS NULL OR [TradingDate]<=[EffectiveDate])))");
                         });
                 });
 
@@ -699,6 +2202,15 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
                         .WithMany()
                         .HasForeignKey("ContractorId")
                         .OnDelete(DeleteBehavior.NoAction);
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.ExchangeRate", b =>
+                {
+                    b.HasOne("Vatowiec.Core.Domain.Currency", null)
+                        .WithMany()
+                        .HasForeignKey("CurrencyCode")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Vatowiec.Core.Domain.ExternalVerification", b =>

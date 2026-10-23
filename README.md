@@ -5,10 +5,21 @@ Projekt wielostanowiskowej aplikacji dla polskich mikrofirm. Obecny stan to
 wybór firmy, dodawanie/edycja z audytem i konfliktami oraz wyszukiwanie po stronie serwera.
 Osobne SystemDbContext i CompanyDbContext, trzy bazy SQL
 Server oraz dwie fikcyjne firmy. Działają Identity, sesje API i autoryzowany resolver
-bazy firmy. Pełny zestaw obejmuje 210 testów, w tym 83 z SQL/API (127 bez SQL), bez pominięć.
+bazy firmy. Pełny zestaw po zmianie klucza waluty ADR-024: **244/244**,
+bez pominięć — 94 SQL/API i 150 bez SQL. Kompilacja bez ostrzeżeń i błędów.
 Nie jest to jeszcze program do prowadzenia księgowości.
 
-**Aktualny etap: DataPort i konfiguracja firmy (ADR-022).** Jeden formularz
+**Aktualny etap: kod ISO jako jedyny identyfikator waluty (ADR-024).** Każda firma ma lokalny
+słownik 149 walut, ustawienia A/B/C, kursy decimal i niezmienną historię.
+W Avalonia wybierz **Słowniki → Waluty i kursy NBP**: konfiguracja, filtry,
+ręczny import najnowszych publikacji lub okresu oraz jawne rozstrzyganie konfliktów.
+Domyślnie EUR/USD/GBP/CHF z A; PLN bez pobierania. Nie ma harmonogramu ani
+reguł doboru kursu do faktur. [Instrukcja, API i wyniki](docs/currencies-and-nbp.md).
+Walutę identyfikuje wyłącznie niezmienne Code char(3) PK; kursy wskazują
+CurrencyCode FK i zachowują własne bigint Id. Reset objął tylko moduł walutowy,
+bez mapowania starych identyfikatorów i bez zmian konfiguracji DataPort.
+
+Formularz kontrahenta
 ma Dane główne, Adresy, Kontakty i Rachunki bankowe. Można wybierać grupę,
 dodawać rodzaje adresów, edytować szczegóły i atomowo zmieniać preferencje.
 TaxId/VatEuId/KsefIdWew są edytowalne z normalizacją, wersjonowanymi regułami

@@ -2,9 +2,9 @@
 
 Projekt: **Otwarty następca VATowca** (nazwa robocza).  
 Główne źródło wymagań: [`SPECYFIKACJA.md`](./SPECYFIKACJA.md).  
-Status: DataPort i szyfrowana konfiguracja firmy, 2026-10-22; ADR-022.
+Status: waluty identyfikowane wyłącznie kodem ISO 4217, 2026-10-23; ADR-024.
 
-**Aktualny etap obejmuje implementację zatwierdzonego modelu ADR-018.**
+**Aktualny etap: wdrożony klucz waluty Code (ADR-024), 244/244 testy.**
 Użytkownik zakończył etap dokumentacyjny. Można odtwarzać wyłącznie lokalne
 Vatowiec_System, Vatowiec_Company_A_Dev i Vatowiec_Company_B_Dev po kontroli
 instancji, dokładnych nazw, znaczników i fikcyjnego przeznaczenia danych.
@@ -24,7 +24,28 @@ API zwraca tylko stan, nigdy klucz/szyfrogram. X-API-Key tylko na jednym żądan
 stały HTTPS dataport.pl, bez logowania treści/nagłówka i ponowień. Dane pośrednika
 mogą pochodzić z cache, nie są bezpośrednim potwierdzeniem urzędu. Używamy obecnego
 audit.ExternalVerifications i selektywnego importu do szkicu. Szczegóły: docs/dataport.md.
-Nie wykonuj Commit ani Push.
+ADR-023 dodaje lokalne ref.Currencies (149 pozycji offline i ustawienia A/B/C),
+core.ExchangeRates i niezmienne audit.CurrencyOperations, bez CompanyId i GUID PK.
+ADR-024 zastępuje numeryczny klucz WALUTY: wyłącznie Code char(3) PRIMARY KEY,
+wielkie litery, niezmienny kod, bez Id/int/GUID. Kursy mają CurrencyCode char(3)
+FK do Code i zachowują własne bigint IDENTITY. API/DTO/Avalonia używają kodów.
+Odtwarzamy tylko trzy demonstracyjne tabele modułu walutowego; nie migrujemy
+danych ani CurrencyId. Sama migracja nie dotyka innych kartotek ani DataPort.
+Użytkownik następnie jawnie odwołał ograniczenie czyszczenia danych demonstratora
+i zatwierdził pełny reset fikcyjnych danych na potrzeby wszystkich testów.
+Używamy istniejącego `test` na trzech dozwolonych bazach; nie tworzymy *_Test.
+Runner nadal zachowuje zastany szyfrogram DataPort po zweryfikowanych kopiach.
+Nie rozszerza to zgody na inne aplikacje, bazy SQL systemowe ani zdalne serwery.
+Pozostałe zasady ADR-023 obowiązują.
+Domyślnie EUR/USD/GBP/CHF z A; PLN bez pobierania. ViewExchangeRates=64,
+ManageCurrencies=128, ImportExchangeRates=256; B tylko odczyt. NBP to publiczne
+HTTPS/JSON bez klucza; pobieranie wyłącznie ręczne, zakresy po 93 dni włącznie.
+Nie generuj dat/kursów ani nie nadpisuj konfliktu po cichu. Mid/Bid/Ask decimal(24,12),
+opcjonalne TradingDate C; świadome rozstrzygnięcie wymaga zgodnej wersji i audytu.
+Nie dodawaj harmonogramu ani reguł doboru kursu dla faktury. Automatyczne testy
+NBP używają atrap. Pełny runner chroni zastany szyfrogram DataPort zweryfikowanymi
+kopiami i przywraca go do zgodnego profilu po testach, bez odczytu sekretu.
+Szczegóły: docs/currencies-and-nbp.md. Nie wykonuj Commit ani Push.
 
 ## 1. Co budujemy
 

@@ -16,8 +16,8 @@ public sealed class SqlServerPersistenceTests
     {
         await using var session = await Session.Open("Vatowiec_System", "ConnectionStrings__VatowiecSystemTest");
         await using var context = session.System();
-        Assert.Equal(6, (await context.Database.GetAppliedMigrationsAsync()).Count());
-        Assert.EndsWith("_CompanyIntegrationPermission", (await context.Database.GetAppliedMigrationsAsync()).Last());
+        Assert.Equal(7, (await context.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.EndsWith("_CurrencyPermissions", (await context.Database.GetAppliedMigrationsAsync()).Last());
         Assert.Empty(await context.Database.GetPendingMigrationsAsync());
         using var command = new SqlCommand("SELECT COUNT(*) FROM sys.tables WHERE schema_id = SCHEMA_ID('core')", session.Connection, session.Transaction);
         Assert.Equal(2, (int)(await command.ExecuteScalarAsync())!);
@@ -37,7 +37,7 @@ public sealed class SqlServerPersistenceTests
         await b.Seed(idB);
         await using var first = a.Company(idA);
         await using var second = b.Company(idB);
-        Assert.EndsWith("_DataPortConfiguration", (await first.Database.GetAppliedMigrationsAsync()).Last());
+        Assert.EndsWith("_CurrencyIsoCodePrimaryKey", (await first.Database.GetAppliedMigrationsAsync()).Last());
         Assert.Empty(await first.Database.GetPendingMigrationsAsync());
         Assert.Equal("KLIENT", (await first.Contractors.SingleAsync()).Code);
         Assert.Equal("KLIENT", (await second.Contractors.SingleAsync()).Code);
@@ -55,13 +55,13 @@ public sealed class SqlServerPersistenceTests
         await using var second = b.Company(null);
         await using var system = s.System();
         using var command = new SqlCommand("DELETE FROM dbo.__EFMigrationsHistory;", a.Connection, a.Transaction);
-        Assert.Equal(4, await command.ExecuteNonQueryAsync());
+        Assert.Equal(7, await command.ExecuteNonQueryAsync());
         Assert.Empty(await first.Database.GetAppliedMigrationsAsync());
-        Assert.Equal(4, (await first.Database.GetPendingMigrationsAsync()).Count());
-        Assert.EndsWith("_DataPortConfiguration", (await second.Database.GetAppliedMigrationsAsync()).Last());
+        Assert.Equal(7, (await first.Database.GetPendingMigrationsAsync()).Count());
+        Assert.EndsWith("_CurrencyIsoCodePrimaryKey", (await second.Database.GetAppliedMigrationsAsync()).Last());
         Assert.Empty(await second.Database.GetPendingMigrationsAsync());
-        Assert.Equal(6, (await system.Database.GetAppliedMigrationsAsync()).Count());
-        Assert.EndsWith("_CompanyIntegrationPermission", (await system.Database.GetAppliedMigrationsAsync()).Last());
+        Assert.Equal(7, (await system.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.EndsWith("_CurrencyPermissions", (await system.Database.GetAppliedMigrationsAsync()).Last());
         Assert.Empty(await system.Database.GetPendingMigrationsAsync());
         // Usunięcie wpisu historii w A jest wycofywane przez Session.DisposeAsync.
     }

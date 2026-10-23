@@ -71,6 +71,7 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
                 services.AddSingleton<Vatowiec.Core.Infrastructure.Registries.IDataPortKeyProtector>(
                     new Vatowiec.Core.Infrastructure.Registries.DataPortKeyProtector(new EphemeralDataProtectionProvider()));
                 services.AddScoped<Vatowiec.Core.Infrastructure.Registries.IDataPortClient>(_ => new MockDataPort(dataPortRequests));
+                services.AddSingleton<Vatowiec.Core.Infrastructure.Registries.INbpClient>(nbpFixture);
             });
         });
         using var scope = application.Services.CreateScope();
@@ -127,6 +128,11 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
                 BEGIN TRY
                     DISABLE TRIGGER audit.TR_ExternalVerifications_Immutable ON audit.ExternalVerifications;
                     DELETE FROM audit.ExternalVerifications;
+                    DISABLE TRIGGER audit.TR_CurrencyOperations_Immutable ON audit.CurrencyOperations;
+                    DELETE FROM audit.CurrencyOperations;
+                    ENABLE TRIGGER audit.TR_CurrencyOperations_Immutable ON audit.CurrencyOperations;
+                    DELETE FROM core.ExchangeRates;
+                    UPDATE ref.Currencies SET IsActive=1, DownloadA=CASE WHEN Code IN ('EUR','USD','GBP','CHF') THEN 1 ELSE 0 END, DownloadB=0, DownloadC=0;
                     ENABLE TRIGGER audit.TR_ExternalVerifications_Immutable ON audit.ExternalVerifications;
                     COMMIT;
                 END TRY

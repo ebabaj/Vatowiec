@@ -20,10 +20,20 @@ public sealed class CompanyDbContext(
     public DbSet<ContractorCreateOperation> ContractorCreateOperations => Set<ContractorCreateOperation>();
     public DbSet<ExternalVerification> ExternalVerifications => Set<ExternalVerification>();
 
+    public DbSet<Currency> Currencies => Set<Currency>();
+    public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
+    public DbSet<CurrencyOperation> CurrencyOperations => Set<CurrencyOperation>();
+
     public DbSet<DataPortConfiguration> DataPortConfigurations => Set<DataPortConfiguration>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.ApplyConfiguration(new CurrencyConfiguration());
+        modelBuilder.ApplyConfiguration(new ExchangeRateConfiguration());
+        modelBuilder.ApplyConfiguration(new CurrencyOperationConfiguration());
+        modelBuilder.Entity<Currency>().HasQueryFilter(x => CurrentCompanyId != null && CompanyProfiles.Any(p => p.CompanyId == CurrentCompanyId));
+        modelBuilder.Entity<ExchangeRate>().HasQueryFilter(x => CurrentCompanyId != null && CompanyProfiles.Any(p => p.CompanyId == CurrentCompanyId));
+        modelBuilder.Entity<CurrencyOperation>().HasQueryFilter(x => CurrentCompanyId != null && CompanyProfiles.Any(p => p.CompanyId == CurrentCompanyId));
         modelBuilder.ApplyConfiguration(new DataPortConfigurationMapping());
         modelBuilder.Entity<DataPortConfiguration>().HasQueryFilter(x =>
             CurrentCompanyId != null && CompanyProfiles.Any(p => p.CompanyId == CurrentCompanyId));
@@ -74,6 +84,10 @@ public sealed class CompanyDbContext(
     private void PrepareChanges()
     {
         ChangeTracker.DetectChanges();
+        if (ChangeTracker.Entries<CurrencyOperation>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Historia walut jest niezmienna.");
+        if (ChangeTracker.Entries().Any(x => x.State == EntityState.Deleted && x.Entity is Currency or ExchangeRate))
+            throw new InvalidOperationException("Nie usuwamy fizycznie walut ani kursów.");
         if (ChangeTracker.Entries<ExternalVerification>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("Historia weryfikacji zewnętrznych jest niezmienna.");
         if (ChangeTracker.Entries<ContractorChange>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))

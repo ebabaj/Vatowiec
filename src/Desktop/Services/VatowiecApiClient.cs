@@ -25,6 +25,12 @@ public interface IVatowiecApiClient : IDisposable
     Task<ContractorResponse[]> ParentCandidates(Guid companyId, string search, int excludeId, int offset = 0) => Task.FromResult<ContractorResponse[]>([]);
     Task<ContractorResponse[]> Children(Guid companyId, int parentId, int offset = 0) => Task.FromResult<ContractorResponse[]>([]);
     Task Logout();
+    Task<CurrencyResponse[]> Currencies(Guid companyId) => throw new NotSupportedException();
+    Task<CurrencyResponse> SaveCurrency(Guid companyId, string currencyCode, CurrencyWriteRequest value) => throw new NotSupportedException();
+    Task<RatePage> Rates(Guid companyId, string? code, string? table, DateOnly? from, DateOnly? to, int offset, bool descending) => throw new NotSupportedException();
+    Task<RateImportResponse> ImportRates(Guid companyId, RateImportRequest value) => throw new NotSupportedException();
+    Task<CurrencyHistoryResponse> ResolveRate(Guid companyId, long auditId, RateResolutionRequest value) => throw new NotSupportedException();
+    Task<CurrencyHistoryResponse[]> CurrencyHistory(Guid companyId, int offset) => throw new NotSupportedException();
     Task<DataPortConfigurationResponse> DataPortConfiguration(Guid companyId) => throw new NotSupportedException();
     Task<DataPortConfigurationResponse> SaveDataPortKey(Guid companyId, SaveDataPortKeyRequest value) => throw new NotSupportedException();
     Task<DataPortConfigurationResponse> DeleteDataPortKey(Guid companyId, DeleteDataPortKeyRequest value) => throw new NotSupportedException();
@@ -87,6 +93,20 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
     }
 
     public Task<CompanyResponse[]> Companies() => Get<CompanyResponse[]>("api/v1/companies");
+    public Task<CurrencyResponse[]> Currencies(Guid companyId) => Get<CurrencyResponse[]>($"api/v1/companies/{companyId}/currencies");
+    public Task<CurrencyResponse> SaveCurrency(Guid companyId, string currencyCode, CurrencyWriteRequest value) => Write<CurrencyResponse>($"api/v1/companies/{companyId}/currencies/{Uri.EscapeDataString(currencyCode)}", value, true);
+    public Task<RatePage> Rates(Guid companyId, string? code, string? table, DateOnly? from, DateOnly? to, int offset, bool descending)
+    {
+        var query = $"offset={offset}&limit=51&descending={descending.ToString().ToLowerInvariant()}";
+        if (code != null) query += "&code=" + Uri.EscapeDataString(code);
+        if (table != null) query += "&table=" + Uri.EscapeDataString(table);
+        if (from != null) query += "&from=" + from.Value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        if (to != null) query += "&to=" + to.Value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        return Get<RatePage>($"api/v1/companies/{companyId}/exchange-rates?{query}");
+    }
+    public Task<RateImportResponse> ImportRates(Guid companyId, RateImportRequest value) => Post<RateImportResponse>($"api/v1/companies/{companyId}/exchange-rates/imports", value);
+    public Task<CurrencyHistoryResponse> ResolveRate(Guid companyId, long auditId, RateResolutionRequest value) => Post<CurrencyHistoryResponse>($"api/v1/companies/{companyId}/exchange-rates/imports/{auditId}/resolve", value);
+    public Task<CurrencyHistoryResponse[]> CurrencyHistory(Guid companyId, int offset) => Get<CurrencyHistoryResponse[]>($"api/v1/companies/{companyId}/exchange-rates/history?offset={offset}");
     public Task<DataPortConfigurationResponse> DataPortConfiguration(Guid companyId) => Get<DataPortConfigurationResponse>($"api/v1/companies/{companyId}/integrations/dataport");
     public Task<DataPortConfigurationResponse> SaveDataPortKey(Guid companyId, SaveDataPortKeyRequest value) => DataPortWrite(companyId, value, HttpMethod.Put);
     public Task<DataPortConfigurationResponse> DeleteDataPortKey(Guid companyId, DeleteDataPortKeyRequest value) => DataPortWrite(companyId, value, HttpMethod.Delete);
@@ -191,6 +211,7 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         catch (JsonException) { }
         var message = response.StatusCode switch
         {
+            _ when error?.Code?.StartsWith("currency_", StringComparison.Ordinal) == true => error.Message ?? "Sprawdź ustawienia, daty i aktualną wersję danych walutowych.",
             HttpStatusCode.Conflict when error?.Code == "configuration_stale" => "Ustawienia zmieniły się. Odśwież stan DataPort i ponownie wpisz klucz.",
             HttpStatusCode.BadRequest when error?.Code is "dataport_key_invalid" or "confirmation_required" => error.Message ?? "Sprawdź konfigurację DataPort.",
             HttpStatusCode.BadRequest when error?.Code is "verification_unsupported" or "verification_invalid" or "verification_date" => error.Message ?? "Sprawdź dane wejściowe weryfikacji.",

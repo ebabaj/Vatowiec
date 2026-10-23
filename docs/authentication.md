@@ -10,8 +10,8 @@ Nie ma operacji księgowych ani provisioningu firm.
 
 | Konto | Rola Identity | Firma A | Firma B |
 |---|---|---|---|
-| operator.m0 | Operator | ViewProfile, ViewContractors, EditContractors, AcceptWarnings, VerifyRegistries, ManageCompanyIntegrations | ViewProfile, ViewContractors |
-| czytelnik.m0 | Reader | ViewProfile | brak dostępu |
+| operator.m0 | Operator | ViewProfile, ViewContractors, EditContractors, AcceptWarnings, VerifyRegistries, ManageCompanyIntegrations, ViewExchangeRates, ManageCurrencies, ImportExchangeRates | ViewProfile, ViewContractors, ViewExchangeRates |
+| czytelnik.m0 | Reader | ViewProfile, ViewExchangeRates | brak dostępu |
 
 EditContractors od etapu ADR-017 pozwala na dodawanie i edycję z CSRF i rowversion;
 zapis wymaga także ViewContractors. Instrukcja: [kartoteka](contractors.md).
@@ -21,6 +21,13 @@ ADR-021 rozszerza ten sam mechanizm o identyfikatory; VerifyRegistries (16)
 jest osobnym prawem do ręcznego sprawdzania rejestrów z CSRF. W B operator nie
 może ich inicjować. Środowiska i konfiguracja: [rejestry](identifiers-and-registries.md).
 Rola Identity nie daje dostępu do firmy bez przypisania CompanyAccess.
+
+ADR-023 dodaje firmowe ViewExchangeRates=64, ManageCurrencies=128 i
+ImportExchangeRates=256. Zapis konfiguracji i import wymagają także odczytu
+oraz CSRF; konfiguracja używa rowversion. Rozstrzyganie konfliktów wymaga
+obu praw zapisu i świadomego potwierdzenia. Maski demonstratora: operator A
+511, B 67, czytelnik A 65. B i czytelnik nie mogą zapisywać ani importować
+kursów również przez bezpośrednie API. [Obsługa walut](currencies-and-nbp.md).
 
 Firma A: aaaaaaaa-0000-4000-8000-000000000001, Vatowiec_Company_A_Dev.
 Firma B: bbbbbbbb-0000-4000-8000-000000000002, Vatowiec_Company_B_Dev.

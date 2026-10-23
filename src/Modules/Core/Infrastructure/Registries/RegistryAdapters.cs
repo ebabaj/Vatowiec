@@ -218,6 +218,10 @@ public static class RegistryRegistration
         services.AddHttpClient("dataport", http => { http.Timeout = TimeSpan.FromSeconds(12); http.MaxResponseContentBufferSize = 2_000_000; })
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })
             .RemoveAllLoggers();
+        services.AddScoped<INbpClient, NbpClient>();
+        services.AddHttpClient("nbp", http => { http.Timeout = TimeSpan.FromSeconds(12); http.MaxResponseContentBufferSize = 8_000_000; })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })
+            .RemoveAllLoggers();
         services.AddSingleton<RegistrySettings>(); services.AddSingleton<RegistryThrottle>();
         services.AddScoped<IRegistryAdapters, RegistryAdapters>();
         services.AddHttpClient("registries", http => { http.Timeout = TimeSpan.FromSeconds(12); http.MaxResponseContentBufferSize = 2_000_000; })
