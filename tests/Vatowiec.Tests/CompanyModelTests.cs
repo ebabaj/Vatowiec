@@ -114,10 +114,10 @@ public sealed class CompanyModelTests
     {
         using var system = new SystemDbContextFactory().CreateDbContext([]);
         using var company = new CompanyDbContextFactory().CreateDbContext([]);
-        Assert.Equal(10, system.Database.GetMigrations().Count());
-        Assert.EndsWith("_InstallationRegistrySettings", system.Database.GetMigrations().Last());
-        Assert.Equal(7, company.Database.GetMigrations().Count());
-        Assert.EndsWith("_CurrencyIsoCodePrimaryKey", company.Database.GetMigrations().Last());
+        Assert.Equal(11, system.Database.GetMigrations().Count());
+        Assert.EndsWith("_ContractorPeselPermission", system.Database.GetMigrations().Last());
+        Assert.Equal(8, company.Database.GetMigrations().Count());
+        Assert.EndsWith("_StandardContractorIdentifiers", company.Database.GetMigrations().Last());
         Assert.False(system.Database.HasPendingModelChanges());
         Assert.False(company.Database.HasPendingModelChanges());
         Assert.NotEqual(system.GetService<IMigrationsAssembly>().ModelSnapshot!.GetType(),

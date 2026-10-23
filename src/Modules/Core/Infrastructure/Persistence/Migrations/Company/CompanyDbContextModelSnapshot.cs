@@ -115,6 +115,10 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Bdo")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -131,6 +135,10 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<string>("Krs")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<string>("KsefIdWew")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -142,6 +150,14 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.Company
 
                     b.Property<int?>("ParentId")
                         .HasColumnType("int");
+
+                    b.Property<string>("Pesel")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Regon")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()

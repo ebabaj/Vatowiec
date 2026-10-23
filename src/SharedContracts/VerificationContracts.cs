@@ -1,12 +1,15 @@
 namespace Vatowiec.SharedContracts;
 
 public sealed record IdentifierCheck(string Field, string? Normalized, string Status, string Message,
-    string RuleVersion, bool FormatChecked, bool ChecksumChecked);
+    string RuleVersion, bool FormatChecked, bool ChecksumChecked)
+{
+    public override string ToString() => $"{Field}: {Status} — {Message} [{RuleVersion}]";
+}
 public sealed record IdentifierDuplicate(string Field, int Id, string Code, string Name, string RowVersion);
 public sealed record IdentifierPreview(IdentifierCheck[] Checks, IdentifierDuplicate[] Duplicates, string WarningHash,
     bool NeedsWarning)
 {
-    public override string ToString() => string.Join("\n", Checks.Select(x => $"{x.Field}: {x.Normalized ?? "(pusto)"} — {x.Message} [{x.RuleVersion}]")) +
+    public override string ToString() => string.Join("\n", Checks.Select(x => $"{x.Field}: {(x.Field == "Pesel" ? "(dane chronione)" : x.Normalized ?? "(pusto)")} — {x.Message} [{x.RuleVersion}]")) +
         (Duplicates.Length == 0 ? "" : "\nDuplikaty:\n" + string.Join("\n", Duplicates.Select(x => $"{x.Field}: {x.Code} — {x.Name} (Id {x.Id})")));
 }
 

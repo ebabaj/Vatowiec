@@ -16,16 +16,21 @@ internal sealed class PreservedSystemTransaction : IAsyncDisposable
     private readonly SqlConnection connection;
     private readonly SqlTransaction transaction;
     public DbContextOptions<SystemDbContext> Options { get; }
+    public DbContextOptions<CompanyDbContext> CompanyOptions { get; }
     private PreservedSystemTransaction(SqlConnection connection, SqlTransaction transaction)
     {
         this.connection = connection; this.transaction = transaction;
         Options = new DbContextOptionsBuilder<SystemDbContext>().UseSqlServer(connection)
             .AddInterceptors(new BindCommands(transaction), new KeepTransaction(transaction))
             .ReplaceService<IRelationalTransactionFactory, NonOwningTransactions>().Options;
+        CompanyOptions = new DbContextOptionsBuilder<CompanyDbContext>().UseSqlServer(connection)
+            .AddInterceptors(new BindCommands(transaction), new KeepTransaction(transaction))
+            .ReplaceService<IRelationalTransactionFactory, NonOwningTransactions>().Options;
     }
-    public static async Task<PreservedSystemTransaction> Open()
+    public static async Task<PreservedSystemTransaction> Open(string database = "Vatowiec_System")
     {
-        var connection = new SqlConnection("Server=localhost\\SQLEXPRESS;Database=Vatowiec_System;Integrated Security=True;Encrypt=True;TrustServerCertificate=True");
+        if (database is not ("Vatowiec_System" or "Vatowiec_Company_A_Dev" or "Vatowiec_Company_B_Dev")) throw new InvalidOperationException("Unknown test database");
+        var connection = new SqlConnection($"Server=localhost\\SQLEXPRESS;Database={database};Integrated Security=True;Encrypt=True;TrustServerCertificate=True");
         await connection.OpenAsync();
         try
         {
@@ -70,6 +75,23 @@ internal sealed class PreservedSystemTransaction : IAsyncDisposable
     {
         public RelationalTransaction Create(IRelationalConnection connection, DbTransaction transaction, Guid transactionId,
             IDiagnosticsLogger<DbLoggerCategory.Database.Transaction> logger, bool transactionOwned) =>
-            new(connection, transaction, transactionId, logger, transactionOwned: false, dependencies.SqlGenerationHelper);
+            new SavepointTransaction(connection, transaction, transactionId, logger, dependencies.SqlGenerationHelper);
+    }
+    // Reproduce endpoint commit/rollback semantics inside the preserved outer transaction.
+    private sealed class SavepointTransaction : RelationalTransaction
+    {
+        private readonly DbTransaction root;
+        private readonly string savepoint = "test_" + Guid.NewGuid().ToString("N")[..24];
+        private bool completed;
+        public SavepointTransaction(IRelationalConnection connection, DbTransaction transaction, Guid id,
+            IDiagnosticsLogger<DbLoggerCategory.Database.Transaction> logger, Microsoft.EntityFrameworkCore.Storage.ISqlGenerationHelper sql)
+            : base(connection, transaction, id, logger, transactionOwned: false, sql)
+        { root = transaction; root.Save(savepoint); }
+        public override void Commit() => completed = true;
+        public override Task CommitAsync(CancellationToken ct = default) { completed = true; return Task.CompletedTask; }
+        public override void Rollback() { root.Rollback(savepoint); completed = true; }
+        public override async Task RollbackAsync(CancellationToken ct = default) { await root.RollbackAsync(savepoint, ct); completed = true; }
+        public override void Dispose() { if (!completed) Rollback(); base.Dispose(); }
+        public override async ValueTask DisposeAsync() { if (!completed) await RollbackAsync(); await base.DisposeAsync(); }
     }
 }

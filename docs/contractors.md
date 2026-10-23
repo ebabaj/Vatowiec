@@ -10,6 +10,11 @@ Bieżące API i formularz: [ADR-020](adr/ADR-020-kompletna-kartoteka-avalonia.md
 Rozszerzenie: [identyfikatory i zakładka Weryfikacje](identifiers-and-registries.md),
 [ADR-021](adr/ADR-021-identyfikatory-i-rejestry-testowe.md).
 
+ADR-030 rozszerza **Dane główne** o REGON, KRS, BDO i PESEL. Kontrola lokalna,
+ostrzeżenia oraz wyszukiwanie: [instrukcja](standard-identifiers.md).
+PESEL wymaga osobnego firmowego ManageContractorPesel; pełna kartoteka i rola
+administratora instalacji nie przyznają tego prawa automatycznie.
+
 ## Uruchomienie
 
 W katalogu projektu:

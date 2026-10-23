@@ -21,7 +21,18 @@ public sealed class AuthorizedCompanyDatabase(CompanyDbContext context, CompanyP
     public ValueTask DisposeAsync() => Context.DisposeAsync();
 }
 
-public sealed class CompanyDatabaseResolver(SystemDbContext system, IConfiguration configuration, ILogger<CompanyDatabaseResolver> logger)
+public interface ICompanyDatabaseContextFactory
+{
+    CompanyDbContext Create(string connectionString, Guid companyId);
+}
+public sealed class CompanyDatabaseContextFactory : ICompanyDatabaseContextFactory
+{
+    public CompanyDbContext Create(string connectionString, Guid companyId) => new(
+        new DbContextOptionsBuilder<CompanyDbContext>().UseSqlServer(connectionString).Options, new CompanyContext(companyId));
+}
+
+public sealed class CompanyDatabaseResolver(SystemDbContext system, IConfiguration configuration, ILogger<CompanyDatabaseResolver> logger,
+    ICompanyDatabaseContextFactory? contexts = null)
 {
     public async Task<AuthorizedCompanyDatabase> Resolve(Guid userId, Guid companyId,
         CompanyPermission required, bool isDevelopment, CancellationToken cancellationToken = default)
@@ -47,8 +58,7 @@ public sealed class CompanyDatabaseResolver(SystemDbContext system, IConfigurati
                 throw new CompanyResolutionException("company_unavailable");
             connection.InitialCatalog = registration.DatabaseName;
             DatabaseConnectionPolicy.ValidateCompany(connection.ConnectionString, isDevelopment);
-            context = new CompanyDbContext(new DbContextOptionsBuilder<CompanyDbContext>()
-                .UseSqlServer(connection.ConnectionString).Options, new CompanyContext(companyId));
+            context = (contexts ?? new CompanyDatabaseContextFactory()).Create(connection.ConnectionString, companyId);
             var identity = await context.CompanyProfiles.IgnoreQueryFilters().AsNoTracking()
                 .SingleOrDefaultAsync(cancellationToken);
             if (identity is null || identity.CompanyId != companyId)

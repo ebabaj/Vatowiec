@@ -14,7 +14,17 @@ public sealed partial class MainViewModel
     private VerificationResponse? selectedVerification;
     private string? assessedCountry;
     private bool AssessmentCurrent => identifierPreview is not null && editor is not null && assessedCountry == editor.CountryCode &&
-        identifierPreview.Checks.All(x => (x.Normalized ?? "") == (x.Field == "TaxId" ? editor.TaxId : x.Field == "VatEuId" ? editor.VatEuId : editor.KsefIdWew));
+        identifierPreview.Checks.All(x => (x.Normalized ?? "") == (x.Field switch
+        {
+            "TaxId" => editor.TaxId,
+            "VatEuId" => editor.VatEuId,
+            "KsefIdWew" => editor.KsefIdWew,
+            "Regon" => editor.Regon,
+            "Krs" => editor.Krs,
+            "Bdo" => editor.Bdo,
+            "Pesel" => editor.Pesel,
+            _ => ""
+        }));
     private string Assessment(string field) => AssessmentCurrent ? identifierPreview?.Checks.FirstOrDefault(x => x.Field == field)?.Message ?? "Nie sprawdzono." : "Nie sprawdzono aktualnej wartości. Uruchom kontrolę.";
     private void ObserveIdentifierEdits()
     {
@@ -24,6 +34,10 @@ public sealed partial class MainViewModel
     public string TaxIdAssessment => Assessment("TaxId");
     public string VatEuIdAssessment => Assessment("VatEuId");
     public string KsefIdWewAssessment => Assessment("KsefIdWew");
+    public string RegonAssessment => Assessment("Regon");
+    public string KrsAssessment => Assessment("Krs");
+    public string BdoAssessment => Assessment("Bdo");
+    public string PeselAssessment => Assessment("Pesel");
     public string IdentifierSummary => identifierPreview?.ToString() ?? "";
     public bool HasIdentifierWarning => identifierPreview?.NeedsWarning == true;
     public string RegistryEnvironmentLabel => "Oficjalne MF/GUS/VIES: " + (registryEnvironment.Mf == "Production" && registryEnvironment.Gus == "Production" && registryEnvironment.Vies == "Production"
@@ -82,6 +96,10 @@ public sealed partial class MainViewModel
             if (check.Field == "TaxId") { changed |= editor.TaxId != normalized; editor.TaxId = normalized; }
             if (check.Field == "VatEuId") { changed |= editor.VatEuId != normalized; editor.VatEuId = normalized; }
             if (check.Field == "KsefIdWew") { changed |= editor.KsefIdWew != normalized; editor.KsefIdWew = normalized; }
+            if (check.Field == "Regon") { changed |= editor.Regon != normalized; editor.Regon = normalized; }
+            if (check.Field == "Krs") { changed |= editor.Krs != normalized; editor.Krs = normalized; }
+            if (check.Field == "Bdo") { changed |= editor.Bdo != normalized; editor.Bdo = normalized; }
+            if (check.Field == "Pesel" && CanManagePesel) { changed |= editor.Pesel != normalized; editor.Pesel = normalized; }
         }
         return changed;
     }

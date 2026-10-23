@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Vatowiec.Core.Domain;
+using Vatowiec.Core.Application;
 using Vatowiec.Core.Infrastructure.Persistence;
 using Vatowiec.SharedContracts;
 
@@ -17,7 +18,10 @@ public static class ContractorEndpoints
     {
         var group = companies.MapGroup("/{companyId:guid}/contractors")
             .AddEndpointFilter(CompanyEndpoints.ValidateCompanySource);
-        group.MapGet("", List);
+        group.MapGet("", (Guid companyId, HttpContext http, CompanyDatabaseResolver resolver, IWebHostEnvironment environment,
+            string? q, string? country, bool? active, int? parentId, int? excludeId, int offset = 0, int limit = 50) =>
+            List(companyId, http, resolver, environment, q, country, active, parentId, excludeId, offset, limit));
+        group.MapPost("/search", Search);
         group.MapGet("/{contractorId:int}", Get);
         group.MapPost("", Create);
         group.MapPut("/{contractorId:int}", Update);
@@ -31,7 +35,8 @@ public static class ContractorEndpoints
             environment.IsDevelopment(), context.RequestAborted);
 
     private static async Task<IResult> List(Guid companyId, HttpContext context, CompanyDatabaseResolver resolver,
-        IWebHostEnvironment environment, string? q, string? country, bool? active, int? parentId, int? excludeId, int offset = 0, int limit = 50)
+        IWebHostEnvironment environment, string? q, string? country, bool? active, int? parentId, int? excludeId, int offset = 0, int limit = 50,
+        bool searchPesel = false)
     {
         await using var db = await Resolve(companyId, context, resolver, environment);
         if (offset < 0 || offset > 1000000 || limit is < 1 or > 100 || q?.Length > 128 ||
@@ -41,8 +46,11 @@ public static class ContractorEndpoints
         if (parentId.HasValue) rows = rows.Where(x => x.ParentId == parentId);
         if (excludeId.HasValue) rows = rows.Where(x => x.Id != excludeId);
         var search = q?.Trim();
+        var identifierSearch = StandardIdentifiers.Normalize(search) ?? search;
         if (!string.IsNullOrEmpty(search)) rows = rows.Where(x => x.Code.Contains(search) || x.Name.Contains(search) ||
-            (x.TaxId != null && x.TaxId.Contains(search)) || (x.VatEuId != null && x.VatEuId.Contains(search)));
+            (x.TaxId != null && x.TaxId.Contains(search)) || (x.VatEuId != null && x.VatEuId.Contains(search)) ||
+            (x.Regon != null && x.Regon.Contains(identifierSearch!)) || (x.Krs != null && x.Krs.Contains(identifierSearch!)) || (x.Bdo != null && x.Bdo.Contains(identifierSearch!)) ||
+            (searchPesel && (db.Permissions & CompanyPermission.ManageContractorPesel) != 0 && x.Pesel != null && x.Pesel.Contains(identifierSearch!)));
         if (!string.IsNullOrWhiteSpace(country))
         {
             var code = country.Trim().ToUpperInvariant();
@@ -50,15 +58,26 @@ public static class ContractorEndpoints
         }
         if (active.HasValue) rows = rows.Where(x => x.IsActive == active.Value);
         var page = await rows.OrderBy(x => x.Code).ThenBy(x => x.Id).Skip(offset).Take(limit).ToListAsync(context.RequestAborted);
-        return Results.Ok(page.Select(x => Response(x, companyId)));
+        return Results.Ok(page.Select(x => Response(x, companyId, CanPesel(db))));
     }
+
+    private static async Task<IResult> Search(Guid companyId, ContractorSearchRequest value, HttpContext http,
+        CompanyDatabaseResolver resolver, IWebHostEnvironment environment, IAntiforgery csrf)
+    {
+        try { await csrf.ValidateRequestAsync(http); }
+        catch (AntiforgeryValidationException) { return Error(400, "csrf_invalid", "Nie udało się potwierdzić żądania."); }
+        return await List(companyId, http, resolver, environment, value.Query, value.Country, value.Active,
+            value.ParentId, value.ExcludeId, value.Offset, value.Limit, searchPesel: true);
+    }
+    private static bool CanPesel(AuthorizedCompanyDatabase db) => (db.Permissions & CompanyPermission.ManageContractorPesel) != 0;
+    private static IResult PeselDenied() => Error(403, "pesel_permission_denied", "Brak uprawnienia do odczytu i edycji PESEL w tej firmie.");
 
     private static async Task<IResult> Get(Guid companyId, int contractorId, HttpContext context,
         CompanyDatabaseResolver resolver, IWebHostEnvironment environment)
     {
         await using var db = await Resolve(companyId, context, resolver, environment);
         var row = await db.Context.Contractors.AsNoTracking().SingleOrDefaultAsync(x => x.Id == contractorId, context.RequestAborted);
-        return row is null ? Error(404, "contractor_not_found", "Nie znaleziono kontrahenta w tej firmie.") : Results.Ok(Response(row, companyId));
+        return row is null ? Error(404, "contractor_not_found", "Nie znaleziono kontrahenta w tej firmie.") : Results.Ok(Response(row, companyId, CanPesel(db)));
     }
 
     private static Task<IResult> Create(Guid companyId, ContractorWriteRequest value, HttpContext context,
@@ -73,6 +92,7 @@ public static class ContractorEndpoints
         CompanyDatabaseResolver resolver, IWebHostEnvironment environment, IAntiforgery csrf, IdentifierChecks identifiers)
     {
         await using var db = await Resolve(companyId, context, resolver, environment, edit: true);
+        if (!CanPesel(db) && value.Pesel is not null) return PeselDenied();
         try { await csrf.ValidateRequestAsync(context); }
         catch (AntiforgeryValidationException) { return Error(400, "csrf_invalid", "Nie udało się potwierdzić żądania."); }
         var errors = ContractorValidation.Validate(value);
@@ -84,6 +104,7 @@ public static class ContractorEndpoints
         CompanyDatabaseResolver resolver, IWebHostEnvironment environment, IAntiforgery csrf, SystemDbContext system, TimeProvider clock, IdentifierChecks identifiers)
     {
         await using var db = await Resolve(companyId, context, resolver, environment, edit: true);
+        if (!CanPesel(db) && value.Pesel is not null) return PeselDenied();
         try { await csrf.ValidateRequestAsync(context); }
         catch (AntiforgeryValidationException) { return Error(400, "csrf_invalid", "Nie udało się potwierdzić żądania. Spróbuj ponownie."); }
         var errors = ContractorValidation.Validate(value);
@@ -113,7 +134,10 @@ public static class ContractorEndpoints
         var normalized = new Contractor(value.Code, value.Name, value.CountryCode,
             initial.Checks[0].Normalized, initial.Checks[1].Normalized, initial.Checks[2].Normalized, value.ParentId);
         normalized.Update(value.Code, value.Name, value.CountryCode, value.IsActive);
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Snapshot(normalized))));
+        normalized.SetStandardIdentifiers(initial.Checks.Single(x => x.Field == "Regon").Normalized,
+            initial.Checks.Single(x => x.Field == "Krs").Normalized, initial.Checks.Single(x => x.Field == "Bdo").Normalized,
+            initial.Checks.Single(x => x.Field == "Pesel").Normalized);
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(RequestSnapshot(normalized))));
         await using var transaction = await db.Context.Database.BeginTransactionAsync(context.RequestAborted);
         try
         {
@@ -124,7 +148,7 @@ public static class ContractorEndpoints
                 var previous = await db.Context.ContractorCreateOperations.AsNoTracking().SingleOrDefaultAsync(x =>
                     x.ActorId == actor && x.ActorIssuerId == issuer && x.OperationKind == "Contractor" && x.OperationId == value.OperationId, context.RequestAborted);
                 if (previous is not null)
-                    return previous.RequestHash == hash ? Results.Content(previous.ResponseJson, "application/json", statusCode: 200)
+                    return previous.RequestHash == hash ? Results.Ok(Replay(previous.ResponseJson, CanPesel(db)))
                         : Error(409, "operation_payload_mismatch", "Ta operacja tworzenia została już wykonana z innymi danymi. Odśwież kartotekę.");
             }
             Contractor row;
@@ -134,11 +158,12 @@ public static class ContractorEndpoints
                 var existing = await db.Context.Contractors.SingleOrDefaultAsync(x => x.Id == contractorId, context.RequestAborted);
                 if (existing is null) return Error(404, "contractor_not_found", "Nie znaleziono kontrahenta w tej firmie.");
                 row = existing;
-                if (!row.RowVersion.SequenceEqual(version)) return Conflict(row, companyId);
+                if (!row.RowVersion.SequenceEqual(version)) return Conflict(row, companyId, CanPesel(db));
                 before = Snapshot(row);
                 row.Update(value.Code, value.Name, value.CountryCode, value.IsActive);
                 row.SetParent(value.ParentId);
                 row.SetIdentifiers(normalized.TaxId, normalized.VatEuId, normalized.KsefIdWew);
+                row.SetStandardIdentifiers(normalized.Regon, normalized.Krs, normalized.Bdo, CanPesel(db) ? normalized.Pesel : row.Pesel);
             }
             else
             {
@@ -159,25 +184,25 @@ public static class ContractorEndpoints
             if (row.ParentId.HasValue && !await db.Context.Contractors.AnyAsync(x => x.Id == row.ParentId, context.RequestAborted))
                 return Error(400, "invalid_parent", "Rekord nadrzędny nie istnieje w tej firmie.");
             var after = Snapshot(row);
-            if (before == after) return Results.Ok(Response(row, companyId));
+            if (before == after) return Results.Ok(Response(row, companyId, CanPesel(db)));
             await db.Context.SaveChangesAsync(context.RequestAborted); // Uzyskanie int IDENTITY i rowversion.
             db.Context.ContractorChanges.Add(new ContractorChange(row.Id, actor, issuer, actorName,
                 clock.GetUtcNow(), context.TraceIdentifier, before, after,
-                warningJson: preview.NeedsWarning ? JsonSerializer.Serialize(new { accepted = true, preview.WarningHash, preview.Checks, preview.Duplicates }) : null));
+                warningJson: preview.NeedsWarning ? JsonSerializer.Serialize(new { accepted = true, preview.WarningHash, preview.Checks, preview.Duplicates }) : null, snapshotVersion: 3));
             if (!contractorId.HasValue)
                 db.Context.ContractorCreateOperations.Add(new ContractorCreateOperation(value.OperationId!.Value, actor, issuer,
-                    hash, row.Id, JsonSerializer.Serialize(Response(row, companyId), new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+                    hash, row.Id, JsonSerializer.Serialize(Response(row, companyId, CanPesel(db)), new JsonSerializerOptions(JsonSerializerDefaults.Web))));
             await db.Context.SaveChangesAsync(context.RequestAborted);
             await transaction.CommitAsync(context.RequestAborted);
-            return contractorId.HasValue ? Results.Ok(Response(row, companyId))
-                : Results.Created($"/api/v1/companies/{companyId}/contractors/{row.Id}", Response(row, companyId));
+            return contractorId.HasValue ? Results.Ok(Response(row, companyId, CanPesel(db)))
+                : Results.Created($"/api/v1/companies/{companyId}/contractors/{row.Id}", Response(row, companyId, CanPesel(db)));
         }
         catch (DbUpdateConcurrencyException)
         {
             await transaction.RollbackAsync(context.RequestAborted);
             db.Context.ChangeTracker.Clear();
             var current = await db.Context.Contractors.AsNoTracking().SingleOrDefaultAsync(x => x.Id == value.Id, context.RequestAborted);
-            return current is null ? Error(404, "contractor_not_found", "Kontrahent nie jest już dostępny.") : Conflict(current, companyId);
+            return current is null ? Error(404, "contractor_not_found", "Kontrahent nie jest już dostępny.") : Conflict(current, companyId, CanPesel(db));
         }
         catch (DbUpdateException error) when (error.InnerException is SqlException { Number: 51001 })
         {
@@ -193,14 +218,18 @@ public static class ContractorEndpoints
         }
     }
 
-    private static IResult Conflict(Contractor row, Guid companyId) => Results.Json(new
+    private static IResult Conflict(Contractor row, Guid companyId, bool canPesel) => Results.Json(new
     {
         code = "contractor_conflict",
         message = "Inna osoba zmieniła kontrahenta. Porównaj wersje przed ponownym zapisem.",
-        current = Response(row, companyId)
+        current = Response(row, companyId, canPesel)
     }, statusCode: 409);
 
     private static IResult Error(int status, string code, string message) => Results.Json(new { code, message }, statusCode: status);
+    private static string RequestSnapshot(Contractor row) => row.Regon != null || row.Krs != null || row.Bdo != null || row.Pesel != null
+        ? Snapshot(row)
+        // Preserve durable request hashes created before the additive schema change.
+        : JsonSerializer.Serialize(new { row.Code, row.Name, row.TaxId, row.VatEuId, row.KsefIdWew, row.ParentId, row.CountryCode, row.IsActive });
     private static string Snapshot(Contractor row) => JsonSerializer.Serialize(new
     {
         row.Code,
@@ -208,10 +237,20 @@ public static class ContractorEndpoints
         row.TaxId,
         row.VatEuId,
         row.KsefIdWew,
+        row.Regon,
+        row.Krs,
+        row.Bdo,
+        row.Pesel,
         row.ParentId,
         row.CountryCode,
         row.IsActive
     });
-    private static ContractorResponse Response(Contractor row, Guid companyId) => new(row.Id, companyId, row.Code, row.Name,
-        row.CountryCode, row.TaxId, row.IsActive, Convert.ToBase64String(row.RowVersion), row.ParentId, row.VatEuId, row.KsefIdWew);
+    internal static ContractorResponse Replay(string json, bool canPesel)
+    {
+        var response = JsonSerializer.Deserialize<ContractorResponse>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        return canPesel ? response : response with { Pesel = null };
+    }
+    private static ContractorResponse Response(Contractor row, Guid companyId, bool canPesel) => new(row.Id, companyId, row.Code, row.Name,
+        row.CountryCode, row.TaxId, row.IsActive, Convert.ToBase64String(row.RowVersion), row.ParentId, row.VatEuId, row.KsefIdWew,
+        row.Regon, row.Krs, row.Bdo, canPesel ? row.Pesel : null);
 }

@@ -7,7 +7,10 @@ using Vatowiec.Core.Domain;
 namespace Vatowiec.Core.Application;
 
 public sealed record IdentifierAssessment(string Field, string? Normalized, string Status,
-    string Message, string RuleVersion, bool FormatChecked, bool ChecksumChecked);
+    string Message, string RuleVersion, bool FormatChecked, bool ChecksumChecked)
+{
+    public override string ToString() => $"{Field}: {Status} — {Message} [{RuleVersion}]";
+}
 
 public interface IIdentifierChecksum
 {

@@ -22,6 +22,7 @@ public static class ApiSecurity
     {
         services.AddVatowiecIdentity();
         services.AddScoped<CompanyDatabaseResolver>();
+        services.AddScoped<ICompanyDatabaseContextFactory, CompanyDatabaseContextFactory>();
         services.AddSingleton<DummyPassword>();
         services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, InstallationAdministratorHandler>();
         services.AddAuthentication(IdentityConstants.ApplicationScheme).AddCookie(IdentityConstants.ApplicationScheme, options =>

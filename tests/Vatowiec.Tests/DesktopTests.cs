@@ -42,7 +42,9 @@ public sealed partial class DesktopTests
                 Assert.Equal("authenticated", request.Headers.GetValues("X-CSRF-TOKEN").Single());
                 return new HttpResponseMessage(HttpStatusCode.NoContent);
             }
-            Assert.Equal($"/api/v1/companies/{A:D}/contractors", path);
+            Assert.Equal($"/api/v1/companies/{A:D}/contractors/search", path);
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal("authenticated", request.Headers.GetValues("X-CSRF-TOKEN").Single());
             Assert.False(request.Headers.Contains("X-Company-Id"));
             return Json(Array.Empty<ContractorResponse>());
         }))
@@ -50,7 +52,7 @@ public sealed partial class DesktopTests
         await client.Login("fictional", "temporary-fictional-password");
         Assert.Empty(await client.Contractors(A));
         await client.Logout();
-        Assert.Equal(new[] { "/api/v1/auth/csrf", "/api/v1/auth/login", $"/api/v1/companies/{A:D}/contractors",
+        Assert.Equal(new[] { "/api/v1/auth/csrf", "/api/v1/auth/login", "/api/v1/auth/csrf", $"/api/v1/companies/{A:D}/contractors/search",
             "/api/v1/auth/csrf", "/api/v1/auth/logout" }, requests);
     }
 

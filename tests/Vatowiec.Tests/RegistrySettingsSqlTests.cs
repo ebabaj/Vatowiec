@@ -63,6 +63,11 @@ public sealed class RegistrySettingsSqlTests
         });
         using var scope = app.Services.CreateScope(); var system = scope.ServiceProvider.GetRequiredService<SystemDbContext>();
         var initialAuditCount = await system.RegistryConfigurationChanges.CountAsync();
+        // The user may have consciously enabled Production locally. Preserve it;
+        // normalize this fixture only inside the outer rollback transaction.
+        foreach (var configuration in await system.RegistryConfigurations.ToArrayAsync())
+            configuration.Update("Test", configuration.TestUrl, configuration.ProductionUrl, configuration.TestWl2Url, configuration.ProductionWl2Url);
+        await system.SaveChangesAsync();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var roles = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
         var password = "Fake!a1-" + Guid.NewGuid().ToString("N");

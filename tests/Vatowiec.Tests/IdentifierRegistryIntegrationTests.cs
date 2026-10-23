@@ -39,7 +39,7 @@ public sealed partial class AuthenticationIntegrationTests
         using var client = await DetailOperator();
         var request = NewContractor("NORMALIZED") with { TaxId = "PL 324-517-45-04", VatEuId = "pl 324 5174504" };
         var preview = await Preview(client, request); Assert.False(preview.NeedsWarning);
-        Assert.All(preview.Checks.Where(x => x.Field != "KsefIdWew"), x => Assert.Equal("Valid", x.Status));
+        Assert.All(preview.Checks.Where(x => x.Field is "TaxId" or "VatEuId"), x => Assert.Equal("Valid", x.Status));
         using var created = await client.PostAsJsonAsync(ContractorsPath(), request);
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var row = (await created.Content.ReadFromJsonAsync<ContractorResponse>())!;

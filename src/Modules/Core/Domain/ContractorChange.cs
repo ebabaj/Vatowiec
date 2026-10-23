@@ -6,7 +6,7 @@ public sealed class ContractorChange : ITrackedEntity
 
     public ContractorChange(int? contractorId, Guid actorId, Guid actorIssuerId,
         string actorName, DateTimeOffset occurredAtUtc, string correlationId, string? beforeJson, string afterJson,
-        string recordType = "Contractor", int? recordId = null, string? warningJson = null)
+        string recordType = "Contractor", int? recordId = null, string? warningJson = null, int snapshotVersion = 2)
     {
         Id = Guid.NewGuid();
         if (contractorId is <= 0) throw new ArgumentException("Brak kontrahenta.", nameof(contractorId));
@@ -14,6 +14,7 @@ public sealed class ContractorChange : ITrackedEntity
         RecordType = recordType;
         RecordId = recordId ?? contractorId ?? throw new ArgumentException("Brak identyfikatora rekordu.");
         WarningJson = warningJson;
+        SnapshotVersion = snapshotVersion;
         ActorId = EntityText.Id(actorId, nameof(actorId));
         ActorIssuerId = EntityText.Id(actorIssuerId, nameof(actorIssuerId));
         ActorName = EntityText.Required(actorName, 256, nameof(actorName));

@@ -14,7 +14,8 @@ public sealed record CompanyResponse(Guid CompanyId, string Name, string[] Permi
 public sealed record CompanyProfileResponse(Guid CompanyId, string Name, string? Nip, string? Regon);
 public sealed record ContractorResponse(int Id, Guid CompanyId, string Code, string Name, string CountryCode,
     string? TaxId = null, bool IsActive = true, string RowVersion = "", int? ParentId = null,
-    string? VatEuId = null, string? KsefIdWew = null)
+    string? VatEuId = null, string? KsefIdWew = null, string? Regon = null, string? Krs = null,
+    string? Bdo = null, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Pesel = null)
 {
     public override string ToString() => $"{Code} — {Name} ({CountryCode})";
     [JsonIgnore]

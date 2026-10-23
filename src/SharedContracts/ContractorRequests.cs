@@ -2,7 +2,17 @@ namespace Vatowiec.SharedContracts;
 
 public sealed record ContractorWriteRequest(int Id, string Code, string Name,
     string CountryCode, bool IsActive, string? RowVersion = null, Guid? OperationId = null, int? ParentId = null,
-    string? TaxId = null, string? VatEuId = null, string? KsefIdWew = null, bool AcceptWarning = false, string? WarningHash = null);
+    string? TaxId = null, string? VatEuId = null, string? KsefIdWew = null, bool AcceptWarning = false, string? WarningHash = null,
+    string? Regon = null, string? Krs = null, string? Bdo = null, string? Pesel = null)
+{
+    public override string ToString() => $"ContractorWriteRequest Id={Id} (dane formularza chronione)";
+}
+
+public sealed record ContractorSearchRequest(string? Query = null, string? Country = null, bool? Active = null,
+    int? ParentId = null, int? ExcludeId = null, int Offset = 0, int Limit = 50)
+{
+    public override string ToString() => "ContractorSearchRequest (filtry chronione)";
+}
 
 public static class ContractorValidation
 {
@@ -12,6 +22,8 @@ public static class ContractorValidation
         if (value.TaxId?.Length > 100) errors["TaxId"] = ["Najwyżej 100 znaków."];
         if (value.VatEuId?.Length > 100) errors["VatEuId"] = ["Najwyżej 100 znaków."];
         if (value.KsefIdWew?.Length > 100) errors["KsefIdWew"] = ["Najwyżej 100 znaków."];
+        foreach (var (field, text) in new[] { ("Regon", value.Regon), ("Krs", value.Krs), ("Bdo", value.Bdo), ("Pesel", value.Pesel) })
+            if (text?.Length > 100) errors[field] = ["Najwyżej 100 znaków."];
         if (value.Id < 0) errors["Id"] = ["Nieprawidłowy identyfikator pozycji."];
         if (value.ParentId is <= 0 || (value.Id > 0 && value.ParentId == value.Id))
             errors["ParentId"] = ["Nieprawidłowy rekord nadrzędny."];

@@ -26,6 +26,10 @@ internal sealed class ContractorConfiguration : IEntityTypeConfiguration<Contrac
         builder.Property(x => x.TaxId).HasMaxLength(100);
         builder.Property(x => x.VatEuId).HasMaxLength(100);
         builder.Property(x => x.KsefIdWew).HasMaxLength(100);
+        builder.Property(x => x.Regon).HasMaxLength(100);
+        builder.Property(x => x.Krs).HasMaxLength(100);
+        builder.Property(x => x.Bdo).HasMaxLength(100);
+        builder.Property(x => x.Pesel).HasMaxLength(100);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.HasOne<Contractor>().WithMany().HasForeignKey(x => x.ParentId).OnDelete(DeleteBehavior.NoAction);
         builder.HasIndex(x => x.Code).IsUnique();

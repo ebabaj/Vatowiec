@@ -111,7 +111,8 @@ użyj narzędzia .NET powyżej; nie trzeba zmieniać polityki PowerShell.
 | POST /api/v1/auth/logout | Ważna sesja i nowy token CSRF pobrany po logowaniu; 204 |
 | GET /api/v1/companies | Dostępne firmy i uprawnienia; nigdy lokalizacje SQL ani dane dostępowe |
 | GET /api/v1/companies/{id}/profile | Wymaga ViewProfile; 200 po kontroli profilu i schematu bazy |
-| GET /api/v1/companies/{id}/contractors | Wymaga ViewContractors; filtry q/country/active oraz offset/limit, maks. 100 pozycji |
+| GET /api/v1/companies/{id}/contractors | Wymaga ViewContractors; filtry q/country/active oraz offset/limit, maks. 100 pozycji; bez wyszukiwania PESEL |
+| POST /api/v1/companies/{id}/contractors/search | ViewContractors i CSRF; filtry w ciele zamiast URL; PESEL tylko z ManageContractorPesel |
 | GET /api/v1/companies/{id}/contractors/{contractorId} | Odczyt aktualnej wersji i rowversion; ViewContractors |
 | POST /api/v1/companies/{id}/contractors | ViewContractors + EditContractors i CSRF; atomowy audyt utworzenia |
 | PUT /api/v1/companies/{id}/contractors/{contractorId} | Te same prawa i CSRF, wymagane rowversion; 409 przy konflikcie |
@@ -196,3 +197,11 @@ i ostrzeżeń. Formatowanie i git diff --check poprawne. Osobno wykonano verify-
 na rzeczywistym HTTPS localhost:7245 z domyślną walidacją TLS; oba konta i wszystkie
 odmowy zachowały się zgodnie z tabelą. Nie zmieniano polityki PowerShell ani zaufania
 certyfikatów. Po próbie wylogowano oba konta. Nie wykonano commit ani push.
+
+ADR-030 dodaje firmowe **ManageContractorPesel=512**. ViewContractors jest nadal
+wymagane do odczytu, EditContractors do zapisu, AcceptWarnings do odstępstwa.
+Nie nadano nowego prawa automatycznie operator.m0 ani innym istniejącym kontom;
+maski demonstratora pozostają bez zmian. Bez prawa odpowiedzi API pomijają PESEL,
+edycja innych pól zachowuje jego wartość, a jawne próby zmiany dają 403.
+Dotyczy także konfliktów, wyszukiwania i ponowienia operacji tworzenia.
+Szczegóły: [standardowe identyfikatory](standard-identifiers.md).

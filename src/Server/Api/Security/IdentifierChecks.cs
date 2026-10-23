@@ -15,9 +15,11 @@ public sealed class IdentifierChecks(SystemDbContext system, TaxIdentifierValida
     {
         var rules = await system.TaxIdentifierSchemes.AsNoTracking().ToListAsync(ct);
         var date = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
-        var checks = new[] { ("TaxId", value.TaxId), ("VatEuId", value.VatEuId), ("KsefIdWew", value.KsefIdWew) }
+        var taxChecks = new[] { ("TaxId", value.TaxId), ("VatEuId", value.VatEuId), ("KsefIdWew", value.KsefIdWew) }
             .Select(x => validator.Assess(x.Item1, x.Item2, value.CountryCode.Trim().ToUpperInvariant(), rules, date))
-            .Select(x => new IdentifierCheck(x.Field, x.Normalized, x.Status, x.Message, x.RuleVersion, x.FormatChecked, x.ChecksumChecked)).ToArray();
+            .Concat(new[] { ("Regon", value.Regon), ("Krs", value.Krs), ("Bdo", value.Bdo), ("Pesel", value.Pesel) }
+                .Select(x => StandardIdentifiers.Assess(x.Item1, x.Item2)));
+        var checks = taxChecks.Select(x => new IdentifierCheck(x.Field, x.Normalized, x.Status, x.Message, x.RuleVersion, x.FormatChecked, x.ChecksumChecked)).ToArray();
         var tax = checks[0].Normalized; var vat = checks[1].Normalized; var ksef = checks[2].Normalized;
         var duplicates = await company.Contractors.AsNoTracking().Where(x => x.Id != value.Id &&
             ((tax != null && x.TaxId == tax) || (vat != null && x.VatEuId == vat) || (ksef != null && x.KsefIdWew == ksef)))

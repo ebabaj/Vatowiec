@@ -29,6 +29,10 @@ public sealed class Contractor : ITrackedEntity
     public string? TaxId { get; private set; }
     public string? VatEuId { get; private set; }
     public string? KsefIdWew { get; private set; }
+    public string? Regon { get; private set; }
+    public string? Krs { get; private set; }
+    public string? Bdo { get; private set; }
+    public string? Pesel { get; private set; }
     public bool IsActive { get; private set; } = true;
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset UpdatedAtUtc { get; private set; }
@@ -49,6 +53,15 @@ public sealed class Contractor : ITrackedEntity
         var vat = EntityText.Optional(vatEuId, 100, nameof(vatEuId));
         var ksef = EntityText.Optional(ksefIdWew, 100, nameof(ksefIdWew));
         TaxId = tax; VatEuId = vat; KsefIdWew = ksef;
+    }
+
+    public void SetStandardIdentifiers(string? regon, string? krs, string? bdo, string? pesel)
+    {
+        var r = EntityText.Optional(regon, 100, nameof(regon));
+        var k = EntityText.Optional(krs, 100, nameof(krs));
+        var b = EntityText.Optional(bdo, 100, nameof(bdo));
+        var p = EntityText.Optional(pesel, 100, nameof(pesel));
+        Regon = r; Krs = k; Bdo = b; Pesel = p;
     }
 
     public void Update(string code, string name, string countryCode, bool isActive)

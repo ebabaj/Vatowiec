@@ -5,12 +5,19 @@ Projekt wielostanowiskowej aplikacji dla polskich mikrofirm. Obecny stan to
 wybór firmy, dodawanie/edycja z audytem i konfliktami oraz wyszukiwanie po stronie serwera.
 Osobne SystemDbContext i CompanyDbContext, trzy bazy SQL
 Server oraz dwie fikcyjne firmy. Działają Identity, sesje API i autoryzowany resolver
-bazy firmy. Ustawienia rejestrów ADR-029: **335/335 wykonanych testów**,
-330 bez SQL i 5 niedestrukcyjnych SQL/API. Dawnych 103 SQL/API z resetującym fixture
+bazy firmy. Standardowe identyfikatory ADR-030: **359/359 wykonanych testów**,
+352 bez SQL i 7 niedestrukcyjnych SQL/API. Dawnych 103 SQL/API z resetującym fixture
 nie uruchamiano, aby zachować dane. Kompilacja bez ostrzeżeń i błędów.
 Nie jest to jeszcze program do prowadzenia księgowości.
 
-**Aktualny etap: ustawienia GUS/MF/VIES w Avalonia (ADR-029).**
+**Aktualny etap: REGON, KRS, BDO i chroniony PESEL (ADR-030).**
+Opcjonalne teksty w danych głównych, jawna normalizacja i kontrola sum REGON/PESEL,
+ostrzeżenia, rowversion i atomowy audyt. Odczyt/edycja PESEL wymaga osobnego prawa
+firmy ManageContractorPesel; istniejące konta nie otrzymują go automatycznie.
+Wyszukiwanie w SQL przez POST z CSRF, bez numerów w URL. Migracje addytywne
+zachowały istniejące dane. [Instrukcja i wyniki](docs/standard-identifiers.md).
+
+Ustawienia GUS/MF/VIES w Avalonia (ADR-029):
 Administrator instalacji wybiera TEST/PRODUKCJA i oficjalne URL obu środowisk
 w Ustawieniach instalacji → Integracje zewnętrzne; MF ma także osobne URL WL2.
 Publiczna konfiguracja jest w System, z rowversion i trwałym audytem. Zapis działa

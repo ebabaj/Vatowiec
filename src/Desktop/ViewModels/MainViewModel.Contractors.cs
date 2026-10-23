@@ -17,6 +17,7 @@ public sealed partial class MainViewModel
     public string FilterCountry { get; set; } = "";
     public int FilterActivity { get; set; }
     public bool CanEditContractors => CanViewContractors && selectedCompany?.CanEditContractors == true;
+    public bool CanManagePesel => selectedCompany?.Permissions.Contains("ManageContractorPesel", StringComparer.Ordinal) == true;
     public bool CanBrowse => CanViewContractors && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !IsGusSettings;
     public bool IsBrowsingWorkspace => IsWorkspace && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !IsGusSettings;
     public bool IsEditing => editor is not null;
@@ -25,7 +26,7 @@ public sealed partial class MainViewModel
     public ContractorEditor? Editor => editor;
     public string EditorTitle => editor?.IsNew == true ? "Nowy kontrahent" : "Edycja kontrahenta";
     public string ServerVersionSummary => conflictCurrent is null ? "" : Summary(conflictCurrent, conflictParentLabel);
-    public string LocalVersionSummary => editor is null ? "" : $"Kod: {editor.Code}\nNazwa: {editor.Name}\nTaxId: {editor.TaxId}\nVatEuId: {editor.VatEuId}\nKsefIdWew: {editor.KsefIdWew}\nNadrzędny: {ParentLabel}\nKraj: {editor.CountryCode}\nStatus: {(editor.IsActive ? "Aktywny" : "Nieaktywny")}";
+    public string LocalVersionSummary => editor is null ? "" : $"Kod: {editor.Code}\nNazwa: {editor.Name}\nTaxId: {editor.TaxId}\nVatEuId: {editor.VatEuId}\nKsefIdWew: {editor.KsefIdWew}\nREGON: {editor.Regon}\nKRS: {editor.Krs}\nBDO: {editor.Bdo}\nPESEL: dane chronione — porównaj w formularzu po wczytaniu wersji\nNadrzędny: {ParentLabel}\nKraj: {editor.CountryCode}\nStatus: {(editor.IsActive ? "Aktywny" : "Nieaktywny")}";
     public bool HasPreviousPage => pageOffset > 0;
     public bool HasNextPage => hasNextPage;
     public string PageLabel => $"Strona {pageOffset / 50 + 1} · do 50 pozycji";
@@ -155,7 +156,7 @@ public sealed partial class MainViewModel
         if (profile is null || row.CompanyId != profile.CompanyId)
             throw new ApiException(502, "API zwróciło dane innej firmy. Odmowa wyświetlenia danych.");
     }
-    private static string Summary(ContractorResponse row, string parentLabel) => $"Kod: {row.Code}\nNazwa: {row.Name}\nTaxId: {row.TaxId}\nVatEuId: {row.VatEuId}\nKsefIdWew: {row.KsefIdWew}\nNadrzędny: {parentLabel}\nKraj: {row.CountryCode}\nStatus: {row.ActivityLabel}";
+    private static string Summary(ContractorResponse row, string parentLabel) => $"Kod: {row.Code}\nNazwa: {row.Name}\nTaxId: {row.TaxId}\nVatEuId: {row.VatEuId}\nKsefIdWew: {row.KsefIdWew}\nREGON: {row.Regon}\nKRS: {row.Krs}\nBDO: {row.Bdo}\nPESEL: dane chronione — porównaj w formularzu po wczytaniu wersji\nNadrzędny: {parentLabel}\nKraj: {row.CountryCode}\nStatus: {row.ActivityLabel}";
     private void ClearContractorState()
     {
         ResetDetails();
@@ -184,6 +185,7 @@ public sealed class ContractorEditor : System.ComponentModel.INotifyPropertyChan
         TaxId = row.TaxId ?? "";
         VatEuId = row.VatEuId ?? "";
         KsefIdWew = row.KsefIdWew ?? "";
+        Regon = row.Regon ?? ""; Krs = row.Krs ?? ""; Bdo = row.Bdo ?? ""; Pesel = row.Pesel ?? "";
         CountryCode = row.CountryCode;
         IsActive = row.IsActive;
         RowVersion = row.RowVersion;
@@ -196,6 +198,11 @@ public sealed class ContractorEditor : System.ComponentModel.INotifyPropertyChan
     public string Code { get; set; } = "";
     public string Name { get; set; } = "";
     private string taxId = "", vatEuId = "", ksefIdWew = "";
+    private string regon = "", krs = "", bdo = "", pesel = "";
+    public string Regon { get => regon; set { regon = value; PropertyChanged?.Invoke(this, new(nameof(Regon))); } }
+    public string Krs { get => krs; set { krs = value; PropertyChanged?.Invoke(this, new(nameof(Krs))); } }
+    public string Bdo { get => bdo; set { bdo = value; PropertyChanged?.Invoke(this, new(nameof(Bdo))); } }
+    public string Pesel { get => pesel; set { pesel = value; PropertyChanged?.Invoke(this, new(nameof(Pesel))); } }
     public string TaxId { get => taxId; set { taxId = value; PropertyChanged?.Invoke(this, new(nameof(TaxId))); } }
     public string VatEuId { get => vatEuId; set { vatEuId = value; PropertyChanged?.Invoke(this, new(nameof(VatEuId))); } }
     public string KsefIdWew { get => ksefIdWew; set { ksefIdWew = value; PropertyChanged?.Invoke(this, new(nameof(KsefIdWew))); } }
@@ -205,7 +212,7 @@ public sealed class ContractorEditor : System.ComponentModel.INotifyPropertyChan
     public bool IsNew { get; } = true;
     public string? RowVersion { get; set; }
     private string? original;
-    public bool IsDirty => original is null ? Code.Length != 0 || Name.Length != 0 || TaxId.Length != 0 || VatEuId.Length != 0 || KsefIdWew.Length != 0 || ParentId.HasValue || CountryCode != "PL" || !IsActive
+    public bool IsDirty => original is null ? Code.Length != 0 || Name.Length != 0 || TaxId.Length != 0 || VatEuId.Length != 0 || KsefIdWew.Length != 0 || Regon.Length != 0 || Krs.Length != 0 || Bdo.Length != 0 || Pesel.Length != 0 || ParentId.HasValue || CountryCode != "PL" || !IsActive
         : original != System.Text.Json.JsonSerializer.Serialize(Request());
     public string CodeError { get; private set; } = "";
     public string NameError { get; private set; } = "";
@@ -214,8 +221,11 @@ public sealed class ContractorEditor : System.ComponentModel.INotifyPropertyChan
     public string TaxIdError { get; private set; } = "";
     public string VatEuIdError { get; private set; } = "";
     public string KsefIdWewError { get; private set; } = "";
+    public string StandardIdentifierErrors { get; private set; } = "";
     public void SetErrors(Dictionary<string, string[]> errors)
     {
+        StandardIdentifierErrors = string.Join(" ", new[] { "Regon", "Krs", "Bdo", "Pesel" }.Where(errors.ContainsKey).SelectMany(x => errors[x]));
+        PropertyChanged?.Invoke(this, new(nameof(StandardIdentifierErrors)));
         CodeError = errors.TryGetValue("Code", out var code) ? string.Join(" ", code) : "";
         NameError = errors.TryGetValue("Name", out var name) ? string.Join(" ", name) : "";
         CountryError = errors.TryGetValue("CountryCode", out var country) ? string.Join(" ", country) : "";
@@ -232,5 +242,6 @@ public sealed class ContractorEditor : System.ComponentModel.INotifyPropertyChan
         PropertyChanged?.Invoke(this, new(nameof(ParentError)));
     }
     public void SetImportedName(string name) { Name = name; PropertyChanged?.Invoke(this, new(nameof(Name))); }
-    public ContractorWriteRequest Request() => new(Id, Code, Name, CountryCode, IsActive, RowVersion, IsNew ? OperationId : null, ParentId, TaxId, VatEuId, KsefIdWew);
+    public ContractorWriteRequest Request() => new(Id, Code, Name, CountryCode, IsActive, RowVersion, IsNew ? OperationId : null, ParentId, TaxId, VatEuId, KsefIdWew,
+        Regon: Regon, Krs: Krs, Bdo: Bdo, Pesel: string.IsNullOrEmpty(Pesel) ? null : Pesel);
 }

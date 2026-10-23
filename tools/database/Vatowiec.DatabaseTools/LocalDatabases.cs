@@ -140,7 +140,7 @@ internal static class LocalDatabases
         if (Convert.ToInt32(unknownTables) != 0) throw new InvalidOperationException($"Obce tabele w {database}.");
         var unknownHistory = await Scalar(database, """
             SELECT COUNT(*) FROM dbo.__EFMigrationsHistory WHERE MigrationId NOT IN (
-                '20261021102912_InitialCompany','20261022060000_ContractorAudit','20261022143310_CompanyModelV2','20261022161050_ContractorDetailAudit','20261022175433_ExternalVerifications','20261022194946_DataPortConfiguration','20261022205922_CurrenciesAndNbpRates','20261022211121_OptionalNbpTradingDate','20261023041721_CurrencyIsoCodePrimaryKey',
+                '20261021102912_InitialCompany','20261022060000_ContractorAudit','20261022143310_CompanyModelV2','20261022161050_ContractorDetailAudit','20261022175433_ExternalVerifications','20261022194946_DataPortConfiguration','20261022205922_CurrenciesAndNbpRates','20261022211121_OptionalNbpTradingDate','20261023041721_CurrencyIsoCodePrimaryKey','20261023173705_StandardContractorIdentifiers',
                 '20261021102909_InitialSystem','20261021114324_IdentityAndCompanyAccess','20261022055958_InstallationIdentity');
             """);
         // Rzeczywiste identyfikatory migracji systemowych weryfikuje niżej kontekst.
@@ -472,7 +472,7 @@ internal static class LocalDatabases
         await using var system = SystemContext(SystemDatabase);
         await ShowSchema(system, SystemDatabase, ["core.Companies", "core.CompanyDatabases", "dbo.__EFMigrationsHistory",
             "security.Users", "security.Roles", "security.UserRoles", "security.UserClaims", "security.UserLogins",
-            "security.UserTokens", "security.RoleClaims", "security.CompanyAccess", "security.UserSessions", "security.Installation", "security.GusConfiguration", "security.RegistryConfigurations", "audit.RegistryConfigurationChanges", "ref.TaxIdentifierSchemes"], "_InstallationRegistrySettings");
+            "security.UserTokens", "security.RoleClaims", "security.CompanyAccess", "security.UserSessions", "security.Installation", "security.GusConfiguration", "security.RegistryConfigurations", "audit.RegistryConfigurationChanges", "ref.TaxIdentifierSchemes"], "_ContractorPeselPermission");
         if (await system.InstallationIdentities.CountAsync() != 1 || (await system.InstallationIdentities.SingleAsync()).Id == Guid.Empty)
             throw new InvalidOperationException("Brak trwałej identyfikacji instalacji.");
         if (await system.Companies.CountAsync() != 2 || await system.CompanyDatabases.CountAsync() != 2)
@@ -485,7 +485,7 @@ internal static class LocalDatabases
             if (registration.ServerName != Server || registration.DatabaseName != database)
                 throw new InvalidOperationException("Błędna lokalizacja firmy.");
             await using var company = CompanyContext(database, id);
-            await ShowSchema(company, database, ["core.CompanyProfile", "core.Contractors", "core.ContractorAddresses", "core.ContractorContacts", "core.ContractorBankAccounts", "core.ContractorCreateOperations", "ref.AddressTypes", "audit.ContractorChanges", "audit.ExternalVerifications", "security.DataPortConfiguration", "ref.Currencies", "core.ExchangeRates", "audit.CurrencyOperations", "dbo.__EFMigrationsHistory"], "_CurrencyIsoCodePrimaryKey");
+            await ShowSchema(company, database, ["core.CompanyProfile", "core.Contractors", "core.ContractorAddresses", "core.ContractorContacts", "core.ContractorBankAccounts", "core.ContractorCreateOperations", "ref.AddressTypes", "audit.ContractorChanges", "audit.ExternalVerifications", "security.DataPortConfiguration", "ref.Currencies", "core.ExchangeRates", "audit.CurrencyOperations", "dbo.__EFMigrationsHistory"], "_StandardContractorIdentifiers");
             var profile = await company.CompanyProfiles.IgnoreQueryFilters().SingleAsync();
             if (profile.CompanyId != id)
                 throw new InvalidOperationException("Niezgodna tożsamość danych firmy.");

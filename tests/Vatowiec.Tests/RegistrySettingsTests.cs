@@ -72,10 +72,11 @@ public sealed class RegistrySettingsTests
         Assert.Null(company.Model.FindEntityType(typeof(RegistryConfiguration)));
         Assert.Empty(system.Model.FindEntityType(typeof(RegistryConfigurationChange))!.GetForeignKeys());
         var names = system.Database.GetMigrations().ToArray(); var migrator = system.GetService<IMigrator>();
-        var sql = migrator.GenerateScript(names[^2], names[^1]);
+        var index = Array.FindIndex(names, x => x.EndsWith("_InstallationRegistrySettings", StringComparison.Ordinal));
+        var sql = migrator.GenerateScript(names[index - 1], names[index]);
         Assert.Contains("CREATE TABLE [security].[RegistryConfigurations]", sql); Assert.Contains("CREATE TABLE [audit].[RegistryConfigurationChanges]", sql);
         Assert.Contains("CREATE TRIGGER", sql); Assert.DoesNotContain("DELETE FROM", sql); Assert.DoesNotContain("DROP TABLE", sql);
         Assert.DoesNotContain("[GusConfiguration]", sql); Assert.DoesNotContain("DataPort", sql);
-        Assert.Throws<NotSupportedException>(() => migrator.GenerateScript(names[^1], names[^2]));
+        Assert.Throws<NotSupportedException>(() => migrator.GenerateScript(names[index], names[index - 1]));
     }
 }

@@ -150,15 +150,8 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
     }
     public Task<CompanyProfileResponse> Profile(Guid companyId) => Get<CompanyProfileResponse>($"api/v1/companies/{companyId:D}/profile");
     public Task<ContractorResponse[]> Contractors(Guid companyId, string? search = null, string? country = null, bool? active = null, int offset = 0, int limit = 50)
-    {
-        var query = new List<string>();
-        if (!string.IsNullOrWhiteSpace(search)) query.Add("q=" + Uri.EscapeDataString(search.Trim()));
-        if (!string.IsNullOrWhiteSpace(country)) query.Add("country=" + Uri.EscapeDataString(country.Trim()));
-        if (active.HasValue) query.Add("active=" + (active.Value ? "true" : "false"));
-        if (offset != 0) query.Add("offset=" + offset);
-        if (limit != 50) query.Add("limit=" + limit);
-        return Get<ContractorResponse[]>($"api/v1/companies/{companyId:D}/contractors" + (query.Count == 0 ? "" : "?" + string.Join("&", query)));
-    }
+        => Post<ContractorResponse[]>($"api/v1/companies/{companyId:D}/contractors/search",
+            new ContractorSearchRequest(search?.Trim(), country?.Trim(), active, Offset: offset, Limit: limit));
 
     public Task<ContractorResponse> Contractor(Guid companyId, int id) => Get<ContractorResponse>($"api/v1/companies/{companyId:D}/contractors/{id:D}");
 
@@ -183,7 +176,7 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
     public Task<AddressTypeResponse[]> AddressTypes(Guid companyId) => Get<AddressTypeResponse[]>($"api/v1/companies/{companyId}/address-types");
     public Task<AddressTypeResponse> AddAddressType(Guid companyId, AddressTypeWriteRequest value) => Write<AddressTypeResponse>($"api/v1/companies/{companyId}/address-types", value, false);
     public Task<ContractorResponse[]> ParentCandidates(Guid companyId, string search, int excludeId, int offset = 0) =>
-        Get<ContractorResponse[]>($"api/v1/companies/{companyId}/contractors?q={Uri.EscapeDataString(search)}&excludeId={excludeId}&limit=51&offset={offset}");
+        Post<ContractorResponse[]>($"api/v1/companies/{companyId}/contractors/search", new ContractorSearchRequest(search, ExcludeId: excludeId, Offset: offset, Limit: 51));
     public Task<ContractorResponse[]> Children(Guid companyId, int parentId, int offset = 0) =>
         Get<ContractorResponse[]>($"api/v1/companies/{companyId}/contractors?parentId={parentId}&limit=51&offset={offset}");
     private async Task<T> Write<T>(string path, object value, bool update)
@@ -244,6 +237,7 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
             HttpStatusCode.ServiceUnavailable when error?.Code is "configuration_audit_failed" or "registry_configuration_missing" => error.Message ?? "Nie zapisano konfiguracji rejestru.",
             HttpStatusCode.Unauthorized when login => "Nieprawidłowy login lub hasło albo konto jest zablokowane.",
             HttpStatusCode.Unauthorized => "Sesja wygasła lub została unieważniona. Zaloguj się ponownie.",
+            HttpStatusCode.Forbidden when error?.Code == "pesel_permission_denied" => "Brak uprawnienia do odczytu i edycji PESEL w tej firmie.",
             HttpStatusCode.Forbidden => "Brak uprawnień do firmy lub kartoteki kontrahentów.",
             HttpStatusCode.BadRequest when error?.Code is "hierarchy_cycle" or "invalid_parent" or "invalid_address_type" => error.Message ?? "Sprawdź wybrane powiązanie.",
             HttpStatusCode.BadRequest => "API odrzuciło żądanie. Spróbuj ponownie; sprawdź wersję aplikacji i API.",

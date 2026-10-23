@@ -1,6 +1,6 @@
 # Otwarty następca VATowca — specyfikacja produktu i architektury
 
-**Wersja dokumentu:** 0.17 (ustawienia rejestrów w instalacji, ADR-029)
+**Wersja dokumentu:** 0.18 (standardowe identyfikatory kontrahenta, ADR-030)
 **Data:** 2026-10-23
 **Status:** projekt założeń; nie jest potwierdzeniem zgodności podatkowej gotowego oprogramowania  
 **Nazwa projektu:** robocza „Otwarty następca VATowca”; docelowa nazwa i użycie nazwy „VATowiec” wymagają odrębnej decyzji i sprawdzenia praw  
@@ -279,6 +279,26 @@ ani sekretów nie usuwamy. Ochrona GUS, DataPort i firmowe prawa pozostają.
 Weryfikacja: build bez błędów/ostrzeżeń, 335/335 (330 bez SQL, 5 niedestrukcyjnych
 SQL/API), bez zapytań produkcyjnych i resetów. 103 starszych testów z resetującymi
 fixture nie uruchamiano. [Decyzja ADR-029](docs/adr/ADR-029-ustawienia-rejestrow-w-instalacji.md).
+
+### 3.10.1. Standardowe identyfikatory kontrahenta (ADR-030)
+
+Rozszerzenie kartoteki ADR-030 (ORG-003/007): core.Contractors ma opcjonalne
+Regon, Krs, Bdo i Pesel, wszystkie nvarchar(100) NULL, zachowujące zera wiodące.
+REGON 9/14 i PESEL 11 cyfr mają kontrolę sumy, KRS 10 i BDO 9 cyfr tylko formatu.
+Żaden wynik lokalny nie potwierdza nadania numeru. Normalizacja pokazuje postać
+w formularzu; błędne dane można zapisać tylko z osobnym AcceptWarnings i aktualnym
+WarningHash. Zmiana i audyt SnapshotVersion=3 są atomowe; stare zdarzenia pozostają.
+ManageContractorPesel=512 to dodatkowe, nieprzyznawane automatycznie prawo firmy
+do odczytu/edycji PESEL. Bez niego serwer nie zwraca wartości (również w konflikcie
+i replay), odmawia jawnego zapisu pola, a edycja innych danych zachowuje PESEL.
+Nie ujawniamy go w ToString/logach/diagnostyce. Klient wyszukuje przez POST search
+z CSRF i filtrami w ciele, bez PESEL w URL; dopasowanie PESEL wymaga tego prawa.
+Dotychczasowy GET działa dla publicznych identyfikatorów. ParentId i integracje
+nie zmieniają zasad. Migracje dodają cztery kolumny NULL w A/B i rozszerzają CHECK
+maski praw w System; bez resetów i zmiany istniejących uprawnień. Historia
+surowego audytu pozostaje dostępna tylko wewnątrz bazy, bez endpointu publicznego.
+[Decyzja i granice](docs/adr/ADR-030-standardowe-identyfikatory-kontrahenta.md),
+[instrukcja i testy](docs/standard-identifiers.md).
 
 ### 3.11. DataPort i konfiguracja integracji firmy (ADR-022)
 
@@ -632,13 +652,13 @@ Nie oznacza to przenoszenia firmowych adresów lub kontaktów do bazy systemowej
 |---|---|
 | `CompanyProfile` | `SingletonKey = 1`, `CompanyId`, NIP, REGON, nazwa prawna; dokładnie jeden po inicjalizacji bazy firmy |
 | `TaxProfile` | typ podatnika, forma PIT, VAT, `ValidFrom`, `ValidTo`; kontekst bazy firmy |
-| `core.Contractors` — wdrożona podstawa | `Id int IDENTITY`, `ParentId` grupujący podmioty/grupy/jednostki bez dziedziczenia i cykli, opcjonalne `TaxId` i `VatEuId` do 100 znaków oraz `KsefIdWew`; bez zbędnego `CompanyId`; edycja identyfikatorów z normalizacją/ostrzeżeniami ADR-021 |
+| `core.Contractors` — wdrożona podstawa | `Id int IDENTITY`, `ParentId` grupujący podmioty/grupy/jednostki bez dziedziczenia i cykli, opcjonalne `TaxId`, `VatEuId`, `KsefIdWew`, `Regon`, `Krs`, `Bdo`, `Pesel` do 100 znaków; bez zbędnego `CompanyId`; normalizacja/ostrzeżenia ADR-021/030, PESEL chroniony osobnym prawem |
 | `core.ContractorAddresses` — wdrożony schemat | wiele własnych adresów kontrahenta, także tego samego rodzaju z ref.AddressTypes; najwyżej jeden preferowany na ContractorId i AddressTypeId; pełne kolumny i typy w ADR-018 §3.7 |
 | `ref.AddressTypes` — wdrożony schemat | lokalny, otwarty słownik: Adres rejestrowy, Adres korespondencyjny i możliwość dodawania własnych rodzajów w zakładce Adresy (ADR-020) |
 | `core.ContractorContacts` — wdrożony schemat | jeden uniwersalny model kontaktu: obowiązkowe Name, opcjonalna funkcja/telefon/e-mail/adres/uwagi, bez FK do ContractorAddresses; techniczne typy określa ADR-019 |
 | `core.ContractorBankAccounts` — wdrożony schemat | wiele rachunków bez unikalności numeru, CurrencyCode char(3) NULL, IsDefault bit, najwyżej jeden domyślny w grupie ContractorId/waluta, także NULL; brak obowiązku domyślnego; pełne kolumny i typy w ADR-018 §3.9 |
 | `core.ContractorCreateOperations` — wdrożone | techniczny trwały wynik tworzenia w zakresie aktora, instalacji, OperationKind i operacji; atomowy z rekordem i audytem, szczegóły ADR-019 |
-| `audit.ContractorChanges` | wdrożony audyt SnapshotVersion=2 z RecordType, RecordId i WarningJson; atomowe wartości przed/po i trwały wykonawca; świadome odstępstwa rachunków i identyfikatorów ADR-021 |
+| `audit.ContractorChanges` | wdrożony audyt SnapshotVersion=3 dla nowych zmian danych głównych (starsze i szczegóły =2) z RecordType, RecordId i WarningJson; atomowe wartości przed/po i trwały wykonawca; świadome odstępstwa rachunków i identyfikatorów ADR-021 |
 | `audit.ExternalVerifications` — wdrożone | niezmienne sprawdzenia zewnętrzne w bazie firmy, niezależne od edycji, snapshot wejścia, środowisko i trwały aktor; zakres informacji w §8.3 i ADR-021 |
 | `ref.TaxIdentifierSchemes` — wdrożone w System | państwo/typ/prefiks, regex, klucz algorytmu, wersja, okres, aktywność i URL źródła, bez danych kontrahentów |
 | `security.GusConfiguration` — wdrożone w System | singleton szyfrowanego produkcyjnego klucza GUS całej instalacji, rowversion, bez CompanyId; ADR-028 |
@@ -977,6 +997,7 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | [ADR-020](docs/adr/ADR-020-kompletna-kartoteka-avalonia.md) | Kompletna kartoteka Avalonia | Cztery zakładki, grupy, CRUD szczegółów, typowany audyt, idempotencja, atomowe preferencje i osobne uprawnienie do ostrzeżeń rachunków; bez walidatorów podatkowych/integracji |
 | [ADR-019](docs/adr/ADR-019-implementacja-modelu-kontrahentow.md) | Implementacja podstawy kartoteki | int IDENTITY, zabezpieczona hierarchia, lokalne szczegóły, trwała idempotencja, audyt i odtworzenie trzech demonstracyjnych baz; bez walidatorów i nowych ekranów |
 | [ADR-018](docs/adr/ADR-018-docelowy-model-kontrahentow.md) | Docelowy model kontrahentów i niezależne weryfikacje | Uzupełniony o ParentId bez dziedziczenia, nazwy tabel, reguły identyfikatorów i domyślność walutową; ślad rozstrzygnięć K-01–K-09, pozostałe doprecyzowania w §4; podstawa implementacji ADR-019, bez migracji danych demonstracyjnych |
+| [ADR-030](docs/adr/ADR-030-standardowe-identyfikatory-kontrahenta.md) | REGON, KRS, BDO i PESEL | Opcjonalne teksty, kontrola sum/formatu, osobne firmowe prawo PESEL, bezpieczne wyszukiwanie POST, addytywne migracje i audyt wersji 3 |
 | ADR-006 | Podpisywanie XML i przechowywanie certyfikatów | Przed implementacją wysyłek MF; nie przechowywać sekretów w zwykłej bazie |
 | ADR-007 | API pluginów: manifest, sandbox, granice dostępu | Przed pierwszą wykonywalną wtyczką |
 | ADR-008 | Pełny wykaz typów VAT i deklaracji na 1.0 | Przed M3; uzgodnić precyzyjne scenariusze |

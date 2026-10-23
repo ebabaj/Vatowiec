@@ -2,14 +2,30 @@
 
 Projekt: **Otwarty następca VATowca** (nazwa robocza).  
 Główne źródło wymagań: [`SPECYFIKACJA.md`](./SPECYFIKACJA.md).  
-Status: centralna konfiguracja GUS/MF/VIES przez Avalonia, 2026-10-23; ADR-029.
+Status: REGON, KRS, BDO i chroniony PESEL kontrahenta, 2026-10-23; ADR-030.
 
-**Aktualny etap: ustawienia rejestrów w instalacji (ADR-029).**
+**Aktualny etap: standardowe identyfikatory kontrahenta (ADR-030).**
+Dodajemy Regon/Krs/Bdo/Pesel jako opcjonalne teksty nvarchar(100) w bazie firmy,
+z addytywnymi migracjami i zachowaniem istniejących danych oraz ParentId.
+ManageContractorPesel=512 jest osobnym prawem firmy do odczytu i edycji PESEL,
+bez automatycznego nadania istniejącym kontom. Bez niego API pomija PESEL
+w listach/szczególe/konflikcie/replay i odrzuca jawny zapis tego pola; brak pola
+przy PUT zachowuje chronioną wartość. AcceptWarnings nie zastępuje tego prawa.
+Nie loguj PESEL, ciał formularzy/wyszukiwań ani wartości parametrów SQL.
+Wyszukiwanie klienta używa POST search + CSRF, bez numerów w URL; PESEL wyłącznie
+z odpowiednim prawem. Audyt przed/po jest chronioną częścią bazy firmy;
+przyszłe udostępnienie historii musi również filtrować PESEL. SnapshotVersion=3
+dla nowych zmian danych głównych, bez przepisywania dawnych zdarzeń.
+REGON 9/14 i PESEL mają kontrolę sumy; KRS/BDO tylko formatu. Nie potwierdzamy
+nadania numeru. Normalizacja jest jawna, błędne dane wymagają AcceptWarnings
+i aktualnego WarningHash. Integracje nie nadpisują nowych pól automatycznie.
+Nie uruchamiaj destrukcyjnego runnera SQL; nowe StandardIdentifierSqlTests
+używają rzeczywistych transakcji wycofywanych po testach, bez czyszczenia baz.
 W tym zadaniu zachowujemy wszystkie istniejące dane, konta i tabele System:
 nie uruchamiaj resetującego runnera `DatabaseTools test` ani jego fixture.
-Używaj niedestrukcyjnych OfficialVatRulesSqlTests/GusConfigurationSqlTests/RegistrySettingsSqlTests po jawnej migracji
+Używaj niedestrukcyjnych OfficialVatRulesSqlTests/GusConfigurationSqlTests/RegistrySettingsSqlTests/StandardIdentifierSqlTests po jawnej migracji
 i backupie. Jest to ograniczenie bieżące, nadrzędne wobec historycznych zgód
-na reset demonstratora poniżej. Rozszerzamy istniejące adaptery i ustawienia Avalonia;
+na reset demonstratora poniżej. Rozszerzamy istniejącą kartotekę i formularz Avalonia;
 nie wykonujemy automatycznych zapytań produkcyjnych ani konfiguracji klucza za użytkownika.
 Użytkownik zakończył etap dokumentacyjny. Można odtwarzać wyłącznie lokalne
 Vatowiec_System, Vatowiec_Company_A_Dev i Vatowiec_Company_B_Dev po kontroli
