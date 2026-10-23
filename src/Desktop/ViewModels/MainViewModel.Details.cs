@@ -11,6 +11,8 @@ public sealed partial class MainViewModel
     private DetailResponse? detailConflict;
     private string? warningHash;
     private string warningMessage = "";
+    private BankAccountValidationResponse? bankValidation;
+    public string BankValidationMessage => bankValidation?.Message ?? "Numer nie został jeszcze sprawdzony. Użyj przycisku „Sprawdź numer” lub zapisz formularz.";
     private Action? discardAction;
     private int detailOffset;
     private int parentOffset;
@@ -164,7 +166,7 @@ public sealed partial class MainViewModel
     public void NewDetail()
     {
         if (busy || !CanEditDetails) return;
-        void Open() { ClearDetailDraft(); detailEditor = new DetailEditor(DetailKind); ChangedAll(); }
+        void Open() { ClearDetailDraft(); SetDetailEditor(new DetailEditor(DetailKind)); ChangedAll(); }
         if (detailEditor?.IsDirty == true) RequestDiscard(Open); else Open();
     }
     public Task EditDetail() => Run(async () =>
@@ -174,7 +176,17 @@ public sealed partial class MainViewModel
         var row = await api.Detail(profile.CompanyId, editor.Id, DetailKind, SelectedDetail.Id);
         CheckDetail(row);
         ClearDetailDraft();
-        detailEditor = new DetailEditor(row);
+        SetDetailEditor(new DetailEditor(row));
+        bankValidation = row.BankValidation;
+    });
+    public Task ValidateBankAccount() => Run(async () =>
+    {
+        if (api is null || profile is null || editor is null || detailEditor is null || !IsBankTab) return;
+        var draft = detailEditor;
+        var number = draft.AccountNumber ?? "";
+        if (string.IsNullOrWhiteSpace(number)) { message = "Wpisz numer rachunku."; return; }
+        var result = await api.ValidateBankAccount(profile.CompanyId, editor.Id, number);
+        if (ReferenceEquals(draft, detailEditor) && draft.AccountNumber == number) bankValidation = result;
     });
     public Task SaveDetail(bool acceptWarning = false) => Run(async () =>
     {
@@ -191,7 +203,7 @@ public sealed partial class MainViewModel
             message = "Zapisano pozycję i audyt zmian.";
         }
         catch (ApiException ex) when (ex.Code == "bank_warning" && ex.WarningHash is not null)
-        { warningHash = ex.WarningHash; warningMessage = ex.Message; }
+        { warningHash = ex.WarningHash; warningMessage = ex.Message; bankValidation = ex.BankValidation; }
         catch (ApiException ex) when (ex.Code == "detail_conflict" && ex.DetailCurrent is not null)
         {
             CheckDetail(ex.DetailCurrent);
@@ -208,7 +220,7 @@ public sealed partial class MainViewModel
     {
         if (busy || detailConflict is null || detailEditor is null) return;
         if (keepLocal) detailEditor.RowVersion = detailConflict.RowVersion;
-        else detailEditor = new DetailEditor(detailConflict);
+        else { SetDetailEditor(new DetailEditor(detailConflict)); bankValidation = detailConflict.BankValidation; }
         detailConflict = null;
         message = keepLocal ? "Sprawdź własne pola i ponownie zapisz, aby zastąpić porównaną wersję." : "Wczytano wersję serwera.";
         ChangedAll();
@@ -236,7 +248,27 @@ public sealed partial class MainViewModel
         if (profile is null || editor is null || row.CompanyId != profile.CompanyId || row.ContractorId != editor.Id || row.Kind != DetailKind)
             throw new ApiException(502, "API zwróciło dane innego kontrahenta lub firmy. Odmowa wyświetlenia.");
     }
-    private void ClearDetailDraft() { detailEditor = null; detailConflict = null; warningHash = null; warningMessage = ""; }
+    private void SetDetailEditor(DetailEditor value)
+    {
+        if (detailEditor is not null) detailEditor.PropertyChanged -= DetailFieldChanged;
+        detailEditor = value;
+        detailEditor.PropertyChanged += DetailFieldChanged;
+    }
+    private void DetailFieldChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName != nameof(DetailEditor.AccountNumber)) return;
+        bankValidation = null;
+        warningHash = null;
+        warningMessage = "";
+        Changed(nameof(BankValidationMessage));
+        Changed(nameof(HasBankWarning));
+        Changed(nameof(CanSaveDetail));
+    }
+    private void ClearDetailDraft()
+    {
+        if (detailEditor is not null) detailEditor.PropertyChanged -= DetailFieldChanged;
+        detailEditor = null; detailConflict = null; warningHash = null; warningMessage = ""; bankValidation = null;
+    }
     private void ResetDetails()
     {
         ResetVerifications();
@@ -291,7 +323,12 @@ public sealed class DetailEditor : System.ComponentModel.INotifyPropertyChanged
     public string? Email { get; set; }
     public string? Phone { get; set; }
     public string? Notes { get; set; }
-    public string? AccountNumber { get; set; }
+    private string? accountNumber;
+    public string? AccountNumber
+    {
+        get => accountNumber;
+        set { if (accountNumber == value) return; accountNumber = value; PropertyChanged?.Invoke(this, new(nameof(AccountNumber))); }
+    }
     public string? BankName { get; set; }
     public string? Bic { get; set; }
     public string? CurrencyCode { get; set; }

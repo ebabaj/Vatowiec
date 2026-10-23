@@ -31,6 +31,7 @@ public static class DependencyInjection
     {
         services.TryAddScoped<ICompanyContext>(_ => new CompanyContext(null));
         services.AddScoped<IExchangeRateReader, ExchangeRateReader>();
+        services.AddSingleton<IBankAccountValidator, IbanNetBankAccountValidator>();
         services.AddDbContext<SystemDbContext>((provider, options) =>
         {
             // Odczyt po złożeniu konfiguracji hosta, w tym nadpisań testowych.

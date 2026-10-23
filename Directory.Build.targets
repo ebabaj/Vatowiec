@@ -1,0 +1,9 @@
+<Project>
+  <!-- Informacje prawne trafiają do każdego dystrybuowanego programu. -->
+  <ItemGroup Condition="'$(OutputType)' == 'Exe' Or '$(OutputType)' == 'WinExe'">
+    <Content Include="$(MSBuildThisFileDirectory)licenses/IbanNet/LICENSE.md"
+             Link="licenses/IbanNet/LICENSE.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(MSBuildThisFileDirectory)licenses/THIRD-PARTY-NOTICES.md"
+             Link="licenses/THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

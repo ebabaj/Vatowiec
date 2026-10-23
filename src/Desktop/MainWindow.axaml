@@ -276,8 +276,10 @@
                 </StackPanel>
                 <StackPanel IsVisible="{Binding IsAddressesTab}" Spacing="4"><TextBlock Text="Województwo/region"/><TextBox Text="{Binding DetailEditor.Region, Mode=TwoWay}" MaxLength="100" AutomationProperties.AutomationId="DetailRegion"/><TextBlock Text="{Binding DetailEditor.Errors[Region]}" Foreground="#B42318"/></StackPanel>
                 <StackPanel IsVisible="{Binding IsBankTab}" Spacing="10">
-                  <TextBlock Text="Brak kontroli sumy rachunku i weryfikacji urzędowej. Numer nie jest oznaczany jako prawidłowy." TextWrapping="Wrap" Opacity="0.75"/>
+                  <TextBlock Text="Kontrola formatu i sumy kontrolnej. Nie potwierdza istnienia rachunku, właściciela, banku ani BIC." TextWrapping="Wrap" Opacity="0.75"/>
 <StackPanel Spacing="4"><TextBlock Text="Numer rachunku *"/><TextBox Text="{Binding DetailEditor.AccountNumber, Mode=TwoWay}" MaxLength="100" AutomationProperties.AutomationId="DetailAccountNumber"/><TextBlock Text="{Binding DetailEditor.Errors[AccountNumber]}" Foreground="#B42318"/></StackPanel>
+                  <Button Content="Sprawdź numer" Click="ValidateBankAccountClick" AutomationProperties.AutomationId="ValidateBankAccount"/>
+                  <TextBlock Text="{Binding BankValidationMessage}" TextWrapping="Wrap" AutomationProperties.AutomationId="BankValidationStatus"/>
 <StackPanel Spacing="4"><TextBlock Text="Nazwa banku"/><TextBox Text="{Binding DetailEditor.BankName, Mode=TwoWay}" MaxLength="200" AutomationProperties.AutomationId="DetailBankName"/><TextBlock Text="{Binding DetailEditor.Errors[BankName]}" Foreground="#B42318"/></StackPanel>
 <StackPanel Spacing="4"><TextBlock Text="BIC/SWIFT"/><TextBox Text="{Binding DetailEditor.Bic, Mode=TwoWay}" MaxLength="11" AutomationProperties.AutomationId="DetailBic"/><TextBlock Text="{Binding DetailEditor.Errors[Bic]}" Foreground="#B42318"/></StackPanel>
 <StackPanel Spacing="4"><TextBlock Text="Waluta (trzy litery; puste = bez waluty)"/><TextBox Text="{Binding DetailEditor.CurrencyCode, Mode=TwoWay}" MaxLength="3" AutomationProperties.AutomationId="DetailCurrencyCode"/><TextBlock Text="{Binding DetailEditor.Errors[CurrencyCode]}" Foreground="#B42318"/></StackPanel>

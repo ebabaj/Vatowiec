@@ -2,6 +2,9 @@
 
 Data: 2026-10-22
 Status: przyjęty dla bieżącego zakresu M0.
+Aktualizacja 2026-10-23: uproszczoną kontrolę rachunków `bank-text-v1`
+zastępuje [ADR-025](ADR-025-walidacja-rachunkow-ibannet.md). Poniższy opis
+zachowuje historię decyzji z etapu ADR-020.
 Wymagania: ORG-003/004/005/008, E04, SPECYFIKACJA §8, §10–11.
 Uzupełnia ADR-018/019; zasady biznesowe ADR-018 pozostają obowiązkowe.
 Źródło doprecyzowania: pełne polecenie użytkownika z 2026-10-22.

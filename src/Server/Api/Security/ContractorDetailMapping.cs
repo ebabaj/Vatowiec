@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Vatowiec.Core.Domain;
+using Vatowiec.Core.Application;
 using Vatowiec.SharedContracts;
 
 namespace Vatowiec.Api.Security;
@@ -15,8 +16,11 @@ internal static class ContractorDetailMapping
     public static DetailValues Values(object entity) => JsonSerializer.SerializeToElement(entity).Deserialize<DetailValues>()!;
     public static int Id(object entity) => (int)entity.GetType().GetProperty("Id")!.GetValue(entity)!;
     public static byte[] Version(object entity) => (byte[])entity.GetType().GetProperty("RowVersion")!.GetValue(entity)!;
-    public static DetailResponse Response(object entity, string kind, Guid companyId, int contractorId) =>
-        new(Id(entity), companyId, contractorId, kind, Values(entity), Convert.ToBase64String(Version(entity)));
+    public static DetailResponse Response(object entity, string kind, Guid companyId, int contractorId, IBankAccountValidator validator) =>
+        new(Id(entity), companyId, contractorId, kind, Values(entity), Convert.ToBase64String(Version(entity)))
+        { BankValidation = kind == "bank-accounts" ? ValidationResponse(validator.Validate(Values(entity).AccountNumber!)) : null };
+    public static BankAccountValidationResponse ValidationResponse(BankAccountCheck value) =>
+        new(value.Status.ToString(), value.Code, value.Message, value.NormalizedNumber, value.IsPolishNrb, value.RuleVersion);
     public static string Snapshot(object entity) => JsonSerializer.Serialize(Values(entity));
     public static object New(string kind, int contractorId, DetailValues data) => kind switch
     {

@@ -1,6 +1,6 @@
 # Otwarty następca VATowca — specyfikacja produktu i architektury
 
-**Wersja dokumentu:** 0.12.1 (jedyny identyfikator waluty: kod ISO 4217, ADR-024)
+**Wersja dokumentu:** 0.13 (walidacja rachunków IbanNet, ADR-025)
 **Data:** 2026-10-23
 **Status:** projekt założeń; nie jest potwierdzeniem zgodności podatkowej gotowego oprogramowania  
 **Nazwa projektu:** robocza „Otwarty następca VATowca”; docelowa nazwa i użycie nazwy „VATowiec” wymagają odrębnej decyzji i sprawdzenia praw  
@@ -168,11 +168,21 @@ audyty obu rekordów i wynik tworzenia są atomowe. RecordType/RecordId jednozna
 identyfikują pozycję w ContractorChanges; OperationKind rozszerza istniejącą tabelę
 operacji na wszystkie kartoteki i dodawanie rodzaju adresu, bez nowej tabeli.
 
-Podstawowe przygotowanie rachunku w Application/API usuwa białe znaki i zmienia
-litery na wielkie. bank-text-v1 ostrzega o nietypowym zapisie; nie sprawdza sumy
-ani kraju/rejestru. Świadome potwierdzenie wymaga osobnego AcceptWarnings=8,
-zgodnego hasha pokazanej wersji i audytu WarningJson, bez uzasadnienia. To nie
-potwierdza poprawności rachunku i nie obchodzi integralności ani uprawnień.
+Przygotowanie rachunku w Application/API usuwa białe znaki i zmienia litery
+na wielkie. ADR-025 zastępuje bank-text-v1 kontrolą IbanNet 6.2.0 za własnym
+IBankAccountValidator. NRB (26 cyfr) sprawdzamy na kopii z PL, bez zmiany formatu
+zapisu. IBAN ma kontrolę kraju, struktury i sumy kontrolnej. Wynik nie potwierdza
+istnienia rachunku, właściciela, banku ani BIC. Format spoza IBAN pozostaje
+niezweryfikowany. Błąd lub format spoza standardu wymaga osobnego AcceptWarnings=8,
+świadomego potwierdzenia dokładnego ostrzeżenia i audytu WarningJson.
+Hash obejmuje wersję polityki i binariów biblioteki, wynik, dane, firmę, aktora,
+operację i rowversion. Aktualizacja reguł wymaga nowego potwierdzenia niezapisanego
+żądania. Trwały retry skutecznego POST zachowuje historyczny wynik, bez nowego audytu.
+Avalonia pokazuje wynik API na liście i obok numeru (Sprawdź numer); zmiana numeru
+usuwa stary wynik. Nie zmieniono schematu SQL ani integracji rejestrów.
+Dependabot sprawdza tylko IbanNet co tydzień; aktualizacja wymaga testów i nowego
+wydania, bez automatycznego scalania lub aktualizacji w runtime. Kopia Apache-2.0
+i informacje o bibliotece są dołączane do build/publish programów.
 
 Formularze mają błędy przy polach, przewijanie i stały obszar zapisu/anulowania.
 Szkic jest chroniony potwierdzeniem porzucenia. Skróty odnoszą się do aktywnej
@@ -899,6 +909,7 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | [ADR-022](docs/adr/ADR-022-dataport-i-sekrety-firmy.md) | DataPort i ustawienia firmy | Osobny adapter pośrednika, szyfrowany lokalny klucz, kontrola uprawnień i selektywny import do szkicu; bez zmiany oficjalnych adapterów TEST |
 | [ADR-023](docs/adr/ADR-023-waluty-i-reczne-kursy-nbp.md) | Waluty i ręczne kursy NBP | Lokalny słownik/ustawienia A/B/C, kursy decimal, jawne konflikty i audyt, stronicowany ekran Avalonia; bez harmonogramu i reguł faktur |
 | [ADR-024](docs/adr/ADR-024-kod-iso-jako-klucz-waluty.md) | ISO 4217 jako jedyny identyfikator waluty | Code char(3) PK, CurrencyCode FK, brak numerycznego Id waluty; odtworzenie wyłącznie demonstracyjnego modułu walut i kursów |
+| [ADR-025](docs/adr/ADR-025-walidacja-rachunkow-ibannet.md) | Walidacja rachunków | IbanNet 6.2.0 za interfejsem Application, NRB/IBAN, wersjonowane potwierdzenie ostrzeżeń, wynik w Avalonia, licencja i kontrolowane aktualizacje |
 | [ADR-021](docs/adr/ADR-021-identyfikatory-i-rejestry-testowe.md) | Identyfikatory i rejestry TEST | Wersjonowane reguły, ostrzeżenia, osobna niezmienna historia i środowiska Test/Production/Mock; ręczne oficjalne MF/WL2, GUS BIR1.2 i VIES |
 | [ADR-020](docs/adr/ADR-020-kompletna-kartoteka-avalonia.md) | Kompletna kartoteka Avalonia | Cztery zakładki, grupy, CRUD szczegółów, typowany audyt, idempotencja, atomowe preferencje i osobne uprawnienie do ostrzeżeń rachunków; bez walidatorów podatkowych/integracji |
 | [ADR-019](docs/adr/ADR-019-implementacja-modelu-kontrahentow.md) | Implementacja podstawy kartoteki | int IDENTITY, zabezpieczona hierarchia, lokalne szczegóły, trwała idempotencja, audyt i odtworzenie trzech demonstracyjnych baz; bez walidatorów i nowych ekranów |

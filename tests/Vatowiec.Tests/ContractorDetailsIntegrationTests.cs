@@ -32,7 +32,7 @@ public sealed partial class AuthenticationIntegrationTests
     {
         "contacts" => new() { Name = "Fikcyjny kontakt" },
         "addresses" => new() { Street = "Fikcyjna", City = "Miasto testowe" },
-        _ => new() { AccountNumber = "00000000000000000000000000", CurrencyCode = "PLN" }
+        _ => new() { AccountNumber = "70506405335016096312945164", CurrencyCode = "PLN" }
     };
 
     [SqlServerFact]
@@ -237,7 +237,7 @@ public sealed partial class AuthenticationIntegrationTests
         await using var db = Company(false, companyA);
         var audit = Assert.Single(await db.ContractorChanges.ToListAsync());
         Assert.Equal("ContractorBankAccount", audit.RecordType);
-        Assert.Contains("bank-text-v1", audit.WarningJson);
+        Assert.Contains("bank-iban-v2", audit.WarningJson);
         Assert.Contains("Accepted", audit.WarningJson);
     }
 

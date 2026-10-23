@@ -1,185 +1,92 @@
-# Stan pracy Codex — kod ISO jako klucz waluty (ADR-024)
+# Stan pracy Codex — IbanNet (ADR-025)
 
-## Publikacja zlecona przez użytkownika — 2026-10-23
-
-Użytkownik jawnie zlecił Commit i Push do main z komunikatem
-„M1 - slownik walut ISO 4217 i kursy NBP”. Wcześniejsze zakazy Commit/Push
-opisują poprzedni etap i nie blokują tej konkretnej publikacji.
-DataPort jest już w fc7f0f310c297663984893bb80df10218756a730; nie twórz go ponownie.
-Sprawdzono, że lokalny main i origin/main wskazują ten commit. Zakres nowej
-publikacji to ADR-023/024: waluty/NBP, migracje, ich podłączenie do UI/API,
-uprawnień, dokumentacji i istniejącego runnera testów. Brak nowej implementacji
-DataPort i zmian innych modułów biznesowych. TestResults, kopie i sekrety
-pozostają poza repozytorium. Przed publikacją ponownie wykonano build
-(0 błędów/ostrzeżeń) oraz 150 testów bez SQL; potwierdzono wcześniejszy pełny TRX
-244/244 bez pominięć. SHA publikacji odczytaj z historii Git.
-
-
-2026-10-23. ZADANIE UKOŃCZONE. Bez Commit/Push.
-Przed wznowieniem przeczytaj ten plik i git status. Zachowaj wcześniejsze
-niezatwierdzone zmiany ADR-023; nie zaczynaj implementacji od nowa.
-
-## Zlecenie i obowiązująca zgoda
-
-Walutę identyfikuje wyłącznie ISO Code char(3) jako PK, bez numerycznego/GUID
-Id waluty. Kurs zachowuje własny bigint Id i wskazuje CurrencyCode char(3) FK.
-Bez migracji danych demonstracyjnych i mapowania dawnych identyfikatorów.
-
-Po początkowym zakazie czyszczenia innych modułów użytkownik jawnie odpowiedział:
-„Kasuj wszystko. Odwołuję poprzednie ograniczenie. Klucz API skonfiguruję - to
-nie problem.” Zgodę wykorzystano do pełnego runnera fixture na trzech znanych
-lokalnych bazach VATowca. Nie trzeba ponawiać pytania. Nie rozszerzaj zgody na
-inne aplikacje, SQL systemowy ani serwery zdalne. Nie tworzono *_Test, nie
-wykonano DROP/CREATE baz. Pomysł dodatkowego runnera izolowanego usunięto.
-Klucz DataPort mimo zgody na usunięcie zachowano istniejącym mechanizmem
-szyfrogramu w pamięci i verified backupów; nie odszyfrowywano go ani nie wypisano.
+2026-10-23. ZADANIE UKOŃCZONE. Bez Commit/Push — użytkownik wykona je sam.
+Przed wznowieniem przeczytaj ten plik i git status; nie zaczynaj od nowa.
+Poprzedni moduł walut jest opublikowany: 7bb07a7fbd93f930363fd6dff5e49575f0a88a7f,
+DataPort: fc7f0f310c297663984893bb80df10218756a730. Bieżąca zgoda NIE obejmuje publikacji.
 
 ## Wykonano
 
-- Currency.Code init jest jedynym PK, char(3), ValueGeneratedNever, BIN2,
-  wielkie litery. SQL trigger blokuje zmianę kodu także bez powiązanych kursów.
-- ExchangeRate.CurrencyCode char(3) FK do Code. Własny bigint IDENTITY kursu
-  i unikalność CurrencyCode/Source/TableType/EffectiveDate zachowane.
-- Domyślny słownik149 i EUR/USD/GBP/CHF A, PLN bez pobierania.
-- API PUT /currencies/{currencyCode}; brak Id w CurrencyResponse. RateResponse
-  i RateConflict używają CurrencyCode. Serwisy, idempotencja, klient API,
-  wybór/cache/lista i filtry Avalonia używają kodów. Brak liczbowych aliasów.
-- Współbieżność, trwałe ponowienie, audyt atomowy, CSRF, sesje, autoryzacja i
-  izolacja firm zachowane. Nie zmieniano reguł księgowych/architektury.
-- Rachunki już miały CurrencyCode, bez CurrencyId; zasady ich edycji niezmienione.
-- Nowa migracja 20261023041721_CurrencyIsoCodePrimaryKey: DROP/CREATE tylko
-  ref.Currencies, core.ExchangeRates, audit.CurrencyOperations + seed, indeksy,
-  FK i triggery. Bez INSERT SELECT/mapowania danych. Down odmawia numerycznego PK.
-- Historyczne migracje i ADR-023 zachowano; aktywny snapshot już bez CurrencyId.
-- Jawne wdrożenie A/B po preflight/zweryfikowanych COPY_ONLY/CHECKSUM/VERIFYONLY.
-  localhost\SQLEXPRESS, Windows Authentication. Każda baza ma14tabel,
-  System i obie firmy po7migracji. Nowe firmy kończą pełny łańcuch na tym modelu.
-- Bezpośrednio po DDL hashe/liczniki WSZYSTKICH tabel poza modułem były identyczne,
-  w tym DataPort. Dopiero osobny, potem zatwierdzony pełny runner zresetował
-  inne fikcyjne kartoteki i konta. Migracja sama ich nie zmieniała.
-- Dokumentacja: ADR-024, adnotacja historycznego ADR-023, SPECYFIKACJA 0.12.1,
-  AGENTS, README, docs/currencies-and-nbp.md i database-per-company.md.
+- IbanNet 6.2.0 w centralnym Directory.Packages.props i Infrastructure csproj.
+- Application: IBankAccountValidator, typowany wynik i normalizacja. Infrastructure:
+  adapter IbanNet; NRB sprawdzany z PL na kopii, zapis NRB bez PL, IBAN według kraju,
+  konkretne polskie błędy i non-IBAN jako niezweryfikowany. Brak zapytań zewnętrznych.
+- API: wynik przy odczycie/zapisie rachunku; POST bank-accounts/validate z ViewContractors,
+  CSRF, profilem i sprawdzeniem kontrahenta. WarningHash obejmuje reguły/binary MVID,
+  wynik/dane, firmę, autora, operację i rowversion. Istniejące transakcje, uprawnienie
+  AcceptWarnings, audyt i idempotencja zachowane. Brak nowych tabel/migracji.
+- Avalonia: przycisk Sprawdź numer i wynik obok pola; wynik również na liście.
+  Zmiana numeru usuwa wynik i potwierdzenie. Test ViewModel z rzeczywistym API gotowy.
+- Dependabot tylko IbanNet co tydzień, brak automatycznego scalania.
+- licenses/IbanNet/LICENSE.md pobrano z oficjalnego tagu v6.2.0, Apache-2.0;
+  THIRD-PARTY-NOTICES.md: autor Martijn Bodeman, wersja, commit i zasady dystrybucji.
+  Sprawdzono nuspec, nupkg i upstream tree: brak dodatkowego NOTICE.
+- Directory.Build.targets dołącza oba pliki prawne do build/publish programów.
+  Publish API i Desktop wykonany; hash licencji jest identyczny w obu dystrybucjach.
+- ADR-025, historyczna adnotacja ADR-020, SPEC, AGENTS, README i docs/contractors.md zaktualizowane.
+- Dodano 24 testy walidatora i 5 testów SQL/API (w tym ViewModel+HTTP).
+  Stary fixture zerowego NRB zastąpiono poprawnym testowym NRB; fixture testu
+  odmowy MF dla DE miał błędną sumę, zmieniono tylko numer na wzorcowy DE.
+  Logika MF i innych integracji pozostała bez zmian.
 
-## Końcowe wyniki
+## Testy i bieżący proces
 
-- Build całego solution:0błędów,0ostrzeżeń. TestResults/iso-build.log.
-- **244/244 testy, bez pominięć:94 SQL/API +150 bez SQL.**
-- Raport TestResults/database-per-company-b41b723aa3f244c6abbf7a917bb74080.trx.
-- Log TestResults/iso-all-tests.log. Wszystkie automatyczne HTTP są atrapami.
-- Nowe testy klucza/DTO, fizycznego PK/FK, braku Id/CurrencyId, niezmienności,
-  małych liter i liczbowych ścieżek. Pozostałe konflikty/CAS/audyt/rollback,
-  deduplikacja/ponowienia, uprawnienia/CSRF/sesje/izolacja i filtry przechodzą.
-- dotnet format --verify-no-changes i STANDARDOWE git diff --check:0.
-  Nie wyłączaj autocrlf podczas diff-check, bo CRLF dają pozorne błędy whitespace.
-- Ręczne SQL A/B w rollback: duże litery, FK i trigger niezmienności potwierdzone.
-- Rzeczywiste HTTPS API: login/CSRF, brak Id waluty, kod zamiast liczby, odmowa
-  edycji kodu, B i czytelnik, import, deduplikacja, replay oraz filtr EUR:
-  30.09.2026,190/A/NBP/2026,Mid4,3672. Wszystko poprawne.
-- Rzeczywiste okno Avalonia uruchomione/obejrzane przed i po pełnym runnerze.
-  Zapis/przywrócenie EUR, filtr CHF z1kursem, końcowy filtr C z Bid/Ask/daty/strony.
-  Zrzuty TestResults/iso-ui-filter.png i iso-ui-final.png.
+- Restore i build całego rozwiązania: OK, 0 błędów/ostrzeżeń.
+- Testy BankAccountValidatorTests: 24/24 w końcowym pełnym przebiegu.
+- Pierwszy pełny runner: 266/267, jedyny błąd to stary fixture DE opisany wyżej;
+  poprawiono go. Nie traktuj pierwszego przebiegu jako sukcesu.
+- Końcowy pełny runner: 273/273 bez pominięć, 99 SQL/API + 174 bez SQL.
+  TRX TestResults/database-per-company-b5110f291dec42bb89ddf41fc0e874fc.trx.
+  Logi TestResults/iban-full.log i iban-build.log. Po pierwszym 266/267 poprawiono
+  fixture DE; kolejne przebiegi były zielone. Próba UI ujawniła mylące mapowanie
+  cyfr kontrolnych 00/01/99 w IbanNet; poprawiono komunikaty i dodano regresje.
+  Dodano też rozróżnienie DEMO-... od prefiksu niemieckiego IBAN i krótkiego PL.
+- Runner kontroluje dokładne nazwy/instancję/znaczniki trzech baz, robi backupy
+  COPY_ONLY/CHECKSUM/VERIFYONLY przy konfiguracji DataPort, zachowuje szyfrogram
+  w pamięci i przywraca go po testach. Nie odczytuje sekretu.
+- Użytkownik wcześniej jawnie pozwolił kasować wszystkie dane demonstratora
+  (odwołał ograniczenie walutowe). Nie trzeba ponawiać pytania o runner.
+- Zatrzymano lokalny API PID 14120 przed build/test. Desktop nie działał.
 
-## Liczniki przed/po i rzeczywisty NBP
+## Zakończenie i ewentualne wznowienie
 
-                         Przed DDL     Po DDL     Stan końcowy
-A ref.Currencies             149         149          149
-A core.ExchangeRates         413           0          415
-A audit.CurrencyOperations    12           0           13
-B ref.Currencies             149         149          149
-B core.ExchangeRates           0           0            0
-B audit.CurrencyOperations     0           0            0
+Nie pozostały obowiązkowe kroki implementacji. Brak Commit/Push. Nie uruchamiaj
+ponownie zakończonych testów bez nowej zmiany. Przed dalszą pracą sprawdź git status.
 
-Stare kursy usunięto, nie migrowano. Ponownie pobrano EUR A/C za02.01–22.10.2026
-(412tabel/412kursów), potem A dla4domyślnych walut22.10 (+3,1pominięty).
-Powtórny import0nowych/4pominięte; replayten sam AuditId bez nowego HTTP/audytu.
-Porównano413dawnych kombinacji kod/źródło/typ/data:0braków i0zmian numeru tabeli,
-daty notowania i Mid/Bid/Ask. Dodatkowe2to EUR205/A i205/C z21.10.2026.
-Id publikacji, rowversion i UTC pobrania są nowe. Dane porównawcze nie były
-importowane z pliku; źródłem zapisanych kursów był wyłącznie oficjalny NBP.
-Po pełnym runnerze ponownie wykonano te ręczne próby; stan końcowy jest415/13.
-Nowa historia:8zmian ustawień w API,3importy,2zmiany/przywrócenia w oknie.
+- UIA rzeczywistej Avalonia: operator.m0/A, NRB ze spacjami/zapis/ponowny odczyt
+  bez PL/edycja, PL/DE/GB/FR preview, błąd sumy i świadomy zapis, non-IBAN i zapis,
+  czyszczenie wyniku, B readonly i izolacja, wylogowanie — OK.
+- Zrzut TestResults/iban-ui-warning.png. Odczyt SQL po UI: A 4 rachunki (1 seed+3 UI),
+  4 audyty rachunków, 2 zaakceptowane ostrzeżenia, 1 NRB bez PL; B 1 seed, 0 audytów.
+- Helper UIA wybiera tylko widoczne/wirtualizowane pozycje. Brak NewDetail w B
+  wynika z prawidłowego ukrycia, nie błędu aplikacji. Sprawdzono brak/dostępność.
+- API HTTPS i Desktop pozostawiono uruchomione, Desktop wylogowany. PID w
+  TestResults/iban-processes.json; zawsze sprawdź rzeczywisty ExecutablePath przed
+  ewentualnym zatrzymaniem. Nie ma haseł w logach/pliku.
+- Finalny publish API i Desktop ma licencję i notices. SHA256 LICENSE:
+  3D60FEFD7B68DB4A2517BF551B0944A2770AC92CF12CC087AFE7C0BBD7656FEE.
+- Końcowa dokumentacja/zakres dołączone do raportu. Bazy mają te same historie
+  migracji co przed zadaniem, nie tworzono tabel. Runner wyczyścił dane demo
+  zgodnie z istniejącą zgodą; szyfrogram DataPort przywrócony. Brak zapytań MF/GUS/
+  VIES/DataPort/NBP z nowego walidatora lub próby UI.
 
-Próby rzeczywiste nie należą do automatycznego zestawu. Brak nowych zapytań
-MF/GUS/VIES/DataPort. Szyfrogram DataPort w A przywrócony przez runner.
-Konta operator.m0 i czytelnik.m0 odtworzone, hasła z lokalnego user-secrets.
+## Pliki
 
-## Artefakty i ponowne otwarcie
+Directory.Packages.props, Directory.Build.targets, .github/dependabot.yml;
+Application/BankAccountPreparation.cs; Infrastructure/IbanNetBankAccountValidator.cs,
+DependencyInjection.cs i csproj; API Security/ContractorDetailEndpoints.cs,
+ContractorDetailMapping.cs; SharedContracts/ContractorDetailContracts.cs;
+Desktop/MainWindow.axaml/.cs, Services/VatowiecApiClient.cs,
+ViewModels/MainViewModel.Details.cs; tests/BankAccountValidatorTests.cs,
+BankAccountIntegrationTests.cs, AuthenticationIntegrationTests.cs,
+ContractorDetailsIntegrationTests.cs, IdentifierRegistryIntegrationTests.cs;
+licenses/*; docs/adr/ADR-025*, ADR-020*, SPECYFIKACJA.md, AGENTS.md,
+docs/CODEX_PROGRESS.md, docs/contractors.md, README.md. Zawsze porównaj aktualne git status.
 
-TestResults/IsoCurrencyReset.sql — przejrzany SQL offline.
-TestResults/iso-before-counts.json, iso-before-rates.json — wyłącznie baseline
-liczników/hashów i publicznych kursów bez numerycznych Id walut.
-TestResults/iso-after-ddl-*, iso-after-download-*, iso-final-* — porównania.
-TestResults/iso-live-probe-final.log — ostatnia rzeczywista próba API/NBP.
-TestResults/Capture-IsoBaseline.ps1 i Probe-IsoCurrencyApi.ps1 — lokalne pomocnicze
-skrypty poza repo. Nigdy nie wypisuj/utrwalaj haseł, cookie, CSRF ani kluczy API.
+## Znane ograniczenia
 
-API i Avalonia uruchomione do przeglądu; końcowo operator w A, filtr tabeli C.
-Sesja wygasa normalnie; procesy mogą zakończyć się z sesją narzędzi. Start:
-
-dotnet run --project src/Server/Api --no-build --launch-profile https
-dotnet run --project src/Desktop --no-build
-
-Logowanie lokalnym hasłem, firmaA, Słowniki → Waluty i kursy NBP. B tylko odczyt.
-
-## Problemy i dalsze kroki
-
-Brak znanych blokujących błędów i brak pozostałej pracy dla tego zadania.
-Nie trzeba ponawiać testów ani odczytów NBP. Nie ogłaszamy gotowości księgowej
-ani produkcyjnej. Nie wykonano Commit ani Push. Przy kolejnym zadaniu zachowaj
-cały dotychczasowy diff (obejmuje również poprzedni niezatwierdzony etap ADR-023).
-
-## Zmienione pliki
-```text
- M AGENTS.md
- M README.md
- M SPECYFIKACJA.md
- M docs/authentication.md
- M docs/database-per-company.md
- M docs/dataport.md
- M docs/desktop.md
- M src/Desktop/App.axaml
- M src/Desktop/MainWindow.axaml
- M src/Desktop/MainWindow.axaml.cs
- M src/Desktop/Services/VatowiecApiClient.cs
- M src/Desktop/ViewModels/MainViewModel.Contractors.cs
- M src/Desktop/ViewModels/MainViewModel.Details.cs
- M src/Desktop/ViewModels/MainViewModel.cs
- M src/Modules/Core/Domain/CompanyAccess.cs
- M src/Modules/Core/Infrastructure/DependencyInjection.cs
- M src/Modules/Core/Infrastructure/Persistence/CompanyDbContext.cs
- M src/Modules/Core/Infrastructure/Persistence/Migrations/Company/CompanyDbContextModelSnapshot.cs
- M src/Modules/Core/Infrastructure/Persistence/Migrations/System/SystemDbContextModelSnapshot.cs
- M src/Modules/Core/Infrastructure/Persistence/SystemConfigurations/CompanyAccessConfiguration.cs
- M src/Modules/Core/Infrastructure/Registries/RegistryAdapters.cs
- M src/Server/Api/Security/CompanyEndpoints.cs
- M tests/Vatowiec.Tests/AuthenticationIntegrationTests.cs
- M tests/Vatowiec.Tests/CompanyModelTests.cs
- M tests/Vatowiec.Tests/DesktopTests.cs
- M tests/Vatowiec.Tests/SqlServerFactAttribute.cs
- M tests/Vatowiec.Tests/SqlServerPersistenceTests.cs
- M tools/database/Vatowiec.DatabaseTools/LocalDatabases.cs
-?? docs/CODEX_PROGRESS.md
-?? docs/adr/ADR-023-waluty-i-reczne-kursy-nbp.md
-?? docs/adr/ADR-024-kod-iso-jako-klucz-waluty.md
-?? docs/currencies-and-nbp.md
-?? src/Desktop/ViewModels/MainViewModel.Currencies.cs
-?? src/Modules/Core/Application/ExchangeRates.cs
-?? src/Modules/Core/Domain/Currency.cs
-?? src/Modules/Core/Infrastructure/Persistence/CompanyConfigurations/CurrencyConfigurations.cs
-?? src/Modules/Core/Infrastructure/Persistence/CurrencySeed.cs
-?? src/Modules/Core/Infrastructure/Persistence/ExchangeRateService.cs
-?? src/Modules/Core/Infrastructure/Persistence/Migrations/Company/20261022205922_CurrenciesAndNbpRates.Designer.cs
-?? src/Modules/Core/Infrastructure/Persistence/Migrations/Company/20261022205922_CurrenciesAndNbpRates.cs
-?? src/Modules/Core/Infrastructure/Persistence/Migrations/Company/20261022211121_OptionalNbpTradingDate.Designer.cs
-?? src/Modules/Core/Infrastructure/Persistence/Migrations/Company/20261022211121_OptionalNbpTradingDate.cs
-?? src/Modules/Core/Infrastructure/Persistence/Migrations/Company/20261023041721_CurrencyIsoCodePrimaryKey.Designer.cs
-?? src/Modules/Core/Infrastructure/Persistence/Migrations/Company/20261023041721_CurrencyIsoCodePrimaryKey.cs
-?? src/Modules/Core/Infrastructure/Persistence/Migrations/System/20261022205924_CurrencyPermissions.Designer.cs
-?? src/Modules/Core/Infrastructure/Persistence/Migrations/System/20261022205924_CurrencyPermissions.cs
-?? src/Modules/Core/Infrastructure/Registries/NbpClient.cs
-?? src/Server/Api/Security/CurrencyEndpoints.cs
-?? src/SharedContracts/CurrencyContracts.cs
-?? tests/Vatowiec.Tests/CurrencyDesktopTests.cs
-?? tests/Vatowiec.Tests/CurrencyIntegrationTests.cs
-?? tests/Vatowiec.Tests/NbpTests.cs
-```
+Format NRB rozpoznajemy jako dokładnie 26 cyfr ASCII. Inne czysto lokalne formaty
+są non-IBAN i wymagają ostrzeżenia, nie są bezwarunkowo blokowane. Biblioteka nie
+potwierdza banku, BIC, właściciela ani istnienia rachunku. Upgrade wymaga wydania
+aplikacji/testów; nie ma runtime update. Podgląd nie zapisuje audytu, gdyż nie
+zmienia kartoteki; świadomy zapis zawsze zapisuje istniejący audyt atomowo.

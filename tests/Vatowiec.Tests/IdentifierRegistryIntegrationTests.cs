@@ -169,7 +169,7 @@ public sealed partial class AuthenticationIntegrationTests
         var request = new VerificationRequest(Guid.NewGuid(), "MfTaxpayer", row.RowVersion);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync(VerificationsPath(), request)).StatusCode);
         await SetRegistryInput(); row = (await Read(client, contractorId))!;
-        var bank = await CreateDetail(client, "bank-accounts", new() { AccountNumber = "DE12345678901234567890" });
+        var bank = await CreateDetail(client, "bank-accounts", new() { AccountNumber = "DE89370400440532013000" });
         request = new(Guid.NewGuid(), "MfAccount", row.RowVersion, bank.Id, bank.RowVersion);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync(VerificationsPath(), request)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync(VerificationsPath(), request with { BankAccountId = int.MaxValue })).StatusCode);

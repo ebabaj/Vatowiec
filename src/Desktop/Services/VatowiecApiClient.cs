@@ -20,6 +20,7 @@ public interface IVatowiecApiClient : IDisposable
     Task<DetailResponse[]> Details(Guid companyId, int contractorId, string kind, int offset = 0, int limit = 50) => Task.FromResult<DetailResponse[]>([]);
     Task<DetailResponse> Detail(Guid companyId, int contractorId, string kind, int id) => throw new NotSupportedException();
     Task<DetailResponse> SaveDetail(Guid companyId, int contractorId, string kind, DetailWriteRequest value, bool isNew) => throw new NotSupportedException();
+    Task<BankAccountValidationResponse> ValidateBankAccount(Guid companyId, int contractorId, string number) => throw new NotSupportedException();
     Task<AddressTypeResponse[]> AddressTypes(Guid companyId) => Task.FromResult<AddressTypeResponse[]>([]);
     Task<AddressTypeResponse> AddAddressType(Guid companyId, AddressTypeWriteRequest value) => throw new NotSupportedException();
     Task<ContractorResponse[]> ParentCandidates(Guid companyId, string search, int excludeId, int offset = 0) => Task.FromResult<ContractorResponse[]>([]);
@@ -43,6 +44,7 @@ public sealed class ApiException(int statusCode, string message) : Exception(mes
     public ContractorResponse? Current { get; init; }
     public DetailResponse? DetailCurrent { get; init; }
     public string? WarningHash { get; init; }
+    public BankAccountValidationResponse? BankValidation { get; init; }
     public Dictionary<string, string[]>? Errors { get; init; }
 }
 
@@ -158,6 +160,8 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         Get<DetailResponse>($"api/v1/companies/{companyId}/contractors/{contractorId}/{kind}/{id}");
     public Task<DetailResponse> SaveDetail(Guid companyId, int contractorId, string kind, DetailWriteRequest value, bool isNew) =>
         Write<DetailResponse>($"api/v1/companies/{companyId}/contractors/{contractorId}/{kind}" + (isNew ? "" : $"/{value.Id}"), value, !isNew);
+    public Task<BankAccountValidationResponse> ValidateBankAccount(Guid companyId, int contractorId, string number) =>
+        Write<BankAccountValidationResponse>($"api/v1/companies/{companyId}/contractors/{contractorId}/bank-accounts/validate", new BankAccountValidationRequest(number), false);
     public Task<AddressTypeResponse[]> AddressTypes(Guid companyId) => Get<AddressTypeResponse[]>($"api/v1/companies/{companyId}/address-types");
     public Task<AddressTypeResponse> AddAddressType(Guid companyId, AddressTypeWriteRequest value) => Write<AddressTypeResponse>($"api/v1/companies/{companyId}/address-types", value, false);
     public Task<ContractorResponse[]> ParentCandidates(Guid companyId, string search, int excludeId, int offset = 0) =>
@@ -241,11 +245,11 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         if (response.StatusCode == HttpStatusCode.BadRequest && error?.Code == "validation_failed" && error.Errors is not null)
             message = string.Join(Environment.NewLine, error.Errors.Values.SelectMany(x => x));
         throw new ApiException((int)response.StatusCode, message)
-        { Code = error?.Code, Current = error?.Current, DetailCurrent = error?.DetailCurrent, WarningHash = error?.WarningHash, Errors = error?.Errors };
+        { Code = error?.Code, Current = error?.Current, DetailCurrent = error?.DetailCurrent, WarningHash = error?.WarningHash, BankValidation = error?.BankValidation, Errors = error?.Errors };
     }
 
     private sealed record ApiError(string? Code, Dictionary<string, string[]>? Errors, ContractorResponse? Current,
-        DetailResponse? DetailCurrent, string? WarningHash, string? Message);
+        DetailResponse? DetailCurrent, string? WarningHash, string? Message, BankAccountValidationResponse? BankValidation);
 
     public void Dispose() => http.Dispose();
 }

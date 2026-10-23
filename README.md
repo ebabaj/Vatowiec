@@ -5,11 +5,18 @@ Projekt wielostanowiskowej aplikacji dla polskich mikrofirm. Obecny stan to
 wybór firmy, dodawanie/edycja z audytem i konfliktami oraz wyszukiwanie po stronie serwera.
 Osobne SystemDbContext i CompanyDbContext, trzy bazy SQL
 Server oraz dwie fikcyjne firmy. Działają Identity, sesje API i autoryzowany resolver
-bazy firmy. Pełny zestaw po zmianie klucza waluty ADR-024: **244/244**,
-bez pominięć — 94 SQL/API i 150 bez SQL. Kompilacja bez ostrzeżeń i błędów.
+bazy firmy. Pełny zestaw po integracji IbanNet ADR-025: **273/273**,
+bez pominięć — 99 SQL/API i 174 bez SQL. Kompilacja bez ostrzeżeń i błędów.
 Nie jest to jeszcze program do prowadzenia księgowości.
 
-**Aktualny etap: kod ISO jako jedyny identyfikator waluty (ADR-024).** Każda firma ma lokalny
+**Aktualny etap: walidacja rachunków IbanNet 6.2.0 (ADR-025).** W zakładce
+Rachunki bankowe przycisk **Sprawdź numer** pokazuje kontrolę NRB/IBAN lub
+niezweryfikowany format spoza IBAN. Ostrzeżenia można świadomie zaakceptować
+z osobnym uprawnieniem i audytem. Kontrola nie potwierdza istnienia rachunku,
+właściciela, banku ani BIC. [Instrukcja i wyniki](docs/contractors.md),
+[licencja Apache-2.0 i autor](licenses/THIRD-PARTY-NOTICES.md).
+
+Moduł walut (ADR-024): każda firma ma lokalny
 słownik 149 walut, ustawienia A/B/C, kursy decimal i niezmienną historię.
 W Avalonia wybierz **Słowniki → Waluty i kursy NBP**: konfiguracja, filtry,
 ręczny import najnowszych publikacji lub okresu oraz jawne rozstrzyganie konfliktów.
@@ -30,9 +37,8 @@ Domyślnie Test; TEST/MOCK nie stanowią produkcyjnego potwierdzenia urzędowego
 Działa osobny [DataPort](docs/dataport.md): szyfrowany klucz firmy, ręczne pobranie
 danych pośrednika i selektywny import do szkicu. Rzeczywista usługa DataPort jest
 oddzielna od oficjalnych rejestrów TEST; automatyczne próby wyłącznie na atrapach.
-Nietypowy zapis
-rachunku wymaga świadomej, audytowanej akceptacji przez uprawnioną osobę;
-nie oznacza to weryfikacji numeru. W etapie ADR-021 bazy i kartoteki zachowano; jawnie dodano
+Błędny IBAN lub format spoza standardu wymaga świadomej, audytowanej akceptacji
+przez uprawnioną osobę. W etapie ADR-021 bazy i kartoteki zachowano; jawnie dodano
 słownik reguł w System i historię weryfikacji w każdej bazie firmy, po backupach.
 W ADR-022 dodano konfigurację DataPort po kolejnych zweryfikowanych kopiach;
 za zgodą właściciela pełny runner ponownie zainicjalizował demonstracyjne dane

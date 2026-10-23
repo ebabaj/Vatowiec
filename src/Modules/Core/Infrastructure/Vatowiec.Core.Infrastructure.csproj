@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <PackageReference Include="IbanNet" />
     <ProjectReference Include="../Application/Vatowiec.Core.Application.csproj" />
     <ProjectReference Include="../../../SharedContracts/Vatowiec.SharedContracts.csproj" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />

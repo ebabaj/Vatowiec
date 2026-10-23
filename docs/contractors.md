@@ -92,8 +92,8 @@ dodawać i edytować, bez usuwania. Zatwierdzony model kontaktu nie ma IsActive.
 
 W zakładce Rachunki bankowe kliknij Nowy. Wpisz numer, opcjonalnie nazwę banku,
 BIC/SWIFT, walutę, właściciela, nazwę własną i uwagi. Przykładowe, wyłącznie
-fikcyjne numery do próby UI to 00000000000000000000000001–04. Nie są
-przeznaczone do płatności i nie deklarujemy ich poprawności.
+fikcyjne numery do próby UI to 00000000000000000000000001–04 (błędna suma,
+wymagają potwierdzenia ostrzeżenia). Nie są przeznaczone do płatności.
 
 1. Dodaj rachunek PLN z Domyślny oraz rachunek EUR z Domyślny.
 2. Dodaj dwa rachunki z pustą walutą, kolejno oznaczając je jako domyślne.
@@ -169,6 +169,78 @@ A=15, B=3; ADR-021 rozszerza A do 31 o VerifyRegistries, B nadal ma 3.
 Nowe szczegóły nie zmieniają zatwierdzonych 14 kolumn adresów i 12 rachunków.
 
 ## Testy i granice
+
+### Kontrola NRB i IBAN — ADR-025
+
+Zaloguj się jako operator.m0 (hasło z lokalnej konfiguracji), otwórz firmę A,
+kartotekę kontrahentów i zapisanego kontrahenta. W zakładce **Rachunki bankowe**:
+
+1. Kliknij **Nowy**. Wpisz testowy NRB `70 5064 0533 5016 0963 1294 5164`,
+   nazwę z prefiksem DEMO i opcjonalnie PLN. **Sprawdź numer** pokaże poprawny
+   IBAN (NRB sprawdzony z PL). **Zapisz**, ponownie otwórz: zapis ma 26 cyfr bez PL.
+2. Sprawdź `pl70 5064 0533 5016 0963 1294 5164` oraz wzorce zagraniczne:
+   DE89370400440532013000, GB82WEST12345698765432, FR1420041010050500013M02606.
+   Spacje, tabulatory i wielkość liter są normalizowane. To wzorce do kontroli
+   algorytmu, nie dane do wykonywania płatności.
+3. Dla `00000000000000000000000001` zobaczysz błąd sumy kontrolnej, dla
+   `PL7050640533501609631294516` błąd długości, a dla `ZZ89370400440532013000`
+   nieobsługiwany kraj. Dodanie `?` do prawidłowego numeru daje błąd znaków.
+4. **Zapisz** pokaże konkretne ostrzeżenie; dopiero **Świadomie zapisz pomimo
+   ostrzeżenia** zapisze je z audytem (wymaga AcceptWarnings). `DEMO-LOCAL/123`
+   otrzymuje status **Format spoza IBAN — niezweryfikowany** i też może zostać
+   świadomie zapisany. Zmiana numeru usuwa stary wynik i potwierdzenie.
+5. Przejdź do firmy B: dane A nie są widoczne, operator ma tylko odczyt kartoteki.
+   czytelnik.m0 nie ma prawa do kartoteki. API sprawdza prawa również przy
+   bezpośrednim żądaniu; brak przycisku nie jest zabezpieczeniem serwera.
+
+Wynik kontroli jest widoczny obok numeru oraz przy rachunku na liście. Kontrola
+dotyczy struktury kraju i sumy IBAN, **nie potwierdza istnienia rachunku, jego
+właściciela, banku ani BIC**. Nie zastępuje sprawdzenia w białej liście MF.
+Lokalny format spoza IBAN nie jest uznawany za błędny biznesowo, ale pozostaje
+niezweryfikowany. Integralność SQL (np. długość kolumny) nadal obowiązuje.
+
+API: `POST /api/v1/companies/{companyId}/contractors/{id}/bank-accounts/validate`,
+body `{"accountNumber":"..."}`; sesja, ViewContractors, CSRF, zgodny profil i
+istniejący kontrahent są wymagane. Odpowiedź: Status (`ValidIban`, `InvalidIban`,
+`NonIban`), Code, Message, NormalizedNumber, IsPolishNrb, RuleVersion
+(w JSON nazwy camelCase). Operacja nie zapisuje danych i nie odpytuje rejestrów.
+GET oraz zapis rachunku zwracają dodatkowy BankValidation. POST/PUT ponownie
+sprawdzają numer na serwerze, niezależnie od podglądu. Mechanizm `bank_warning`
+422, AcceptWarning i WarningHash pozostaje; odpowiedź 422 zawiera też BankValidation.
+Hash jest związany z regułami/binary biblioteki, wynikiem, danymi, firmą, aktorem,
+operacją i rowversion. Zmiana reguł wymaga nowego potwierdzenia niezapisanego
+żądania. Udany retry POST zwraca historyczny wynik bez kolejnego audytu.
+
+IbanNet 6.2.0 jest przypięty centralnie, bez aktualizacji w trakcie działania.
+Dependabot sprawdza tylko ten pakiet co tydzień i może otworzyć PR; nie zatwierdza
+ani nie scala go automatycznie. Aktualizacja pakietu/reguł krajowych wymaga testów
+i wydania VATowca. [Licencja i autor](../licenses/THIRD-PARTY-NOTICES.md),
+[decyzja techniczna](adr/ADR-025-walidacja-rachunkow-ibannet.md).
+
+### Uruchomienie pełnego zestawu
+
+Weryfikacja ADR-025 (2026-10-23): build całego rozwiązania 0 błędów/ostrzeżeń;
+**273/273 testy, bez pominięć**: 99 SQL/API i 174 bez SQL (24 przypadki adaptera
+IbanNet). TRX: `TestResults/database-per-company-b5110f291dec42bb89ddf41fc0e874fc.trx`.
+Sprawdzono normalizację, NRB/PL/DE/GB/FR, długość, kraj, znaki, sumę (w tym cyfry
+00/01/99), non-IBAN, CSRF, uprawnienia, idempotencję, zmianę wersji reguł,
+rowversion, izolację i wycofanie zapisu przy błędzie audytu.
+
+W rzeczywistym oknie Avalonia na HTTPS wykonano: logowanie operator.m0, firma A,
+utworzenie NRB ze spacjami, zapis i odczyt 26 cyfr bez PL, edycję nazwy banku,
+podgląd poprawnych PL/DE/GB/FR, pokazanie przyczyny błędu sumy, świadomy zapis
+błędnego NRB i non-IBAN, usunięcie starego wyniku po zmianie numeru, firmę B bez
+danych A i bez możliwości dodawania oraz wylogowanie. Zrzut:
+`TestResults/iban-ui-warning.png`. Końcowy odczyt SQL: A ma 4 rachunki
+(1 seed + 3 utworzone przez UI), 4 audyty rachunków, w tym 2 zaakceptowane
+ostrzeżenia; B ma tylko swój 1 seed i 0 audytów rachunków. Nie wykonano zapytań
+do rejestrów zewnętrznych podczas tej próby.
+
+Brak nowych tabel i migracji. Pełny runner zainicjalizował dane demonstracyjne
+i konta, zachował historie migracji i przywrócił istniejący szyfrogram DataPort
+po zweryfikowanych backupach. Licencję Apache-2.0 i THIRD-PARTY-NOTICES sprawdzono
+w `dotnet publish` API oraz Desktop; hash kopii licencji jest identyczny z plikiem
+źródłowym. Poniższe wcześniejsze wyniki opisują historyczne etapy.
 
 Zatrzymaj API i desktop. Pełny runner czyści **fikcyjne dane** wyłącznie w trzech
 zweryfikowanych bazach, bez DROP/CREATE; po testach inicjalizuje demonstrator:

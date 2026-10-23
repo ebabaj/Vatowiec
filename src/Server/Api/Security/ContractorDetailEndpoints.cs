@@ -30,17 +30,30 @@ public static class ContractorDetailEndpoints
         {
             var group = companies.MapGroup("/{companyId:guid}/contractors/{contractorId:int}/" + kind)
                 .AddEndpointFilter(CompanyEndpoints.ValidateCompanySource);
+            if (kind == "bank-accounts") group.MapPost("/validate", ValidateBankAccount);
             group.MapGet("", (Guid companyId, int contractorId, HttpContext http, CompanyDatabaseResolver resolver,
-                IWebHostEnvironment env, int offset = 0, int limit = 50) => List(companyId, contractorId, kind, offset, limit, http, resolver, env));
+                IWebHostEnvironment env, IBankAccountValidator validator, int offset = 0, int limit = 50) => List(companyId, contractorId, kind, offset, limit, http, resolver, env, validator));
             group.MapGet("/{detailId:int}", (Guid companyId, int contractorId, int detailId, HttpContext http,
-                CompanyDatabaseResolver resolver, IWebHostEnvironment env) => Get(companyId, contractorId, detailId, kind, http, resolver, env));
+                CompanyDatabaseResolver resolver, IWebHostEnvironment env, IBankAccountValidator validator) => Get(companyId, contractorId, detailId, kind, http, resolver, env, validator));
             group.MapPost("", (Guid companyId, int contractorId, DetailWriteRequest value, HttpContext http,
-                CompanyDatabaseResolver resolver, IWebHostEnvironment env, IAntiforgery csrf, SystemDbContext system, TimeProvider clock) =>
-                Write(companyId, contractorId, null, kind, value, http, resolver, env, csrf, system, clock));
+                CompanyDatabaseResolver resolver, IWebHostEnvironment env, IAntiforgery csrf, SystemDbContext system, TimeProvider clock, IBankAccountValidator validator) =>
+                Write(companyId, contractorId, null, kind, value, http, resolver, env, csrf, system, clock, validator));
             group.MapPut("/{detailId:int}", (Guid companyId, int contractorId, int detailId, DetailWriteRequest value, HttpContext http,
-                CompanyDatabaseResolver resolver, IWebHostEnvironment env, IAntiforgery csrf, SystemDbContext system, TimeProvider clock) =>
-                Write(companyId, contractorId, detailId, kind, value, http, resolver, env, csrf, system, clock));
+                CompanyDatabaseResolver resolver, IWebHostEnvironment env, IAntiforgery csrf, SystemDbContext system, TimeProvider clock, IBankAccountValidator validator) =>
+                Write(companyId, contractorId, detailId, kind, value, http, resolver, env, csrf, system, clock, validator));
         }
+    }
+    private static async Task<IResult> ValidateBankAccount(Guid companyId, int contractorId,
+        BankAccountValidationRequest value, HttpContext http, CompanyDatabaseResolver resolver,
+        IWebHostEnvironment env, IAntiforgery csrf, IBankAccountValidator validator)
+    {
+        await using var access = await Resolve(companyId, http, resolver, env, false);
+        if (!await Csrf(csrf, http)) return Error(400, "csrf_invalid", "Nie potwierdzono żądania.");
+        if (string.IsNullOrWhiteSpace(value.AccountNumber) || value.AccountNumber.Length > 100)
+            return Error(400, "validation_failed", "Wpisz numer rachunku, najwyżej 100 znaków.");
+        if (!await access.Context.Contractors.AnyAsync(x => x.Id == contractorId))
+            return Error(404, "contractor_not_found", "Nie znaleziono kontrahenta.");
+        return Results.Ok(ValidationResponse(validator.Validate(value.AccountNumber)));
     }
     private static Task<AuthorizedCompanyDatabase> Resolve(Guid id, HttpContext http, CompanyDatabaseResolver resolver,
         IWebHostEnvironment env, bool edit) => resolver.Resolve(Actor(http), id,
@@ -66,22 +79,22 @@ public static class ContractorDetailEndpoints
         _ => await db.ContractorBankAccounts.SingleOrDefaultAsync(x => x.ContractorId == owner && x.Id == id)
     };
     private static async Task<IResult> List(Guid companyId, int contractorId, string kind, int offset, int limit,
-        HttpContext http, CompanyDatabaseResolver resolver, IWebHostEnvironment env)
+        HttpContext http, CompanyDatabaseResolver resolver, IWebHostEnvironment env, IBankAccountValidator validator)
     {
         await using var access = await Resolve(companyId, http, resolver, env, false);
         if (offset < 0 || limit is < 1 or > 100) return Error(400, "invalid_filter", "Nieprawidłowa strona.");
         if (!await access.Context.Contractors.AnyAsync(x => x.Id == contractorId)) return Error(404, "contractor_not_found", "Nie znaleziono kontrahenta.");
-        return Results.Ok((await Rows(access.Context, contractorId, kind, offset, limit)).Select(x => Response(x, kind, companyId, contractorId)));
+        return Results.Ok((await Rows(access.Context, contractorId, kind, offset, limit)).Select(x => Response(x, kind, companyId, contractorId, validator)));
     }
     private static async Task<IResult> Get(Guid companyId, int contractorId, int detailId, string kind,
-        HttpContext http, CompanyDatabaseResolver resolver, IWebHostEnvironment env)
+        HttpContext http, CompanyDatabaseResolver resolver, IWebHostEnvironment env, IBankAccountValidator validator)
     {
         await using var access = await Resolve(companyId, http, resolver, env, false);
         var row = await Find(access.Context, contractorId, detailId, kind);
-        return row is null ? Error(404, "detail_not_found", "Nie znaleziono pozycji u tego kontrahenta.") : Results.Ok(Response(row, kind, companyId, contractorId));
+        return row is null ? Error(404, "detail_not_found", "Nie znaleziono pozycji u tego kontrahenta.") : Results.Ok(Response(row, kind, companyId, contractorId, validator));
     }
     private static async Task<IResult> Write(Guid companyId, int contractorId, int? detailId, string kind, DetailWriteRequest value,
-        HttpContext http, CompanyDatabaseResolver resolver, IWebHostEnvironment env, IAntiforgery csrf, SystemDbContext system, TimeProvider clock)
+        HttpContext http, CompanyDatabaseResolver resolver, IWebHostEnvironment env, IAntiforgery csrf, SystemDbContext system, TimeProvider clock, IBankAccountValidator validator)
     {
         await using var access = await Resolve(companyId, http, resolver, env, true);
         if (!await Csrf(csrf, http)) return Error(400, "csrf_invalid", "Nie potwierdzono żądania.");
@@ -107,8 +120,10 @@ public static class ContractorDetailEndpoints
         var normalized = New(kind, contractorId, data);
         Apply(normalized, data);
         var fingerprint = Hash(JsonSerializer.Serialize(new { kind, contractorId, Data = Values(normalized) }));
-        var warningHash = Hash(BankAccountPreparation.Rule + fingerprint + value.Id + value.RowVersion);
-        var warning = kind == "bank-accounts" && BankAccountPreparation.NeedsWarning(data.AccountNumber!);
+        var check = kind == "bank-accounts" ? validator.Validate(data.AccountNumber!) : null;
+        var warningHash = Hash(JsonSerializer.Serialize(new { check, fingerprint, companyId, contractorId,
+            ActorId = Actor(http), issuer, value.Id, value.RowVersion, value.OperationId }));
+        var warning = check?.RequiresWarning == true;
         await using var transaction = await db.Database.BeginTransactionAsync();
         try
         {
@@ -122,11 +137,11 @@ public static class ContractorDetailEndpoints
             }
             var entity = detailId.HasValue ? await Find(db, contractorId, detailId.Value, kind) : normalized;
             if (entity is null) return Error(404, "detail_not_found", "Nie znaleziono pozycji.");
-            if (detailId.HasValue && !Version(entity).SequenceEqual(version)) return Conflict(entity, kind, companyId, contractorId);
+            if (detailId.HasValue && !Version(entity).SequenceEqual(version)) return Conflict(entity, kind, companyId, contractorId, validator);
             if (warning)
             {
                 if (!value.AcceptWarning || value.WarningHash != warningHash)
-                    return Results.Json(new { code = "bank_warning", message = BankAccountPreparation.Warning, warningHash }, statusCode: 422);
+                    return Results.Json(new { code = "bank_warning", message = check!.Message, warningHash, bankValidation = ValidationResponse(check) }, statusCode: 422);
                 if ((access.Permissions & CompanyPermission.AcceptWarnings) == 0) return Error(403, "warning_permission_required", "Brak uprawnienia do świadomej akceptacji ostrzeżeń.");
             }
             if (kind == "addresses" && !await db.AddressTypes.AnyAsync(x => x.Id == data.AddressTypeId)) return Error(400, "invalid_address_type", "Wybierz istniejący rodzaj adresu.");
@@ -150,14 +165,14 @@ public static class ContractorDetailEndpoints
                 if (detailId.HasValue) { Apply(entity, data); db.Entry(entity).State = EntityState.Modified; }
             }
             if (!detailId.HasValue) db.Add(entity);
-            if (before == Snapshot(entity) && changes.Count == 0 && !warning) return Results.Ok(Response(entity, kind, companyId, contractorId));
+            if (before == Snapshot(entity) && changes.Count == 0 && !warning) return Results.Ok(Response(entity, kind, companyId, contractorId, validator));
             await db.SaveChangesAsync();
             changes.Add((entity, before));
             foreach (var change in changes)
                 db.ContractorChanges.Add(new ContractorChange(contractorId, Actor(http), issuer, http.User.Identity!.Name!, clock.GetUtcNow(), http.TraceIdentifier,
                     change.Before, Snapshot(change.Entity), Type(kind), Id(change.Entity), warning && ReferenceEquals(change.Entity, entity)
-                        ? JsonSerializer.Serialize(new { Rule = BankAccountPreparation.Rule, Message = BankAccountPreparation.Warning, Accepted = true, warningHash }) : null));
-            var response = Response(entity, kind, companyId, contractorId);
+                        ? JsonSerializer.Serialize(new { Rule = check!.RuleVersion, Message = check.Message, check.Status, check.Code, check.NormalizedNumber, check.IsPolishNrb, Accepted = true, warningHash }) : null));
+            var response = Response(entity, kind, companyId, contractorId, validator);
             if (!detailId.HasValue) db.ContractorCreateOperations.Add(new ContractorCreateOperation(value.OperationId!.Value, Actor(http), issuer, fingerprint, contractorId, JsonSerializer.Serialize(response, Json), Type(kind)));
             await db.SaveChangesAsync();
             await transaction.CommitAsync();
@@ -168,14 +183,14 @@ public static class ContractorDetailEndpoints
             await transaction.RollbackAsync();
             db.ChangeTracker.Clear();
             var row = await Find(db, contractorId, value.Id, kind);
-            return row is null ? Error(404, "detail_not_found", "Pozycja nie jest dostępna.") : Conflict(row, kind, companyId, contractorId);
+            return row is null ? Error(404, "detail_not_found", "Pozycja nie jest dostępna.") : Conflict(row, kind, companyId, contractorId, validator);
         }
         catch (DbUpdateException error) when (error.InnerException is SqlException { Number: 2601 or 2627 })
         { return Error(409, "detail_default_conflict", "Ktoś zmienił pozycję preferowaną. Odśwież dane i ponów świadomie."); }
         catch (DbUpdateException) { return Error(503, "detail_save_failed", "Nie zapisano pozycji ani audytu. Ponów operację."); }
     }
-    private static IResult Conflict(object entity, string kind, Guid company, int contractor) => Results.Json(new
-    { code = "detail_conflict", message = "Inna osoba zmieniła pozycję. Porównaj dane przed ponownym zapisem.", detailCurrent = Response(entity, kind, company, contractor) }, statusCode: 409);
+    private static IResult Conflict(object entity, string kind, Guid company, int contractor, IBankAccountValidator validator) => Results.Json(new
+    { code = "detail_conflict", message = "Inna osoba zmieniła pozycję. Porównaj dane przed ponownym zapisem.", detailCurrent = Response(entity, kind, company, contractor, validator) }, statusCode: 409);
 
     private static async Task<IResult> AddType(Guid companyId, AddressTypeWriteRequest value, HttpContext http,
         CompanyDatabaseResolver resolver, IWebHostEnvironment env, IAntiforgery csrf, SystemDbContext system, TimeProvider clock)

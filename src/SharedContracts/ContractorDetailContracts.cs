@@ -28,13 +28,14 @@ public sealed record DetailWriteRequest(int Id, DetailValues Data, string? RowVe
     Guid? OperationId = null, bool AcceptWarning = false, string? WarningHash = null);
 public sealed record DetailResponse(int Id, Guid CompanyId, int ContractorId, string Kind, DetailValues Data, string RowVersion)
 {
+    public BankAccountValidationResponse? BankValidation { get; init; }
     [System.Text.Json.Serialization.JsonIgnore]
     public string? AddressTypeName { get; init; }
     public override string ToString() => Kind switch
     {
         "addresses" => $"{AddressTypeName ?? "Adres"} · {Data.Name ?? Data.Street} · {Data.City} · {(Data.IsDefault ? "preferowany" : "")} · {(Data.IsActive ? "aktywny" : "nieaktywny")}",
         "contacts" => $"{Data.Name} · {Data.Email} · {Data.Phone} · {Data.City}",
-        _ => $"{Data.Name ?? Data.BankName ?? "Rachunek"} · {Data.AccountNumber} · {Data.CurrencyCode ?? "bez waluty"} · {(Data.IsDefault ? "domyślny" : "")} · {(Data.IsActive ? "aktywny" : "nieaktywny")}",
+        _ => $"{Data.Name ?? Data.BankName ?? "Rachunek"} · {Data.AccountNumber} · {Data.CurrencyCode ?? "bez waluty"} · {(Data.IsDefault ? "domyślny" : "")} · {(Data.IsActive ? "aktywny" : "nieaktywny")} · {BankValidation?.Message}",
     };
 }
 public sealed record AddressTypeResponse(int Id, string Name)
@@ -42,6 +43,10 @@ public sealed record AddressTypeResponse(int Id, string Name)
     public override string ToString() => Name;
 }
 public sealed record AddressTypeWriteRequest(Guid OperationId, string Name);
+
+public sealed record BankAccountValidationRequest(string AccountNumber);
+public sealed record BankAccountValidationResponse(string Status, string Code, string Message,
+    string NormalizedNumber, bool IsPolishNrb, string RuleVersion);
 
 public static class DetailValidation
 {

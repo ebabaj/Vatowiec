@@ -72,6 +72,7 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
                     new Vatowiec.Core.Infrastructure.Registries.DataPortKeyProtector(new EphemeralDataProtectionProvider()));
                 services.AddScoped<Vatowiec.Core.Infrastructure.Registries.IDataPortClient>(_ => new MockDataPort(dataPortRequests));
                 services.AddSingleton<Vatowiec.Core.Infrastructure.Registries.INbpClient>(nbpFixture);
+                services.AddSingleton<IBankAccountValidator>(bankValidator);
             });
         });
         using var scope = application.Services.CreateScope();
