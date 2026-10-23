@@ -45,7 +45,7 @@ public static class ContractorDetailEndpoints
     }
     private static async Task<IResult> ValidateBankAccount(Guid companyId, int contractorId,
         BankAccountValidationRequest value, HttpContext http, CompanyDatabaseResolver resolver,
-        IWebHostEnvironment env, IAntiforgery csrf, IBankAccountValidator validator)
+        IWebHostEnvironment env, IAntiforgery csrf, IBankAccountValidator validator, IBankDirectory directory)
     {
         await using var access = await Resolve(companyId, http, resolver, env, false);
         if (!await Csrf(csrf, http)) return Error(400, "csrf_invalid", "Nie potwierdzono żądania.");
@@ -53,7 +53,14 @@ public static class ContractorDetailEndpoints
             return Error(400, "validation_failed", "Wpisz numer rachunku, najwyżej 100 znaków.");
         if (!await access.Context.Contractors.AnyAsync(x => x.Id == contractorId))
             return Error(404, "contractor_not_found", "Nie znaleziono kontrahenta.");
-        return Results.Ok(ValidationResponse(validator.Validate(value.AccountNumber)));
+        var check = validator.Validate(value.AccountNumber);
+        var response = ValidationResponse(check);
+        if (check.PolishClearingNumber is { } clearingNumber)
+        {
+            var bank = await directory.Find(clearingNumber, http.RequestAborted);
+            response = response with { BankLookup = new(bank.Status, bank.Message, bank.ClearingNumber, bank.BankName, bank.Bics ?? []) };
+        }
+        return Results.Ok(response);
     }
     private static Task<AuthorizedCompanyDatabase> Resolve(Guid id, HttpContext http, CompanyDatabaseResolver resolver,
         IWebHostEnvironment env, bool edit) => resolver.Resolve(Actor(http), id,

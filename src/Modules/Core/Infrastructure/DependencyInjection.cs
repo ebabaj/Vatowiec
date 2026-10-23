@@ -32,6 +32,12 @@ public static class DependencyInjection
         services.TryAddScoped<ICompanyContext>(_ => new CompanyContext(null));
         services.AddScoped<IExchangeRateReader, ExchangeRateReader>();
         services.AddSingleton<IBankAccountValidator, IbanNetBankAccountValidator>();
+        services.AddScoped<IBankDirectory, Registries.EwibBankDirectory>();
+        services.AddHttpClient("ewib", client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(12);
+            client.MaxResponseContentBufferSize = 1024 * 1024;
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });
         services.AddDbContext<SystemDbContext>((provider, options) =>
         {
             // Odczyt po złożeniu konfiguracji hosta, w tym nadpisań testowych.

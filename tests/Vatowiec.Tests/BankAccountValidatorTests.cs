@@ -21,7 +21,7 @@ public sealed class BankAccountValidatorTests
         Assert.Equal(nrb, result.IsPolishNrb);
         Assert.Equal(number, result.NormalizedNumber);
         Assert.Contains("IbanNet-6.2.0", result.RuleVersion);
-        Assert.Contains("bank-iban-v2", result.RuleVersion);
+        Assert.Contains("bank-iban-v3", result.RuleVersion);
     }
 
     [Theory]

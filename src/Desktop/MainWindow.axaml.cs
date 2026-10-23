@@ -70,6 +70,8 @@ public partial class MainWindow : Window
     private async void SaveContractorClick(object? sender, RoutedEventArgs e) => await model.SaveContractor();
     private async void ValidateIdentifiersClick(object? sender, RoutedEventArgs e) => await model.CheckIdentifiers();
     private async void ValidateBankAccountClick(object? sender, RoutedEventArgs e) => await model.ValidateBankAccount();
+    private void ApplyBankNameClick(object? sender, RoutedEventArgs e) => model.ApplyBankNameProposal();
+    private void ApplyBankBicClick(object? sender, RoutedEventArgs e) => model.ApplyBankBicProposal();
     private async void AcceptIdentifiersClick(object? sender, RoutedEventArgs e) => await model.AcceptIdentifierWarning();
     private async void ViesClick(object? sender, RoutedEventArgs e) => await model.VerifyRegistry("Vies");
     private async void GusClick(object? sender, RoutedEventArgs e) => await model.VerifyRegistry("Gus");

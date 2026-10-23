@@ -90,6 +90,41 @@ dodawać i edytować, bez usuwania. Zatwierdzony model kontaktu nie ma IsActive.
 
 ## Rachunki bankowe
 
+### Sprawdź numer i dane banku z NBP EWIB — ADR-026
+
+Uruchom API HTTPS i desktop jak opisano wyżej. Zaloguj się jako operator.m0,
+wybierz firmę A, otwórz kontrahenta i zakładkę **Rachunki bankowe → Nowy**.
+
+1. Wpisz `39-1140-2105-0000-5616-4000-1001` i kliknij **Sprawdź numer**.
+   W polu pojawi się `39114021050000561640001001`. Wariant
+   `PL39-1140-2105-0000-5616-4000-1001` zachowa PL po normalizacji.
+   Spacje, tabulatory, białe znaki Unicode i określone myślniki wizualne są
+   normalizowane wspólnie na serwerze. Nieznane znaki, np. `?`, `/`, kropki,
+   pozostają i wywołują ostrzeżenie; LOCAL-123 zachowuje swój myślnik.
+2. Po poprawnej kontroli polskiego numeru API wyśle do EWIB **tylko 11402105**.
+   Puste pola otrzymają jednoznaczną nazwę banku i pojedynczy BIC z aktualnego
+   rejestru. Zobaczysz „Dane banku pobrano z NBP EWIB”. IbanNet sprawdza numer,
+   natomiast dane banku pochodzą z odrębnego adaptera EWIB.
+3. Wpisz własną nazwę banku/BIC i ponów sprawdzenie. Inne wartości pozostaną
+   w polach; możesz jawnie użyć propozycji. Jeśli jest kilka BIC, wybierz kod
+   i kliknij **Użyj wybranego BIC** albo pozostaw dotychczasowe pole.
+   Brak BIC nie usuwa wpisanej wartości. Nie wybieramy pierwszego z wielu.
+4. Podgląd i użycie propozycji zmieniają wyłącznie szkic. Dopiero **Zapisz pozycję**
+   utrwali zwykłym API numer, bank i BIC z audytem i ochroną rowversion.
+   Możesz również od razu zapisać numer z myślnikami, bez użycia przycisku:
+   serwer sam go normalizuje i waliduje; nie odpytuje wtedy EWIB.
+5. Błędna suma i zagraniczny IBAN nie wywołują EWIB. Brak banku lub błąd usługi
+   ma czytelny komunikat i nie blokuje ręcznego zapisu. Ostrzeżenia numeru nadal
+   wymagają AcceptWarnings i dokładnego potwierdzenia. Zmiana numeru usuwa
+   stare propozycje. Znalezienie instytucji nie potwierdza rachunku ani właściciela.
+
+To przykłady wejścia do próby programu, nie dane do płatności. Dla zagranicy nie
+wyliczamy BIC z identyfikatora banku. Nie ma nowej tabeli, aktualizacji w tle ani
+zmiany ustawień MF/GUS/VIES/DataPort. Wywołanie publicznego EWIB następuje tylko
+po ręcznym sprawdzeniu poprawnego polskiego numeru.
+
+### Pozostałe pola rachunku
+
 W zakładce Rachunki bankowe kliknij Nowy. Wpisz numer, opcjonalnie nazwę banku,
 BIC/SWIFT, walutę, właściciela, nazwę własną i uwagi. Przykładowe, wyłącznie
 fikcyjne numery do próby UI to 00000000000000000000000001–04 (błędna suma,
@@ -180,7 +215,8 @@ kartotekę kontrahentów i zapisanego kontrahenta. W zakładce **Rachunki bankow
    IBAN (NRB sprawdzony z PL). **Zapisz**, ponownie otwórz: zapis ma 26 cyfr bez PL.
 2. Sprawdź `pl70 5064 0533 5016 0963 1294 5164` oraz wzorce zagraniczne:
    DE89370400440532013000, GB82WEST12345698765432, FR1420041010050500013M02606.
-   Spacje, tabulatory i wielkość liter są normalizowane. To wzorce do kontroli
+   Spacje, tabulatory i wielkość liter są normalizowane (ADR-026 dodaje myślniki).
+   To wzorce do kontroli
    algorytmu, nie dane do wykonywania płatności.
 3. Dla `00000000000000000000000001` zobaczysz błąd sumy kontrolnej, dla
    `PL7050640533501609631294516` błąd długości, a dla `ZZ89370400440532013000`
@@ -203,7 +239,12 @@ API: `POST /api/v1/companies/{companyId}/contractors/{id}/bank-accounts/validate
 body `{"accountNumber":"..."}`; sesja, ViewContractors, CSRF, zgodny profil i
 istniejący kontrahent są wymagane. Odpowiedź: Status (`ValidIban`, `InvalidIban`,
 `NonIban`), Code, Message, NormalizedNumber, IsPolishNrb, RuleVersion
-(w JSON nazwy camelCase). Operacja nie zapisuje danych i nie odpytuje rejestrów.
+(w JSON nazwy camelCase). Operacja nie zapisuje danych. ADR-026 dodaje do tego
+samego podglądu opcjonalny `bankLookup`: status (`Found`, `NotFound`, `Ambiguous`,
+`Unavailable`, `InvalidResponse`), komunikat, numer rozliczeniowy, nazwę i tablicę
+BIC. Tylko poprawny NRB/PL uruchamia adapter EWIB. W pozostałych przypadkach
+bankLookup jest null. GET i zapis nie wywołują EWIB. HTTP 400 EWIB jest
+niejednoznaczne według Swaggera, więc nie uznajemy go za pewny brak banku.
 GET oraz zapis rachunku zwracają dodatkowy BankValidation. POST/PUT ponownie
 sprawdzają numer na serwerze, niezależnie od podglądu. Mechanizm `bank_warning`
 422, AcceptWarning i WarningHash pozostaje; odpowiedź 422 zawiera też BankValidation.
@@ -218,6 +259,31 @@ i wydania VATowca. [Licencja i autor](../licenses/THIRD-PARTY-NOTICES.md),
 [decyzja techniczna](adr/ADR-025-walidacja-rachunkow-ibannet.md).
 
 ### Uruchomienie pełnego zestawu
+
+Weryfikacja ADR-026 (2026-10-23): **323/323 testy, bez pominięć**, w tym
+103 SQL/API i 220 bez SQL; build 0 błędów/ostrzeżeń. Nowe testy: 41 przypadków
+normalizacji/HTTP, 5 ViewModel i 4 SQL/API. TRX:
+`TestResults/database-per-company-e841dfc32cfd4f56b0e61273d10334aa.trx`.
+
+Wszystkie automatyczne wywołania EWIB miały atrapy HTTP. Jedna osobna próba
+publicznego `zapytanie1?nrRozliczeniowy=10100000&format=json`: HTTP 200,
+Narodowy Bank Polski, dwa wpisy tego samego NBPLPLPWXXX (BIC i BIC SEPA).
+Nie sprawdzano rachunku klienta ani właściciela. Strukturę potwierdzono w
+[oficjalnym Swaggerze](https://ewib.nbp.pl/api/swagger.json).
+
+Rzeczywistą Avalonia sprawdzono z rzeczywistym HTTPS API (Kestrel) i atrapą HTTP
+EWIB po stronie serwera, bez kolejnego zapytania publicznego. Przeszły:
+normalizacja w polu, autofill, ochrona własnych wartości, jawne zastąpienie,
+wybór drugiego z wielu BIC, brak BIC, brak zapytania dla błędnego/zagranicznego
+numeru, firma B tylko odczyt i wylogowanie. SQL w A i B po podglądach: po jednym
+rachunku demonstracyjnym, zero audytów i operacji tworzenia. Szkic anulowano.
+Zrzut: `TestResults/ewib-ui-proposals.png`. Tymczasowy host testowy zamknięto;
+przywrócono zwykłe API `https://localhost:7243`, desktop pozostawiono wylogowany.
+
+Pełny runner użył istniejącej zgody na reset danych demonstracyjnych. Przed
+czyszczeniem sprawdził instancję, nazwy, znaczniki, profile i historie oraz zrobił
+trzy COPY_ONLY/CHECKSUM/VERIFYONLY backupy. Przywrócił konta i szyfrogram DataPort.
+Nie zmieniano schematów ani migracji. Dalsze wyniki opisują wcześniejsze etapy.
 
 Weryfikacja ADR-025 (2026-10-23): build całego rozwiązania 0 błędów/ostrzeżeń;
 **273/273 testy, bez pominięć**: 99 SQL/API i 174 bez SQL (24 przypadki adaptera

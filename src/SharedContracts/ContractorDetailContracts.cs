@@ -46,7 +46,12 @@ public sealed record AddressTypeWriteRequest(Guid OperationId, string Name);
 
 public sealed record BankAccountValidationRequest(string AccountNumber);
 public sealed record BankAccountValidationResponse(string Status, string Code, string Message,
-    string NormalizedNumber, bool IsPolishNrb, string RuleVersion);
+    string NormalizedNumber, bool IsPolishNrb, string RuleVersion)
+{
+    public BankLookupResponse? BankLookup { get; init; }
+}
+public sealed record BankLookupResponse(string Status, string Message, string ClearingNumber,
+    string? BankName, string[] Bics);
 
 public static class DetailValidation
 {

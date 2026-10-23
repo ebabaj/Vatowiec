@@ -280,6 +280,16 @@
 <StackPanel Spacing="4"><TextBlock Text="Numer rachunku *"/><TextBox Text="{Binding DetailEditor.AccountNumber, Mode=TwoWay}" MaxLength="100" AutomationProperties.AutomationId="DetailAccountNumber"/><TextBlock Text="{Binding DetailEditor.Errors[AccountNumber]}" Foreground="#B42318"/></StackPanel>
                   <Button Content="Sprawdź numer" Click="ValidateBankAccountClick" AutomationProperties.AutomationId="ValidateBankAccount"/>
                   <TextBlock Text="{Binding BankValidationMessage}" TextWrapping="Wrap" AutomationProperties.AutomationId="BankValidationStatus"/>
+                  <TextBlock Text="{Binding BankLookupMessage}" TextWrapping="Wrap" AutomationProperties.AutomationId="BankLookupStatus"/>
+                  <StackPanel IsVisible="{Binding HasBankNameProposal}" Spacing="4">
+                    <TextBlock Text="{Binding BankNameProposal}" TextWrapping="Wrap" AutomationProperties.AutomationId="BankNameProposal"/>
+                    <Button Content="Zastąp nazwę banku propozycją NBP" Click="ApplyBankNameClick" AutomationProperties.AutomationId="ApplyBankName"/>
+                  </StackPanel>
+                  <StackPanel IsVisible="{Binding HasBicProposal}" Spacing="4">
+                    <TextBlock Text="Propozycje BIC z NBP EWIB (wybór nie zmienia pola do zatwierdzenia):" TextWrapping="Wrap"/>
+                    <ComboBox ItemsSource="{Binding BankBicChoices}" SelectedItem="{Binding SelectedBankBic, Mode=TwoWay}" AutomationProperties.AutomationId="BankBicChoices"/>
+                    <Button Content="Użyj wybranego BIC" Click="ApplyBankBicClick" IsEnabled="{Binding CanApplyBankBic}" AutomationProperties.AutomationId="ApplyBankBic"/>
+                  </StackPanel>
 <StackPanel Spacing="4"><TextBlock Text="Nazwa banku"/><TextBox Text="{Binding DetailEditor.BankName, Mode=TwoWay}" MaxLength="200" AutomationProperties.AutomationId="DetailBankName"/><TextBlock Text="{Binding DetailEditor.Errors[BankName]}" Foreground="#B42318"/></StackPanel>
 <StackPanel Spacing="4"><TextBlock Text="BIC/SWIFT"/><TextBox Text="{Binding DetailEditor.Bic, Mode=TwoWay}" MaxLength="11" AutomationProperties.AutomationId="DetailBic"/><TextBlock Text="{Binding DetailEditor.Errors[Bic]}" Foreground="#B42318"/></StackPanel>
 <StackPanel Spacing="4"><TextBlock Text="Waluta (trzy litery; puste = bez waluty)"/><TextBox Text="{Binding DetailEditor.CurrencyCode, Mode=TwoWay}" MaxLength="3" AutomationProperties.AutomationId="DetailCurrencyCode"/><TextBlock Text="{Binding DetailEditor.Errors[CurrencyCode]}" Foreground="#B42318"/></StackPanel>

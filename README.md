@@ -5,13 +5,16 @@ Projekt wielostanowiskowej aplikacji dla polskich mikrofirm. Obecny stan to
 wybór firmy, dodawanie/edycja z audytem i konfliktami oraz wyszukiwanie po stronie serwera.
 Osobne SystemDbContext i CompanyDbContext, trzy bazy SQL
 Server oraz dwie fikcyjne firmy. Działają Identity, sesje API i autoryzowany resolver
-bazy firmy. Pełny zestaw po integracji IbanNet ADR-025: **273/273**,
-bez pominięć — 99 SQL/API i 174 bez SQL. Kompilacja bez ostrzeżeń i błędów.
+bazy firmy. Pełny zestaw po integracji EWIB ADR-026: **323/323**,
+bez pominięć — 103 SQL/API i 220 bez SQL. Kompilacja bez ostrzeżeń i błędów.
 Nie jest to jeszcze program do prowadzenia księgowości.
 
-**Aktualny etap: walidacja rachunków IbanNet 6.2.0 (ADR-025).** W zakładce
+**Aktualny etap: IbanNet i podgląd banku z NBP EWIB (ADR-026).** W zakładce
 Rachunki bankowe przycisk **Sprawdź numer** pokazuje kontrolę NRB/IBAN lub
-niezweryfikowany format spoza IBAN. Ostrzeżenia można świadomie zaakceptować
+niezweryfikowany format spoza IBAN, normalizuje spacje/myślniki w polu i dla
+poprawnego polskiego numeru pobiera propozycje banku/BIC z EWIB przez API.
+Puste pola uzupełnia automatycznie, inne wymagają jawnego zastąpienia; kilka BIC
+wymaga wyboru. Podgląd zmienia tylko szkic. Ostrzeżenia można świadomie zaakceptować
 z osobnym uprawnieniem i audytem. Kontrola nie potwierdza istnienia rachunku,
 właściciela, banku ani BIC. [Instrukcja i wyniki](docs/contractors.md),
 [licencja Apache-2.0 i autor](licenses/THIRD-PARTY-NOTICES.md).

@@ -73,6 +73,7 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
                 services.AddScoped<Vatowiec.Core.Infrastructure.Registries.IDataPortClient>(_ => new MockDataPort(dataPortRequests));
                 services.AddSingleton<Vatowiec.Core.Infrastructure.Registries.INbpClient>(nbpFixture);
                 services.AddSingleton<IBankAccountValidator>(bankValidator);
+                services.AddHttpClient("ewib").ConfigurePrimaryHttpMessageHandler(() => new EwibStub(ewib));
             });
         });
         using var scope = application.Services.CreateScope();

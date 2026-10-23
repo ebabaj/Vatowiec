@@ -10,7 +10,7 @@ public sealed class IbanNetBankAccountValidator : IBankAccountValidator
     private readonly IbanValidator validator = new();
     // Tożsamość binariów obejmuje wbudowane reguły krajowe. Zmiana pakietu
     // unieważnia niezapisane potwierdzenia także bez zmiany polityki aplikacji.
-    private static readonly string RuleVersion = $"bank-iban-v2/IbanNet-{typeof(IbanValidator).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion}/{typeof(IbanValidator).Module.ModuleVersionId}";
+    private static readonly string RuleVersion = $"bank-iban-v3/IbanNet-{typeof(IbanValidator).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion}/{typeof(IbanValidator).Module.ModuleVersionId}";
 
     public BankAccountCheck Validate(string number)
     {

@@ -237,7 +237,7 @@ public sealed partial class AuthenticationIntegrationTests
         await using var db = Company(false, companyA);
         var audit = Assert.Single(await db.ContractorChanges.ToListAsync());
         Assert.Equal("ContractorBankAccount", audit.RecordType);
-        Assert.Contains("bank-iban-v2", audit.WarningJson);
+        Assert.Contains("bank-iban-v3", audit.WarningJson);
         Assert.Contains("Accepted", audit.WarningJson);
     }
 

@@ -1,6 +1,6 @@
 # Otwarty następca VATowca — specyfikacja produktu i architektury
 
-**Wersja dokumentu:** 0.13 (walidacja rachunków IbanNet, ADR-025)
+**Wersja dokumentu:** 0.14 (normalizacja rachunków i NBP EWIB, ADR-026)
 **Data:** 2026-10-23
 **Status:** projekt założeń; nie jest potwierdzeniem zgodności podatkowej gotowego oprogramowania  
 **Nazwa projektu:** robocza „Otwarty następca VATowca”; docelowa nazwa i użycie nazwy „VATowiec” wymagają odrębnej decyzji i sprawdzenia praw  
@@ -180,6 +180,17 @@ operację i rowversion. Aktualizacja reguł wymaga nowego potwierdzenia niezapis
 żądania. Trwały retry skutecznego POST zachowuje historyczny wynik, bez nowego audytu.
 Avalonia pokazuje wynik API na liście i obok numeru (Sprawdź numer); zmiana numeru
 usuwa stary wynik. Nie zmieniono schematu SQL ani integracji rejestrów.
+ADR-026 rozszerza wspólną normalizację o określone myślniki wizualne bez maskowania
+innych znaków i bez zmiany NRB w PL IBAN. Polityka bank-iban-v3 unieważnia stare
+niezapisane potwierdzenia. Po Sprawdź numer klient pokazuje numer po normalizacji.
+Wyłącznie poprawny NRB/PL IBAN uruchamia na jawne żądanie serwerowy adapter
+NBP EWIB: nazwa instytucji i BIC dla dokładnego ośmiocyfrowego numeru rozliczeniowego.
+Nie wysyłamy pełnego rachunku. Puste pola uzupełniamy tylko jednoznacznymi danymi,
+inne wartości wymagają jawnego zastąpienia, wiele BIC — wyboru. Dane trafiają
+do szkicu, nie do SQL. Zapis ponownie samodzielnie normalizuje i waliduje bez
+odpytywania EWIB. Brak banku/BIC lub awaria nie blokują ręcznego zapisu.
+Nie określamy istnienia rachunku ani właściciela. Dla zagranicy brak zgadywania BIC.
+Bez nowych tabel, migracji, pobierania w tle ani zmiany MF/GUS/VIES/DataPort.
 Dependabot sprawdza tylko IbanNet co tydzień; aktualizacja wymaga testów i nowego
 wydania, bez automatycznego scalania lub aktualizacji w runtime. Kopia Apache-2.0
 i informacje o bibliotece są dołączane do build/publish programów.
@@ -910,6 +921,7 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | [ADR-023](docs/adr/ADR-023-waluty-i-reczne-kursy-nbp.md) | Waluty i ręczne kursy NBP | Lokalny słownik/ustawienia A/B/C, kursy decimal, jawne konflikty i audyt, stronicowany ekran Avalonia; bez harmonogramu i reguł faktur |
 | [ADR-024](docs/adr/ADR-024-kod-iso-jako-klucz-waluty.md) | ISO 4217 jako jedyny identyfikator waluty | Code char(3) PK, CurrencyCode FK, brak numerycznego Id waluty; odtworzenie wyłącznie demonstracyjnego modułu walut i kursów |
 | [ADR-025](docs/adr/ADR-025-walidacja-rachunkow-ibannet.md) | Walidacja rachunków | IbanNet 6.2.0 za interfejsem Application, NRB/IBAN, wersjonowane potwierdzenie ostrzeżeń, wynik w Avalonia, licencja i kontrolowane aktualizacje |
+| [ADR-026](docs/adr/ADR-026-ewib-i-normalizacja-rachunkow.md) | Normalizacja i dane banku EWIB | Wspólne separatory, wersja v3, odrębny adapter NBP, bezpieczne propozycje nazwy/BIC tylko do szkicu, bez nowych tabel |
 | [ADR-021](docs/adr/ADR-021-identyfikatory-i-rejestry-testowe.md) | Identyfikatory i rejestry TEST | Wersjonowane reguły, ostrzeżenia, osobna niezmienna historia i środowiska Test/Production/Mock; ręczne oficjalne MF/WL2, GUS BIR1.2 i VIES |
 | [ADR-020](docs/adr/ADR-020-kompletna-kartoteka-avalonia.md) | Kompletna kartoteka Avalonia | Cztery zakładki, grupy, CRUD szczegółów, typowany audyt, idempotencja, atomowe preferencje i osobne uprawnienie do ostrzeżeń rachunków; bez walidatorów podatkowych/integracji |
 | [ADR-019](docs/adr/ADR-019-implementacja-modelu-kontrahentow.md) | Implementacja podstawy kartoteki | int IDENTITY, zabezpieczona hierarchia, lokalne szczegóły, trwała idempotencja, audyt i odtworzenie trzech demonstracyjnych baz; bez walidatorów i nowych ekranów |

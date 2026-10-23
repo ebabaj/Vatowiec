@@ -186,7 +186,10 @@ public sealed partial class MainViewModel
         var number = draft.AccountNumber ?? "";
         if (string.IsNullOrWhiteSpace(number)) { message = "Wpisz numer rachunku."; return; }
         var result = await api.ValidateBankAccount(profile.CompanyId, editor.Id, number);
-        if (ReferenceEquals(draft, detailEditor) && draft.AccountNumber == number) bankValidation = result;
+        if (!ReferenceEquals(draft, detailEditor) || draft.AccountNumber != number) return;
+        draft.AccountNumber = result.NormalizedNumber;
+        bankValidation = result;
+        PrepareBankProposals(result);
     });
     public Task SaveDetail(bool acceptWarning = false) => Run(async () =>
     {
@@ -260,6 +263,7 @@ public sealed partial class MainViewModel
         bankValidation = null;
         warningHash = null;
         warningMessage = "";
+        ResetBankLookup();
         Changed(nameof(BankValidationMessage));
         Changed(nameof(HasBankWarning));
         Changed(nameof(CanSaveDetail));
@@ -268,6 +272,7 @@ public sealed partial class MainViewModel
     {
         if (detailEditor is not null) detailEditor.PropertyChanged -= DetailFieldChanged;
         detailEditor = null; detailConflict = null; warningHash = null; warningMessage = ""; bankValidation = null;
+        ResetBankLookup();
     }
     private void ResetDetails()
     {
@@ -329,8 +334,18 @@ public sealed class DetailEditor : System.ComponentModel.INotifyPropertyChanged
         get => accountNumber;
         set { if (accountNumber == value) return; accountNumber = value; PropertyChanged?.Invoke(this, new(nameof(AccountNumber))); }
     }
-    public string? BankName { get; set; }
-    public string? Bic { get; set; }
+    private string? bankName;
+    public string? BankName
+    {
+        get => bankName;
+        set { if (bankName == value) return; bankName = value; PropertyChanged?.Invoke(this, new(nameof(BankName))); }
+    }
+    private string? bic;
+    public string? Bic
+    {
+        get => bic;
+        set { if (bic == value) return; bic = value; PropertyChanged?.Invoke(this, new(nameof(Bic))); }
+    }
     public string? CurrencyCode { get; set; }
     public string? AccountHolderName { get; set; }
     public Dictionary<string, string> Errors { get; private set; } = typeof(DetailValues).GetProperties().ToDictionary(x => x.Name, _ => "");

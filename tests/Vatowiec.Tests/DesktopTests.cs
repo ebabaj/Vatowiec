@@ -255,6 +255,10 @@ public sealed partial class DesktopTests
     }
     private sealed class FakeApi : IVatowiecApiClient
     {
+        public BankAccountValidationResponse? BankCheck { get; set; }
+        public Task<BankAccountValidationResponse>? PendingBankCheck { get; set; }
+        public Task<BankAccountValidationResponse> ValidateBankAccount(Guid companyId, int contractorId, string number) =>
+            PendingBankCheck ?? Task.FromResult(BankCheck!);
         public List<CurrencyWriteRequest> CurrencyWrites { get; } = [];
         public int NbpImports { get; private set; }
         public CurrencyHistoryResponse[] CurrencyHistoryData { get; set; } = [];

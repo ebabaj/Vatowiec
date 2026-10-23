@@ -1,92 +1,82 @@
-# Stan pracy Codex — IbanNet (ADR-025)
+# Stan pracy Codex — EWIB i normalizacja (ADR-026)
 
 2026-10-23. ZADANIE UKOŃCZONE. Bez Commit/Push — użytkownik wykona je sam.
-Przed wznowieniem przeczytaj ten plik i git status; nie zaczynaj od nowa.
-Poprzedni moduł walut jest opublikowany: 7bb07a7fbd93f930363fd6dff5e49575f0a88a7f,
-DataPort: fc7f0f310c297663984893bb80df10218756a730. Bieżąca zgoda NIE obejmuje publikacji.
+Przed wznowieniem przeczytaj ten plik i git status. Nie powtarzaj ukończonej pracy.
+Bazowy HEAD f3e26b7 (wcześniejszy IbanNet i zasada wspólnego walidatora).
 
 ## Wykonano
 
-- IbanNet 6.2.0 w centralnym Directory.Packages.props i Infrastructure csproj.
-- Application: IBankAccountValidator, typowany wynik i normalizacja. Infrastructure:
-  adapter IbanNet; NRB sprawdzany z PL na kopii, zapis NRB bez PL, IBAN według kraju,
-  konkretne polskie błędy i non-IBAN jako niezweryfikowany. Brak zapytań zewnętrznych.
-- API: wynik przy odczycie/zapisie rachunku; POST bank-accounts/validate z ViewContractors,
-  CSRF, profilem i sprawdzeniem kontrahenta. WarningHash obejmuje reguły/binary MVID,
-  wynik/dane, firmę, autora, operację i rowversion. Istniejące transakcje, uprawnienie
-  AcceptWarnings, audyt i idempotencja zachowane. Brak nowych tabel/migracji.
-- Avalonia: przycisk Sprawdź numer i wynik obok pola; wynik również na liście.
-  Zmiana numeru usuwa wynik i potwierdzenie. Test ViewModel z rzeczywistym API gotowy.
-- Dependabot tylko IbanNet co tydzień, brak automatycznego scalania.
-- licenses/IbanNet/LICENSE.md pobrano z oficjalnego tagu v6.2.0, Apache-2.0;
-  THIRD-PARTY-NOTICES.md: autor Martijn Bodeman, wersja, commit i zasady dystrybucji.
-  Sprawdzono nuspec, nupkg i upstream tree: brak dodatkowego NOTICE.
-- Directory.Build.targets dołącza oba pliki prawne do build/publish programów.
-  Publish API i Desktop wykonany; hash licencji jest identyczny w obu dystrybucjach.
-- ADR-025, historyczna adnotacja ADR-020, SPEC, AGENTS, README i docs/contractors.md zaktualizowane.
-- Dodano 24 testy walidatora i 5 testów SQL/API (w tym ViewModel+HTTP).
-  Stary fixture zerowego NRB zastąpiono poprawnym testowym NRB; fixture testu
-  odmowy MF dla DE miał błędną sumę, zmieniono tylko numer na wzorcowy DE.
-  Logika MF i innych integracji pozostała bez zmian.
+- Zrealizowano wymagania załącznika 1802d74d-6d47-42bb-90bb-834b5b5ef704/Pasted text.txt.
+- Wspólna BankAccountPreparation.Normalize: whitespace Unicode, wielkie litery,
+  myślniki U002D, U2010–2015, U2212, UFE63, UFF0D w zapisach liczbowych/IBAN.
+  Pozostałe znaki zostają; LOCAL-123 zachowuje myślnik. NRB zapis bez PL, IBAN z PL.
+- IbanNet nadal6.2.0; polityka bank-iban-v3. Brak nowej walidacji/checksum.
+  BankAccountCheck.PolishClearingNumber tylko po poprawnej walidacji polskiego numeru.
+- Application IBankDirectory; Infrastructure EwibBankDirectory, HttpClient HTTPS,
+  stały host/parametr8cyfr, brak redirects/cookies/retry, timeout12s, limit1MiB.
+  Parser według oficjalnego Swaggera: tylko BIC dokładnego numeru rozliczeniowego
+  w siedzibie/jednostkach instytucji. Deduplikacja tylko identycznych BIC.
+  Found/NotFound/Ambiguous/Unavailable/InvalidResponse; brak wyniku nie blokuje wpisu.
+- API /bank-accounts/validate zwraca opcjonalny BankLookup. Zachowane prawa, CSRF,
+  profile, właściciel wpisu i izolacja; zapisy/GET nie odpytują EWIB, tylko jawny
+  podgląd poprawnego NRB/PL. Wysyłamy 8cyfr, nie pełny rachunek. Brak tabel/migracji.
+- Avalonia pokazuje znormalizowany numer, wypełnia jednoznaczne puste pola,
+  nie nadpisuje własnych wartości, daje jawne propozycje/wybór BIC. Wszystko do szkicu.
+  Zmiana numeru usuwa propozycje; spóźniona odpowiedź nie zmienia innego szkicu.
+- Normalizacja i walidacja zawsze na serwerze przy zapisie. Zachowane WarningHash,
+  AcceptWarnings, rowversion, idempotencja i atomowy audyt. Inne integracje bez zmian.
+- Zaktualizowano SPEC, AGENTS (zachowano stałą zasadę wspólnej walidacji), README,
+  docs/contractors.md; dodano ADR026. Nie zmieniono historycznych ADR025 i wcześniejszych.
 
-## Testy i bieżący proces
+## Wyniki
 
-- Restore i build całego rozwiązania: OK, 0 błędów/ostrzeżeń.
-- Testy BankAccountValidatorTests: 24/24 w końcowym pełnym przebiegu.
-- Pierwszy pełny runner: 266/267, jedyny błąd to stary fixture DE opisany wyżej;
-  poprawiono go. Nie traktuj pierwszego przebiegu jako sukcesu.
-- Końcowy pełny runner: 273/273 bez pominięć, 99 SQL/API + 174 bez SQL.
-  TRX TestResults/database-per-company-b5110f291dec42bb89ddf41fc0e874fc.trx.
-  Logi TestResults/iban-full.log i iban-build.log. Po pierwszym 266/267 poprawiono
-  fixture DE; kolejne przebiegi były zielone. Próba UI ujawniła mylące mapowanie
-  cyfr kontrolnych 00/01/99 w IbanNet; poprawiono komunikaty i dodano regresje.
-  Dodano też rozróżnienie DEMO-... od prefiksu niemieckiego IBAN i krótkiego PL.
-- Runner kontroluje dokładne nazwy/instancję/znaczniki trzech baz, robi backupy
-  COPY_ONLY/CHECKSUM/VERIFYONLY przy konfiguracji DataPort, zachowuje szyfrogram
-  w pamięci i przywraca go po testach. Nie odczytuje sekretu.
-- Użytkownik wcześniej jawnie pozwolił kasować wszystkie dane demonstratora
-  (odwołał ograniczenie walutowe). Nie trzeba ponawiać pytania o runner.
-- Zatrzymano lokalny API PID 14120 przed build/test. Desktop nie działał.
+- Build całego Vatowiec.slnx: 0 błędów/ostrzeżeń (TestResults/ewib-build.log).
+- Pełny runner: 323/323 bez pominięć, 103 SQL/API i 220 bez SQL.
+  TRX TestResults/database-per-company-e841dfc32cfd4f56b0e61273d10334aa.trx.
+  Nowe testy: 41 HTTP/normalizacja, 5 Desktop, 4 SQL/API (50łącznie).
+  Wcześniejsze osobne offline 46/46. Log TestResults/ewib-full.log.
+- Runner początkowo zatrzymał się przed czyszczeniem na ręcznych TaxId w demo.
+  Kontrola lokalnego lenovo/SQLEXPRESS, profilu A, znaczników i znanego schematu OK.
+  Użytkownik wcześniej jawnie potwierdził wszystkie dane demo i pełny reset;
+  użyto procesowo VATOWIEC_CONFIRMED_DEMO_DATA=1, bez ponownego pytania.
+  Zachowano wszystkie kontrole nazw/instancji/znaczników/schematu/historii;
+  wykonano inspect, trzy COPY_ONLY/CHECKSUM/VERIFYONLY backupy, runner i reseed.
+  Istniejący szyfrogram DataPort zachowany/przywrócony bez odczytu sekretu.
+- JEDNA rzeczywista próba publiczna: EWIB zapytanie1 nrRozliczeniowy10100000,
+  HTTP200; Narodowy Bank Polski, siedziba10100000, dwa te same NBPLPLPWXXX
+  (BIC i BIC SEPA). Potwierdzono FAQ i Swagger. Pełna odpowiedź tylko lokalnie
+  TestResults/ewib-live-response.json; nie drukuj logo base64. Brak pełnego rachunku.
+- Wszystkie testy automatyczne HTTP mają atrapy, także istniejące SQL/API.
+- Rzeczywista Avalonia z HTTPS API/Kestrel i atrapą HTTP EWIB:
+  normalizacja NRB/PL w polu, autofill, własne pola, jawne zastąpienie, wybór
+  drugiego z wieluBIC, brakBIC, błędna suma/zagranica bez wywołania, B readonly,
+  anulowanie szkicu i logout — OK. Nie wykonano kolejnej publicznej próby.
+  Zrzut TestResults/ewib-ui-proposals.png. Lokalny harness tylko w ignorowanym
+  TestResults/EwibUiHost; nie dodano mock-mode ani obejścia auth do produkcyjnegoAPI.
+  Odczyt SQL podczas podglądu: A/B po1seed, 0audytów, 0operacji tworzenia.
+  Szkic anulowano, przykładowego39... nie zapisano w demonstratorze.
+- Testowy host7443 zamknięty (zweryfikowany EwibUiHost.exe PID39388).
+  Przywrócono zwykłe API HTTPS7243, execsession11999. Desktop PID43684 jest
+  wylogowany z adresem7243. Przed zatrzymaniem zawsze sprawdź bieżącą tożsamość procesu.
 
-## Zakończenie i ewentualne wznowienie
+## Pliki zmienione
 
-Nie pozostały obowiązkowe kroki implementacji. Brak Commit/Push. Nie uruchamiaj
-ponownie zakończonych testów bez nowej zmiany. Przed dalszą pracą sprawdź git status.
+Application/BankAccountPreparation.cs, nowy IBankDirectory.cs;
+Infrastructure/IbanNetBankAccountValidator.cs, DependencyInjection.cs,
+nowy Registries/EwibBankDirectory.cs; API/Security/ContractorDetailEndpoints.cs;
+SharedContracts/ContractorDetailContracts.cs; Desktop/MainWindow.axaml/.cs,
+ViewModels/MainViewModel.Details.cs i nowy MainViewModel.BankLookup.cs;
+tests/AuthenticationIntegrationTests.cs, DesktopTests.cs, BankAccountValidatorTests.cs,
+ContractorDetailsIntegrationTests.cs i nowe EwibTests.cs, EwibDesktopTests.cs,
+EwibIntegrationTests.cs; docs/adr/ADR026, SPECYFIKACJA.md, AGENTS.md, README.md,
+docs/contractors.md i docs/CODEX_PROGRESS.md. Porównaj aktualny git status.
 
-- UIA rzeczywistej Avalonia: operator.m0/A, NRB ze spacjami/zapis/ponowny odczyt
-  bez PL/edycja, PL/DE/GB/FR preview, błąd sumy i świadomy zapis, non-IBAN i zapis,
-  czyszczenie wyniku, B readonly i izolacja, wylogowanie — OK.
-- Zrzut TestResults/iban-ui-warning.png. Odczyt SQL po UI: A 4 rachunki (1 seed+3 UI),
-  4 audyty rachunków, 2 zaakceptowane ostrzeżenia, 1 NRB bez PL; B 1 seed, 0 audytów.
-- Helper UIA wybiera tylko widoczne/wirtualizowane pozycje. Brak NewDetail w B
-  wynika z prawidłowego ukrycia, nie błędu aplikacji. Sprawdzono brak/dostępność.
-- API HTTPS i Desktop pozostawiono uruchomione, Desktop wylogowany. PID w
-  TestResults/iban-processes.json; zawsze sprawdź rzeczywisty ExecutablePath przed
-  ewentualnym zatrzymaniem. Nie ma haseł w logach/pliku.
-- Finalny publish API i Desktop ma licencję i notices. SHA256 LICENSE:
-  3D60FEFD7B68DB4A2517BF551B0944A2770AC92CF12CC087AFE7C0BBD7656FEE.
-- Końcowa dokumentacja/zakres dołączone do raportu. Bazy mają te same historie
-  migracji co przed zadaniem, nie tworzono tabel. Runner wyczyścił dane demo
-  zgodnie z istniejącą zgodą; szyfrogram DataPort przywrócony. Brak zapytań MF/GUS/
-  VIES/DataPort/NBP z nowego walidatora lub próby UI.
+## Ograniczenia / następne kroki
 
-## Pliki
-
-Directory.Packages.props, Directory.Build.targets, .github/dependabot.yml;
-Application/BankAccountPreparation.cs; Infrastructure/IbanNetBankAccountValidator.cs,
-DependencyInjection.cs i csproj; API Security/ContractorDetailEndpoints.cs,
-ContractorDetailMapping.cs; SharedContracts/ContractorDetailContracts.cs;
-Desktop/MainWindow.axaml/.cs, Services/VatowiecApiClient.cs,
-ViewModels/MainViewModel.Details.cs; tests/BankAccountValidatorTests.cs,
-BankAccountIntegrationTests.cs, AuthenticationIntegrationTests.cs,
-ContractorDetailsIntegrationTests.cs, IdentifierRegistryIntegrationTests.cs;
-licenses/*; docs/adr/ADR-025*, ADR-020*, SPECYFIKACJA.md, AGENTS.md,
-docs/CODEX_PROGRESS.md, docs/contractors.md, README.md. Zawsze porównaj aktualne git status.
-
-## Znane ograniczenia
-
-Format NRB rozpoznajemy jako dokładnie 26 cyfr ASCII. Inne czysto lokalne formaty
-są non-IBAN i wymagają ostrzeżenia, nie są bezwarunkowo blokowane. Biblioteka nie
-potwierdza banku, BIC, właściciela ani istnienia rachunku. Upgrade wymaga wydania
-aplikacji/testów; nie ma runtime update. Podgląd nie zapisuje audytu, gdyż nie
-zmienia kartoteki; świadomy zapis zawsze zapisuje istniejący audyt atomowo.
+Nie ma zaległych kroków implementacji. Nie aktualizowano NuGet, SQL ani licencji.
+Nie potwierdzamy istnienia rachunku/właściciela. Zagraniczne BIC pozostają ręczne.
+EWIB400 według Swaggera to brak wyniku LUB błędny parametr, więc komunikat
+Unavailable, nie pewny NotFound. Podgląd nie ma trwałej historii — nie zmienia danych;
+świadomy zwykły zapis zawiera bank/BIC w istniejącym audycie. Nie dodano tabel.
+Przy dalszych zmianach używaj wspólnego walidatora i testów; nie rób ponownie
+liveEWIB bez potrzeby. W razie nowego zlecenia sprawdź stan repo, zachowaj noCommit/Push.

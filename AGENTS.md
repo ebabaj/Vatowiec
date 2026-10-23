@@ -2,9 +2,9 @@
 
 Projekt: **Otwarty następca VATowca** (nazwa robocza).  
 Główne źródło wymagań: [`SPECYFIKACJA.md`](./SPECYFIKACJA.md).  
-Status: walidacja rachunków przez IbanNet, 2026-10-23; ADR-025.
+Status: wspólna normalizacja rachunków i uzupełnianie banku z EWIB, 2026-10-23; ADR-026.
 
-**Aktualny etap: kontrola IBAN/NRB i ostrzeżenia (ADR-025), 273/273 testy.**
+**Aktualny etap: IbanNet i podgląd banku z NBP EWIB (ADR-026), 323/323 testy.**
 Użytkownik zakończył etap dokumentacyjny. Można odtwarzać wyłącznie lokalne
 Vatowiec_System, Vatowiec_Company_A_Dev i Vatowiec_Company_B_Dev po kontroli
 instancji, dokładnych nazw, znaczników i fikcyjnego przeznaczenia danych.
@@ -94,6 +94,23 @@ Nowe funkcjonalności muszą korzystać z istniejącego wspólnego walidatora.
 Jeżeli potrzebna będzie nowa reguła, należy rozszerzyć wspólny mechanizm i jego
 testy, zachowując rozdzielenie walidacji numeru od potwierdzania właściciela
 rachunku.
+
+ADR-026 rozszerza wspólną normalizację o jawną listę myślników wizualnych
+(U+002D, U+2010–2015, U+2212, U+FE63, U+FF0D). Usuwaj je z zapisów liczbowych
+lub rozpoczynających się jak IBAN (dwie litery i dwie cyfry); w innych formatach,
+np. LOCAL-123, mogą być częścią identyfikatora. Nie usuwaj nieznanych znaków.
+Polityka bank-iban-v3 wiąże nowe reguły z WarningHash. Wspólny wynik walidatora
+udostępnia numer rozliczeniowy wyłącznie dla poprawnego NRB/PL IBAN.
+
+Nazwa banku i BIC pochodzą z osobnego serwerowego adaptera IBankDirectory/EWIB,
+nie z IbanNet. Tylko jawne Sprawdź numer odpytuje HTTPS ewib.nbp.pl dla ośmiu cyfr
+numeru rozliczeniowego; bez pełnego rachunku, zapytań przy zapisie/odczycie lub w tle.
+Nie dobieraj BIC innych numerów/jednostek, nie wybieraj pierwszego z wielu.
+Avalonia normalizuje numer w polu i przenosi propozycje tylko do szkicu: automatycznie
+jednoznaczne puste pola, zastąpienie niepustych wyłącznie po jawnej decyzji.
+Brak BIC/wyniku lub awaria nie blokują ręcznego zapisu. EWIB nie potwierdza
+istnienia rachunku ani jego właściciela. Automatyczne testy używają atrap HTTP;
+próba publicznego EWIB jest osobna i nie zmienia trybów MF/GUS/VIES TEST/Mock.
 
 ## 3. Nienaruszalne zasady danych
 
