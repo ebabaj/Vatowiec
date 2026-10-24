@@ -5,6 +5,11 @@ oraz w natywnym Avalonia; bez gotowego instalatora i provisioningu certyfikatu.
 Wymagania ORG-003/004/008/009/011 oraz T-012/T-016. Rozszerza ADR-037;
 zachowuje ADR-015/016/032/034/035 i model database-per-company.
 
+Aktualizacja: [ADR-039](ADR-039-personal-cykl-zycia-api.md) zastępuje opisany niżej
+transport HTTPS localhost:18443 lokalnym Named Pipe, bez certyfikatu, i rozszerza
+controller o pojedynczą instancję, nadzór procesu i zatrzymywanie LocalDB.
+Zasady inicjalizacji, checkpointów i trwałego zamknięcia bootstrapu nie zmieniają się.
+
 ## Decyzja
 
 Jeden klient Avalonia obsługuje oba warianty. Jawny argument `--personal`

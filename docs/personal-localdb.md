@@ -5,6 +5,10 @@ Data: 2026-10-24. Decyzja: [ADR-037](adr/ADR-037-personal-localdb.md).
 Nie jest to jeszcze instalator Personal 0.1.0-preview. Nie zbudowano nowego
 instalatora, nie publikowano Release i nie instalowano dodatkowego oprogramowania.
 
+Obecny etap ADR-039: [automatyczne uruchamianie Personal](personal-running.md).
+Wyniki poniżej są zapisem eksperymentu LocalDB; jego HTTPS/dev-certs nie są
+już wymagane przez normalny profil Personal, który korzysta z Named Pipes.
+
 ## Środowisko i zabezpieczenia zakresu
 
 Zastano LocalDB **17.0.4025.3** i instancję `MSSQLLocalDB`. Istniejąca instancja

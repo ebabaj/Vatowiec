@@ -4,6 +4,11 @@ Stan implementacji: etap 2, zweryfikowany 2026-10-24 na rzeczywistym LocalDB
 17.0.4025.3 i w natywnym oknie Avalonia, standardowy Debug.
 Decyzja: [ADR-038](adr/ADR-038-personal-pierwsze-uruchomienie.md).
 
+Aktualizacja ADR-039: kreator korzysta obecnie z controllera procesu i lokalnego
+Named Pipe, bez portu i certyfikatu .NET. [Aktualna instrukcja uruchomienia,
+zamykania i odzyskiwania](personal-running.md). Poniższe wyniki etapu 2 opisują
+historyczny test HTTPS, zastąpiony nowym transportem bez zmian modelu danych.
+
 ## Uruchomienie i obsługa
 
 Edycję Personal wybiera skrót do `Vatowiec.Desktop.exe` z argumentem `--personal`.
@@ -58,16 +63,16 @@ Drugi klient tej samej instalacji otrzymuje informację o już uruchomionym
 Personal. Zamknięcie klienta zatrzymuje jego własny serwer; Network pozostaje
 oddzielnym procesem. LocalDB i dane mogą pozostać na dysku po zamknięciu.
 
-## HTTPS i przygotowanie komputera
+## Połączenie lokalne i przygotowanie komputera
 
-W tym etapie używamy istniejącego zaufanego certyfikatu localhost, bez zmian
-certyfikatów i reguł zapory. Osobny port Personal to `https://localhost:18443`,
-wyłącznie loopback. Zajęty port lub brak poprawnego certyfikatu nie pozwalają
-przejść do logowania; nie wyłączamy sprawdzania TLS. Certyfikat Let's Encrypt
-i porty Network 7243/7443 pozostają nietknięte.
+Aktualne Personal używa Windows Named Pipes z DACL bieżącego użytkownika,
+odmową Network SID i kontrolą tożsamości procesu po stronie klienta. Nie
+nasłuchuje na TCP/LAN i nie potrzebuje certyfikatu. Gotowość jest potwierdzana
+przez własny proces i `/health` w tym kanale. Certyfikat Let's Encrypt,
+standardowa walidacja TLS oraz porty Network 7243/7443 pozostają nietknięte.
 
 Brak LocalDB: [oficjalna procedura i ograniczenia](personal-localdb.md).
-Instalator i obsługa certyfikatu bez SDK nadal wymagają oddzielnego etapu.
+Instalator i dostarczenie runtime/LocalDB nadal wymagają oddzielnego etapu.
 Nie deklarujemy gotowego instalacyjnego Personal 0.1.0-preview.
 
 ## Weryfikacja

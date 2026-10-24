@@ -30,10 +30,11 @@
       <ScrollViewer IsVisible="{Binding IsLogin}">
         <StackPanel MaxWidth="460" HorizontalAlignment="Stretch" Spacing="10" Margin="0,24">
           <TextBlock Text="Zaloguj się" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,12" />
-          <TextBlock Text="Adres serwera API (HTTPS)" />
-          <TextBox Text="{Binding ApiAddress, Mode=TwoWay}" AutomationProperties.AutomationId="ApiAddress" />
+          <TextBlock Text="Adres serwera API (HTTPS)" IsVisible="{Binding !IsPersonal}" />
+          <TextBox Text="{Binding ApiAddress, Mode=TwoWay}" IsVisible="{Binding !IsPersonal}" AutomationProperties.AutomationId="ApiAddress" />
+          <TextBlock Text="Połączenie lokalne — zabezpieczony kanał Windows" IsVisible="{Binding IsPersonal}" TextWrapping="Wrap" />
           <TextBlock Text="Na innym komputerze podaj adres HTTPS serwera otrzymany od administratora. localhost oznacza ten komputer."
-                     TextWrapping="Wrap" Opacity="0.7" />
+                     TextWrapping="Wrap" Opacity="0.7" IsVisible="{Binding !IsPersonal}" />
           <TextBlock Text="Login" />
           <TextBox x:Name="LoginInput" Text="{Binding UserName, Mode=TwoWay}" MaxLength="256"
                    AutomationProperties.AutomationId="Login" />
@@ -47,7 +48,8 @@
                   Margin="0,12,0,0" AutomationProperties.AutomationId="LoginButton" />
           <Button Content="Zapomnij dane logowania" Click="ForgetLoginClick" AutomationProperties.AutomationId="ForgetLogin"/>
           <TextBlock Text="Zapamiętywanie hasła i autologowanie są przeznaczone wyłącznie dla zaufanego konta Windows. Hasło trafia tylko do Windows Credential Manager, sesja pozostaje w pamięci. Puste pole hasła pozwala użyć zapamiętanego poświadczenia dla tego adresu API i loginu. Wymagany jest zaufany certyfikat HTTPS serwera."
-                     TextWrapping="Wrap" Opacity="0.7" Margin="0,8,0,0" />
+                     TextWrapping="Wrap" Opacity="0.7" Margin="0,8,0,0" IsVisible="{Binding !IsPersonal}" />
+          <TextBlock Text="Hasło można zapamiętać wyłącznie w Windows Credential Manager tego konta Windows. Sesja pozostaje w pamięci i dotyczy tej instalacji Personal." TextWrapping="Wrap" Opacity="0.7" IsVisible="{Binding IsPersonal}" />
         </StackPanel>
       </ScrollViewer>
 

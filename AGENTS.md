@@ -11,6 +11,16 @@ lub katalog kończą tworzenie; nie usuwaj danych, aby wymusić powtórkę.
 Profil jest jawny, nie zmienia konfiguracji Network, nie instaluje LocalDB
 automatycznie. Przy zadaniach Personal nie migruj ani nie resetuj istniejącego
 SQLEXPRESS i domyślnego MSSQLLocalDB. Build wyłącznie standardowy Debug.
+
+Personal ADR-038/039: normalny klient `--personal` uruchamia własne API.exe przez
+prywatne potoki sterowania; biznesowe API działa wyłącznie przez Named Pipe
+z DACL bieżącego SID, odmową Network SID i kontrolą PID własnego procesu.
+Nie dodawaj portu TCP, dev-certs ani wyjątków walidacji TLS do Personal. Network
+zachowuje HTTPS 7243/7443. Bootstrap ma checkpointy i trwałe zamknięcie w SQL.
+Zwykły start nie wykonuje migracji/resetu. Fixture `Personal.WizardTest.<GUID>`
+tworzą wyłącznie nowe prywatne instancje/bazy z identyfikatorem instalacji;
+zachowuj je do inspekcji. Wyniki/logi poza repozytorium w LocalAppData.
+Aktualne zasady: docs/adr/ADR-039-personal-cykl-zycia-api.md i docs/personal-running.md.
 Status: historia/ważność haseł i archiwizacja tożsamości, 2026-10-24; ADR-035.
 
 **Aktualny etap: użytkownicy i uprawnienia instalacji (ADR-033).**

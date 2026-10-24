@@ -113,6 +113,12 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         ValidateAddress(http.BaseAddress?.AbsoluteUri ?? "");
         this.http = http;
     }
+    internal static VatowiecApiClient ForPersonal(HttpClient http, PersonalApiConnection endpoint) => new(http, endpoint);
+    private VatowiecApiClient(HttpClient http, PersonalApiConnection endpoint)
+    {
+        if (http.BaseAddress?.AbsoluteUri != endpoint.HttpOrigin) throw new ArgumentException("Niezgodny kanał instalacji Personal.");
+        this.http = http;
+    }
 
     public async Task<SessionResponse> Login(string userName, string password)
     {

@@ -12,7 +12,7 @@ if (args is ["--personal-worker", _, _])
     personalWorker = await Vatowiec.Api.Hosting.PersonalWorker.Prepare(args);
     if (personalWorker == null) return;
 }
-using var personalLifetime = personalWorker;
+await using var personalLifetime = personalWorker;
 var builder = personalWorker == null ? WebApplication.CreateBuilder(args) :
     WebApplication.CreateBuilder(new WebApplicationOptions { Args = [], EnvironmentName = PersonalDatabaseTarget.Edition });
 if (personalWorker != null)
@@ -48,7 +48,7 @@ app.Use(async (context, next) =>
     {
         context.Response.Headers.CacheControl = "no-cache, no-store";
         context.Response.Headers.Pragma = "no-cache";
-        if (!context.Request.IsHttps)
+        if (!context.Request.IsHttps && personalWorker?.IsTrustedPipe(context) != true)
         {
             context.Response.StatusCode = 400;
             await context.Response.WriteAsJsonAsync(new { code = "https_required" });
@@ -87,7 +87,7 @@ app.Use(async (context, next) =>
         });
     }
 });
-app.UseHttpsRedirection();
+if (personalWorker == null) app.UseHttpsRedirection();
 app.UseAuthentication();
 app.Use(async (context, next) =>
 {
@@ -119,7 +119,7 @@ app.MapRegistryConfiguration();
 app.MapCompanies();
 
 if (personalWorker != null && OperatingSystem.IsWindows()) personalWorker.Attach(app);
-app.Run();
+await app.RunAsync();
 
 // Punkt wejścia udostępniony hostowi testowemu bez uruchamiania zewnętrznego procesu.
 public partial class Program;

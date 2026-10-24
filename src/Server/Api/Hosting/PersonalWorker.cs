@@ -10,13 +10,17 @@ using Vatowiec.SharedContracts;
 namespace Vatowiec.Api.Hosting;
 
 // There is intentionally no HTTP bootstrap route. Only the spawning desktop inherits both handles.
-public sealed class PersonalWorker : IDisposable
+public sealed class PersonalWorker : IDisposable, IAsyncDisposable
 {
     private readonly AnonymousPipeClientStream input;
     private readonly AnonymousPipeClientStream output;
     private readonly StreamReader reader;
     private readonly StreamWriter writer;
     private PersonalInstallation? installation;
+    private PersonalApiConnection? endpoint;
+    private PersonalPipeTransport? transport;
+    private bool stopped;
+    public bool IsTrustedPipe(HttpContext context) => transport?.IsTrusted(context) == true;
     private PersonalWorker(string readHandle, string writeHandle)
     {
         input = new(PipeDirection.In, readHandle); output = new(PipeDirection.Out, writeHandle);
@@ -59,7 +63,7 @@ public sealed class PersonalWorker : IDisposable
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         { try { await worker.Write(new(false, SafeError(ex), "error")); } catch (IOException) { } }
-        worker.Dispose(); return null;
+        await worker.DisposeAsync(); return null;
     }
     private static string SafeError(Exception error) => error switch
     {
@@ -74,11 +78,15 @@ public sealed class PersonalWorker : IDisposable
         // Ignore Network Kestrel/connection overrides, including inherited environment variables.
         builder.Configuration.Sources.Clear();
         builder.Configuration.AddInMemoryCollection(installation!.Configuration());
+        endpoint = new(installation.State.InstallationId, "Vatowiec.Personal." + Guid.NewGuid().ToString("N"), Environment.ProcessId);
+        transport = new(endpoint); transport.Configure(builder);
         builder.Services.AddDataProtection().SetApplicationName("VATowiec.Personal." + installation.State.InstallationId)
             .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(installation.Root, "Keys", "Sessions"))).ProtectKeysWithDpapi(false);
         builder.Services.PostConfigure<Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions>(
-            Microsoft.AspNetCore.Identity.IdentityConstants.ApplicationScheme, o => o.Cookie.Name = "__Host-Vatowiec.Personal.Session");
-        builder.Services.PostConfigure<Microsoft.AspNetCore.Antiforgery.AntiforgeryOptions>(o => o.Cookie.Name = "__Host-Vatowiec.Personal.Csrf");
+            Microsoft.AspNetCore.Identity.IdentityConstants.ApplicationScheme, o =>
+            { o.Cookie.Name = "Vatowiec.Personal.Session"; o.Cookie.SecurePolicy = CookieSecurePolicy.None; });
+        builder.Services.PostConfigure<Microsoft.AspNetCore.Antiforgery.AntiforgeryOptions>(o =>
+            { o.Cookie.Name = "Vatowiec.Personal.Csrf"; o.Cookie.SecurePolicy = CookieSecurePolicy.None; });
     }
     public void Attach(WebApplication app)
     {
@@ -89,7 +97,7 @@ public sealed class PersonalWorker : IDisposable
         if (!OperatingSystem.IsWindows()) return;
         try
         {
-            await Write(new(true, "Lokalne API Personal jest gotowe.", "ready", Complete: true, ApiAddress: PersonalInstallation.Address));
+            await Write(new(true, "Lokalne API Personal jest gotowe.", "ready", Complete: true, ApiAddress: endpoint!.Identity, Connection: endpoint));
             // A close command or EOF from a closed/crashed desktop stops only this host, gracefully.
             await reader.ReadLineAsync();
         }
@@ -97,6 +105,20 @@ public sealed class PersonalWorker : IDisposable
         finally { app.Lifetime.StopApplication(); }
     }
     private Task Write(PersonalSetupStatus status) => writer.WriteLineAsync(JsonSerializer.Serialize(status));
+    public async Task StopLocalDb()
+    {
+        if (!OperatingSystem.IsWindows() || installation == null || stopped) return;
+        stopped = true;
+        try { await installation.StopLocalDb(); }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Environment.ExitCode = 2;
+            // Metadata only, no SQL details, secrets or settings. The desktop receives a shutdown warning.
+            try { await Write(new(false, "API zakończyło pracę, ale LocalDB nie potwierdził zatrzymania. Dane zachowano.", "shutdown")); }
+            catch (IOException) { }
+        }
+    }
+    public async ValueTask DisposeAsync() { await StopLocalDb(); Dispose(); }
     public void Dispose()
     {
         writer.Dispose(); reader.Dispose(); output.Dispose(); input.Dispose();

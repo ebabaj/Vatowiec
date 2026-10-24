@@ -21,6 +21,15 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
     private ContractorResponse[] contractors = [];
     private bool contractorsLoaded;
     private bool disposed;
+    private string? personalFailure;
+    public bool IsPersonal => PersonalApiIdentity.TryParse(configuredApiAddress ?? "", out _);
+    public bool IsPersonalUnavailable => personalFailure != null;
+    public void NotifyPersonalFailure(string error)
+    {
+        personalFailure = error; message = error;
+        if (!busy) ResetSession();
+        ChangedAll();
+    }
 
     public MainViewModel(Func<string, IVatowiecApiClient>? connect = null, TimeProvider? clock = null,
         ILoginPreferencesStore? preferencesStore = null, ILoginCredentialStore? credentialStore = null, string? apiAddressOverride = null)
@@ -35,7 +44,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public bool IsBusy => busy;
-    public bool CanInteract => !busy;
+    public bool CanInteract => !busy && personalFailure == null;
     public bool IsLogin => session is null;
     public bool IsCompanySelection => session is not null && profile is null && !gusSettings && !usersSettings && !IsOwnPasswordChange && !passwordPolicyScreen;
     public bool IsWorkspace => session is not null && profile is not null;
@@ -201,7 +210,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private async Task Run(Func<Task> action)
     {
-        if (busy || disposed) return;
+        if (busy || disposed || personalFailure != null) return;
         var wasAuthenticated = session is not null;
         CheckExpiry();
         if (wasAuthenticated && session is null) return;
@@ -236,7 +245,12 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         catch (ArgumentException ex) { message = ex.Message; }
         catch (Exception ex) when (IsExpected(ex))
         {
-            message = ex switch
+            message = IsPersonal ? ex switch
+            {
+                TaskCanceledException => "Przekroczono czas oczekiwania na lokalne API Personal. Sprawdź ostatni zapis; zamknij program i uruchom ponownie.",
+                JsonException => "Lokalny serwer Personal zwrócił nieprawidłową odpowiedź. Sprawdź zgodność wersji klienta i API.",
+                _ => "Nie można potwierdzić bezpiecznego kanału Windows do lokalnego API Personal. Zamknij program i uruchom ponownie. Zapisane dane pozostają zachowane."
+            } : ex switch
             {
                 HttpRequestException { HttpRequestError: HttpRequestError.SecureConnectionError } =>
                     "Nie można potwierdzić bezpiecznego połączenia HTTPS z API. Sprawdź certyfikat serwera: zaufanie, ważność i zgodność nazwy z adresem. Skontaktuj się z administratorem.",
@@ -251,6 +265,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             busy = false;
             if (disposed) ResetSession();
+            if (personalFailure != null) { ResetSession(); message = personalFailure; }
             CheckExpiry();
             ChangedAll();
         }

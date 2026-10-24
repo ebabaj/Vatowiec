@@ -19,8 +19,16 @@ API, bez endpointu HTTP i bez SQL w kliencie. Nowe prywatne bazy mają znaczniki
 własności i checkpointy; pierwszy administrator, rola, CompanyAccess i audyt
 są atomowe. Zapisane w SQL zakończenie trwale zamyka bootstrap. Restart
 wznawia te same identyfikatory albo otwiera normalne logowanie. Network bez zmian;
-instalator i certyfikat Personal pozostają kolejnymi etapami.
+instalator pozostaje kolejnym etapem, a transport zastępuje ADR-039 poniżej.
 [Działanie kreatora i wyniki](docs/personal-first-run.md).
+
+ADR-039: Personal używa Windows Named Pipes, DACL bieżącego konta z odmową
+Network SID oraz przypięcia do własnego procesu API. Nie ma portu TCP ani
+zależności od certyfikatu .NET. Identity, CSRF i uprawnienia pozostają wspólne;
+Network nadal wymaga rzeczywistego HTTPS. Jedna aplikacja Personal na użytkownika,
+potwierdzona gotowość, obsługa awarii i łagodne zatrzymanie API/LocalDB. Preferencje
+i Credential Manager wiążą się ze stałym InstallationId i UserId, nie z losowym
+kanałem. [Uruchamianie i wyniki](docs/personal-running.md).
 
 ADR-036: lokalny instalator klienta Windows `0.1.0-preview`, per-user, self-contained
 Release win-x64, bez API, SQL i migracji. Aktualizacja i odinstalowanie zachowują

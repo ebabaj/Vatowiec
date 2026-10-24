@@ -17,7 +17,7 @@ public sealed partial class MainViewModel
     public string ApiAddress
     {
         get => apiAddress;
-        set { if (busy || value == apiAddress) return; apiAddress = value; ApplyLoginFlags(); Changed(); }
+        set { if (busy || IsPersonal || value == apiAddress) return; apiAddress = value; ApplyLoginFlags(); Changed(); }
     }
     public string UserName
     {

@@ -4,6 +4,7 @@ using Avalonia.Interactivity;
 using Vatowiec.Desktop.Services;
 using Vatowiec.Desktop.ViewModels;
 using Vatowiec.SharedContracts;
+using Avalonia.Threading;
 
 namespace Vatowiec.Desktop;
 
@@ -12,12 +13,15 @@ public partial class PersonalSetupWindow : Window
     private readonly IPersonalBackend backend;
     private readonly Action<MainWindow>? openLogin;
     private bool busy;
+    private bool handingOff;
     public PersonalSetupWindow() : this(new PersonalBackend()) { }
     public PersonalSetupWindow(IPersonalBackend backend, Action<MainWindow>? openLogin = null)
     {
         this.backend = backend; this.openLogin = openLogin; InitializeComponent();
         Opened += async (_, _) => await Inspect();
         Closed += (_, _) => { SetupPassword.Text = ""; SetupPasswordConfirmation.Text = ""; };
+        PersonalWindowLifetime.Attach(this, backend, () => handingOff);
+        backend.Failed += error => Dispatcher.UIThread.Post(() => { SetupStatus.Text = error; SetupForm.IsEnabled = false; });
     }
     private void Busy(bool value) { busy = value; SetupProgress.IsVisible = value; SetupForm.IsEnabled = !value; OpenPersonalLogin.IsEnabled = !value; RetryPersonalCheck.IsEnabled = !value; }
     private async Task Inspect()
@@ -60,10 +64,14 @@ public partial class PersonalSetupWindow : Window
     private async Task OpenLogin()
     {
         var status = await backend.Send(new() { Operation = "serve" }); ShowStatus(status);
-        if (!status.Success || status.Stage != "ready" || status.ApiAddress != "https://localhost:18443") return;
-        var model = new MainViewModel(preferencesStore: new FileLoginPreferencesStore(Path.Combine(backend.Root, "login-preferences.json")),
+        if (!status.Success || status.Stage != "ready" || !PersonalApiIdentity.TryParse(status.ApiAddress ?? "", out var installationId)) return;
+        var store = new PersonalLoginPreferencesStore(new FileLoginPreferencesStore(Path.Combine(backend.Root, "login-preferences.json")), installationId);
+        var model = new MainViewModel(connect: backend.Connect, preferencesStore: store,
             credentialStore: new WindowsLoginCredentialStore(), apiAddressOverride: status.ApiAddress);
         var login = new MainWindow(model) { Title = "VATowiec Personal" };
+        backend.Failed += error => Dispatcher.UIThread.Post(() => model.NotifyPersonalFailure(error));
+        PersonalWindowLifetime.Attach(login, backend);
+        handingOff = true;
         if (openLogin != null) openLogin(login);
         else if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lifetime)
         { lifetime.MainWindow = login; login.Show(); Close(); }

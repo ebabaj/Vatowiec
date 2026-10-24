@@ -7,6 +7,7 @@ using Vatowiec.Core.Infrastructure.Persistence;
 using Vatowiec.Desktop;
 using Vatowiec.Desktop.Services;
 using Vatowiec.Desktop.ViewModels;
+using Vatowiec.SharedContracts;
 using static Vatowiec.Tests.InstallationSecurityUiTests;
 
 namespace Vatowiec.Tests;
@@ -50,7 +51,7 @@ internal static class PersonalSetupUiVerification
                 Click(wizard, "OpenPersonalLogin");
                 await Wait(() => login?.IsVisible == true); wizard.Close();
                 var model = (MainViewModel)login!.DataContext!;
-                Assert.Equal("https://localhost:18443", model.ApiAddress);
+                Assert.True(PersonalApiIdentity.TryParse(model.ApiAddress, out _));
                 Find<TextBox>(login, "Login").Text = "wizard.ui.fixture";
                 Find<TextBox>(login, "Password").Text = "Fictional-Ui-Setup-42!";
                 Click(login, "LoginButton");
@@ -90,12 +91,10 @@ internal static class PersonalSetupUiVerification
     }
     private static void Capture(Window window)
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "AGENTS.md"))) directory = directory.Parent;
-        if (directory == null) return;
+        Directory.CreateDirectory(PersonalLocalPaths.VerificationDirectory);
         using var bitmap = new RenderTargetBitmap(new PixelSize((int)window.Bounds.Width, (int)window.Bounds.Height), new Vector(96, 96));
         bitmap.Render(window);
-        bitmap.Save(Path.Combine(directory.FullName, "TestResults", "personal-wizard.png"), PngBitmapEncoderOptions.Default);
+        bitmap.Save(Path.Combine(PersonalLocalPaths.VerificationDirectory, "personal-wizard.png"), PngBitmapEncoderOptions.Default);
     }
     private static async Task Wait(Func<bool> ready)
     {

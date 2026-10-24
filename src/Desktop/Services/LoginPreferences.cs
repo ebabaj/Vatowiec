@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Vatowiec.SharedContracts;
 
 namespace Vatowiec.Desktop.Services;
 
@@ -12,7 +13,8 @@ public sealed class LoginTarget
     {
         ArgumentException.ThrowIfNullOrEmpty(apiAddress);
         ArgumentException.ThrowIfNullOrEmpty(userName);
-        ApiAddress = VatowiecApiClient.ValidateAddress(apiAddress.Trim()).AbsoluteUri;
+        ApiAddress = PersonalApiIdentity.TryParse(apiAddress.Trim(), out var installation)
+            ? PersonalApiIdentity.For(installation) : VatowiecApiClient.ValidateAddress(apiAddress.Trim()).AbsoluteUri;
         UserName = userName.Trim();
         UserId = userId is { } id && id != Guid.Empty ? id : null;
         if (UserName.Length is 0 or > 256 || UserName.Contains('\0')) throw new ArgumentException("Wpisz poprawny login.");

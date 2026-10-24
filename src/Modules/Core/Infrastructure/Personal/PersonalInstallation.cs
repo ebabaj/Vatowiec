@@ -33,7 +33,7 @@ public sealed class PersonalInstallationState
 [SupportedOSPlatform("windows")]
 public sealed class PersonalInstallation : IDisposable
 {
-    public const string Address = "https://localhost:18443";
+    public string Address => PersonalApiIdentity.For(State.InstallationId);
     public static string DefaultRoot => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Vatowiec", "Personal");
     public string Root { get; }
     public PersonalInstallationState State { get; }
@@ -78,15 +78,8 @@ public sealed class PersonalInstallation : IDisposable
     }
     public static string ValidateRoot(string root)
     {
-        var full = Path.GetFullPath(root);
-        var parent = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Vatowiec");
-        var name = Path.GetFileName(full);
-        if (!string.Equals(Path.GetDirectoryName(full), parent, StringComparison.OrdinalIgnoreCase) ||
-            !(name == "Personal" || (name.StartsWith("Personal.WizardTest.", StringComparison.Ordinal) && Guid.TryParseExact(name[20..], "N", out _))))
-            throw new PersonalSetupException("Niedozwolony katalog instalacji Personal.");
-        for (var dir = new DirectoryInfo(full); dir != null && dir.FullName.Length >= parent.Length; dir = dir.Parent)
-            if (dir.Exists && dir.Attributes.HasFlag(FileAttributes.ReparsePoint)) throw new PersonalSetupException("Katalog Personal nie może być dowiązaniem.");
-        return full;
+        try { return PersonalLocalPaths.ValidateRoot(root); }
+        catch (ArgumentException error) { throw new PersonalSetupException(error.Message); }
     }
     private void Save()
     {
@@ -96,6 +89,8 @@ public sealed class PersonalInstallation : IDisposable
         File.Move(temp, StateFile, overwrite: true);
     }
     public static async Task<string> LocalDb(params string[] args)
+        => await RunLocalDb(45, args);
+    private static async Task<string> RunLocalDb(int timeoutSeconds, params string[] args)
     {
         var start = new ProcessStartInfo("SqlLocalDB.exe") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (var arg in args) start.ArgumentList.Add(arg);
@@ -103,7 +98,13 @@ public sealed class PersonalInstallation : IDisposable
         {
             using var process = Process.Start(start) ?? throw new PersonalSetupException("Nie znaleziono SQL Server 2025 LocalDB. Zainstaluj LocalDB według instrukcji Personal, a następnie uruchom program ponownie.");
             var output = process.StandardOutput.ReadToEndAsync(); var error = process.StandardError.ReadToEndAsync();
-            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(45)); await error;
+            try { await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(timeoutSeconds)); }
+            catch (TimeoutException)
+            {
+                if (!process.HasExited) { process.Kill(); await process.WaitForExitAsync(); }
+                throw new PersonalSetupException("Przekroczono czas oczekiwania na LocalDB. Zachowano dane. Spróbuj ponownie uruchomić Personal.");
+            }
+            await error;
             if (process.ExitCode != 0) throw new PersonalSetupException("Nie udało się uruchomić prywatnej instancji LocalDB. Inne instancje nie zostały zmienione.");
             return await output;
         }
@@ -303,8 +304,17 @@ public sealed class PersonalInstallation : IDisposable
     {
         ["Vatowiec:Edition"] = PersonalDatabaseTarget.Edition, ["Personal:InstallationId"] = State.InstallationId.ToString(),
         ["ConnectionStrings:VatowiecSystem"] = Target.Connection(Target.System), ["CompanyConnections:Personal"] = Target.Connection(Target.Company),
-        ["Kestrel:Endpoints:Personal:Url"] = Address, ["AllowedHosts"] = "localhost",
+        ["AllowedHosts"] = "personal-" + State.InstallationId.ToString("N") + ".vatowiec.invalid",
         ["DataPort:KeyRingDirectory"] = Path.Combine(Root, "Keys", "DataPort"), ["Gus:KeyRingDirectory"] = Path.Combine(Root, "Keys", "Gus")
     };
+    public async Task StopLocalDb()
+    {
+        if (!State.InstanceReserved) return;
+        var instances = (await RunLocalDb(10, "info")).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (!instances.Contains(Target.Instance, StringComparer.OrdinalIgnoreCase)) return;
+        // The exact installation-derived name is never MSSQLLocalDB, a prototype or SQLEXPRESS.
+        SqlConnection.ClearAllPools();
+        await RunLocalDb(15, "stop", Target.Instance);
+    }
     public void Dispose() => gate.Dispose();
 }

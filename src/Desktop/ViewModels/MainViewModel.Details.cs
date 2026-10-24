@@ -65,7 +65,7 @@ public sealed partial class MainViewModel
     public string BankWarning => warningMessage;
     public bool CanAcceptWarnings => selectedCompany?.Permissions.Contains("AcceptWarnings", StringComparer.Ordinal) == true;
     public bool DiscardPrompt => discardAction is not null;
-    public bool CanUseForm => !busy && !DiscardPrompt;
+    public bool CanUseForm => !busy && !DiscardPrompt && !IsPersonalUnavailable;
     public bool HasUnsavedChanges => PasswordPolicyEditor?.IsDirty == true || HasAdminChanges || HasFinanceChanges || CurrencyEditor?.IsDirty == true || editor?.IsDirty == true || detailEditor?.IsDirty == true || !string.IsNullOrEmpty(NewAddressTypeName);
     public bool HasNextDetails { get; private set; }
     public bool HasPreviousDetails => detailOffset > 0;

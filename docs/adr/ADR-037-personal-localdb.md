@@ -10,6 +10,10 @@ bootstrapu po pierwszym administratorze. Zweryfikowano nowe bazy, wznowienie,
 restart, logowanie i graceful shutdown. Poniższe granice prototypu opisują etap 1;
 aktualne działanie i wyniki: [pierwsze uruchomienie](../personal-first-run.md).
 
+Etap 3: [ADR-039](ADR-039-personal-cykl-zycia-api.md) wprowadza Named Pipes zamiast
+lokalnego HTTPS, pojedynczą instancję klienta i pełny nadzór cyklu życia API.
+Personal nie wymaga już certyfikatu .NET ani konfiguracji portu.
+
 ## Kontekst i decyzja
 
 Personal: jeden komputer Windows, Avalonia, lokalne API ASP.NET Core i prywatna

@@ -85,13 +85,13 @@ public sealed class PersonalSetupTests
             using (var second = new PersonalBackend(root))
             { var locked = await second.Send(new()); Assert.False(locked.Success); Assert.Contains("już uruchomiona", locked.Message); }
             var ready = await backend.Send(new() { Operation = "serve" }); Assert.True(ready.Success, ready.Message); Assert.Equal("ready", ready.Stage);
-            using var api = VatowiecApiClient.Connect(ready.ApiAddress!);
+            using var api = backend.Connect(ready.ApiAddress!);
             var session = await api.Login("wizard.fixture", "Fictional-Setup-42!"); userId = session.UserId;
             Assert.True(session.IsInstallationAdministrator); Assert.False(session.MustChangePassword);
             var companies = await api.Companies(); Assert.Single(companies); Assert.Equal(company, companies[0].CompanyId);
             Assert.Equal("Firma fikcyjna kreatora", (await api.Profile(company)).Name);
-            using var raw = new HttpClient();
-            using var response = await raw.PostAsJsonAsync(ready.ApiAddress + "/api/v1/personal/initialize", Input());
+            using var raw = backend.CreateHttpClient();
+            using var response = await raw.PostAsJsonAsync("/api/v1/personal/initialize", Input());
             Assert.False(response.IsSuccessStatusCode); // No public HTTP bootstrap route, even during setup.
             await api.Logout();
         }
@@ -100,7 +100,7 @@ public sealed class PersonalSetupTests
             var status = await restarted.Send(new()); Assert.True(status.Success, status.Message); Assert.True(status.Complete);
             var denied = await restarted.Send(Input()); Assert.False(denied.Success);
             var ready = await restarted.Send(new() { Operation = "serve" }); Assert.True(ready.Success, ready.Message);
-            using var api = VatowiecApiClient.Connect(ready.ApiAddress!);
+            using var api = restarted.Connect(ready.ApiAddress!);
             Assert.Equal(userId, (await api.Login("wizard.fixture", "Fictional-Setup-42!")).UserId);
             Assert.Equal(company, Assert.Single(await api.Companies()).CompanyId);
             await api.Logout();
@@ -140,7 +140,7 @@ public sealed class PersonalSetupTests
             Assert.False(status.Complete);
             status = await backend.Send(Input()); Assert.True(status.Success, status.Message); Assert.True(status.Complete);
             var ready = await backend.Send(new() { Operation = "serve" }); Assert.True(ready.Success, ready.Message);
-            using var api = VatowiecApiClient.Connect(ready.ApiAddress!);
+            using var api = backend.Connect(ready.ApiAddress!);
             Assert.True((await api.Login("wizard.fixture", "Fictional-Setup-42!")).IsInstallationAdministrator);
             Assert.Equal(before.CompanyId, Assert.Single(await api.Companies()).CompanyId);
             await api.Logout();
@@ -180,10 +180,8 @@ public sealed class PersonalSetupTests
     private sealed class SimulatedInterruption : Exception;
     private static void Report(string root, PersonalDatabaseTarget target, string checks)
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "AGENTS.md"))) directory = directory.Parent;
-        if (directory == null) return;
-        File.WriteAllText(Path.Combine(directory.FullName, "TestResults", "personal-wizard-" + target.InstallationId.ToString("N") + ".json"),
+        Directory.CreateDirectory(PersonalLocalPaths.VerificationDirectory);
+        File.WriteAllText(Path.Combine(PersonalLocalPaths.VerificationDirectory, "personal-wizard-" + target.InstallationId.ToString("N") + ".json"),
             JsonSerializer.Serialize(new { completed = true, root, instance = target.Instance, databases = new[] { target.System, target.Company }, checks }));
     }
 }
