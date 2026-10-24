@@ -36,7 +36,46 @@ dotnet run --project src/Desktop --no-build
 Domyślny adres to `https://localhost:7243`. Można zmienić go w oknie logowania
 albo przed uruchomieniem ustawić `$env:VATOWIEC_API_URL = 'https://localhost:7243'`.
 Adres nie może zawierać ścieżki, loginu, hasła ani parametrów. Zmiana dotyczy
-następnego logowania; nie zapisuje się w pliku.
+następnego logowania. Po udanym logowaniu niesekretny adres i login są zapamiętane
+w lokalnych preferencjach użytkownika. Zmienna VATOWIEC_API_URL ma pierwszeństwo
+przed zapamiętanym adresem i nie przenosi do niego hasła innego serwera.
+
+## Zapamiętanie logowania i firmy domyślnej (Windows)
+
+Obie opcje są domyślnie wyłączone. Używaj ich wyłącznie na zaufanym koncie Windows.
+
+1. Wpisz poprawny HTTPS API, login i hasło. Opcjonalnie zaznacz
+   **Zapamiętaj dane logowania na tym komputerze** i **Loguj automatycznie przy
+   uruchomieniu**, następnie zaloguj się. Hasło trafia do Windows Credential
+   Manager dopiero po udanym logowaniu, nigdy do lokalnego JSON ani sekretów API.
+2. Na ekranie wyboru firmy zaznacz firmę i wybierz **Ustaw jako domyślną**.
+   Jej nazwa jest wyraźnie pokazana nad listą. Zapisywany jest GUID firmy osobno
+   dla tego serwera i loginu. **Usuń firmę domyślną** usuwa tylko tę preferencję.
+   Ręczne otwarcie innej firmy jej nie zmienia.
+3. Po każdym udanym logowaniu, ręcznym lub automatycznym, klient pobiera aktualne
+   firmy i otwiera dostępną firmę domyślną. Brak ustawienia lub dostępu oznacza
+   wybór firmy; nie zostanie wybrana pierwsza pozycja. Checkbox autologowania
+   steruje wyłącznie próbą logowania podczas uruchomienia aplikacji.
+4. **Zmień firmę** nadal wraca do listy. **Wyloguj** unieważnia sesję jak wcześniej
+   i wyłącza autostart na następne uruchomienia, pozostawiając zapamiętane hasło.
+   Możesz później ponownie włączyć autologowanie i zalogować się przyciskiem;
+   puste pole pozwala użyć poświadczenia dokładnego API/login. Gdy rzeczywiście
+   istnieje ono w Credential Manager, pole pokazuje maskę „••••••••” i status
+   **Hasło zapisane na tym komputerze**. Maska jest tylko prezentacją pustego pola.
+   Wpisane nowe hasło ma pierwszeństwo i po sukcesie aktualizuje poświadczenie,
+   jeśli zaznaczono zapamiętywanie. Zmiana API/loginu czyści wpisane hasło
+   i odświeża maskę; zaznaczenie checkboxa samo nie tworzy maski.
+5. **Zapomnij dane logowania** jest dostępne na formularzu i w nagłówku po
+   zalogowaniu. Usuwa poświadczenie wskazanej pary API/login oraz wyłącza obie
+   flagi. Nie usuwa konta, uprawnień ani firmy domyślnej. Jeśli magazyn Windows
+   jest niedostępny, komunikat wyjaśnia niepowodzenie; nadal możesz wpisać hasło.
+
+Preferencje niesekretne: `%LOCALAPPDATA%\Vatowiec\Desktop\login-preferences.json`.
+Hasło jest przypisane także do portu API; zmiana hosta/portu/loginu nie wysyła
+hasła poprzedniego profilu. Autologowanie nie ponawia prób po błędzie ani po
+wygaśnięciu sesji. Hasło poprawisz ręcznie i zapiszesz ponownie po sukcesie.
+Przy awarii zapisu wyłączenia autostartu klient usuwa poświadczenie zamiast
+pozostawiać automatyczny login; jeśli oba magazyny odmawiają, pokaże komunikat.
 
 ## Operator: firma A i firma B
 
@@ -83,7 +122,8 @@ cookie w pamięci, więc użytkownicy i wybory firm nie zmieniają sobie sesji.
 - Odmowa 403 usuwa dane firmy i wraca do wyboru. Nie ma domyślnej bazy ani
   automatycznej zmiany firmy po błędzie.
 - Sesja ma absolutny termin, domyślnie 30 minut. Po jego upływie także bezczynny
-  klient czyści dane. 401 z API również przenosi do logowania. Hasło trzeba wpisać ponownie.
+  klient czyści dane. 401 z API również przenosi do logowania. Kolejne logowanie
+  wymaga jawnego działania użytkownika; nie ma ponowień w tle.
 - Przy odświeżaniu kartoteki stare rekordy są czyszczone przed pobraniem nowych,
   więc błąd nie pozostawia danych wyglądających na aktualne.
 - **Wyloguj** przy braku sieci usuwa lokalne cookie i dane, ale pokazuje ostrzeżenie,

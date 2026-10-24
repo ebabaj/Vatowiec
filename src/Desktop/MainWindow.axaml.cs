@@ -4,6 +4,7 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Vatowiec.Desktop.ViewModels;
+using Vatowiec.Desktop.Services;
 using Vatowiec.SharedContracts;
 
 namespace Vatowiec.Desktop;
@@ -13,19 +14,24 @@ public partial class MainWindow : Window
     private readonly MainViewModel model;
     private readonly DispatcherTimer expiryTimer = new() { Interval = TimeSpan.FromSeconds(1) };
 
-    public MainWindow() : this(new MainViewModel()) { }
+    public MainWindow() : this(new MainViewModel(preferencesStore: new FileLoginPreferencesStore(), credentialStore: new WindowsLoginCredentialStore())) { }
 
     public MainWindow(MainViewModel model)
     {
         this.model = model;
         InitializeComponent();
         DataContext = model;
+        model.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(MainViewModel.ApiAddress) or nameof(MainViewModel.UserName)) PasswordInput.Text = "";
+        };
+        Activated += (_, _) => model.RefreshSavedPasswordState();
         model.PropertyChanged += (_, _) => { if (!model.IsDataPortSettings) DataPortKeyInput.Text = ""; };
         model.PropertyChanged += (_, _) => { if (!model.IsGusSettings || !model.IsGusServiceSelected || model.IsBusy) GusKeyInput.Text = ""; };
         expiryTimer.Tick += (_, _) => model.CheckExpiry();
         expiryTimer.Start();
         Closed += (_, _) => { expiryTimer.Stop(); model.Dispose(); };
-        Opened += (_, _) =>
+        Opened += async (_, _) =>
         {
             var screen = Screens.ScreenFromWindow(this);
             if (screen is not null)
@@ -35,7 +41,8 @@ public partial class MainWindow : Window
                 Height = Math.Min(Height, MaxHeight);
                 Width = Math.Min(Width, MaxWidth);
             }
-            LoginInput.Focus();
+            await model.InitializeLogin();
+            if (model.IsLogin) LoginInput.Focus();
         };
         var confirmedClose = false;
         Closing += (_, e) =>
@@ -75,6 +82,9 @@ public partial class MainWindow : Window
     }
 
     private async void LoginClick(object? sender, RoutedEventArgs e) => await Login();
+    private async void ForgetLoginClick(object? sender, RoutedEventArgs e) { PasswordInput.Text = ""; await model.ForgetLoginCredentials(); }
+    private async void SetDefaultCompanyClick(object? sender, RoutedEventArgs e) => await model.SetDefaultCompany();
+    private async void ClearDefaultCompanyClick(object? sender, RoutedEventArgs e) => await model.ClearDefaultCompany();
     private void FinanceDirectionSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (sender is not ComboBox box || !(box.IsDropDownOpen || box.IsKeyboardFocusWithin)) return;

@@ -22,16 +22,18 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
     private bool contractorsLoaded;
     private bool disposed;
 
-    public MainViewModel(Func<string, IVatowiecApiClient>? connect = null, TimeProvider? clock = null)
+    public MainViewModel(Func<string, IVatowiecApiClient>? connect = null, TimeProvider? clock = null,
+        ILoginPreferencesStore? preferencesStore = null, ILoginCredentialStore? credentialStore = null)
     {
         this.connect = connect ?? VatowiecApiClient.Connect;
         this.clock = clock ?? TimeProvider.System;
-        ApiAddress = Environment.GetEnvironmentVariable("VATOWIEC_API_URL") ?? "https://localhost:7243";
+        this.preferencesStore = preferencesStore ?? new MemoryLoginPreferencesStore();
+        this.credentialStore = credentialStore ?? new UnavailableLoginCredentialStore();
+        configuredApiAddress = Environment.GetEnvironmentVariable("VATOWIEC_API_URL");
+        apiAddress = configuredApiAddress ?? "https://localhost:7243";
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
-    public string ApiAddress { get; set; }
-    public string UserName { get; set; } = "";
     public bool IsBusy => busy;
     public bool CanInteract => !busy;
     public bool IsLogin => session is null;
@@ -45,7 +47,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
     public CompanyResponse? SelectedCompany
     {
         get => selectedCompany;
-        set { selectedCompany = value; Changed(); }
+        set { selectedCompany = value; Changed(); Changed(nameof(CanSetDefaultCompany)); }
     }
     public ContractorResponse[] Contractors => contractors;
     public bool CanViewContractors => IsWorkspace && selectedCompany?.CanViewContractors == true;
@@ -55,19 +57,30 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public async Task Login(string password)
     {
-        if (busy || !IsLogin) return;
+        if (busy || disposed || !IsLogin) return;
         await Run(async () =>
         {
-            if (string.IsNullOrWhiteSpace(UserName) || string.IsNullOrEmpty(password))
-                throw new ArgumentException("Wpisz login i hasło.");
+            if (string.IsNullOrWhiteSpace(UserName)) throw new ArgumentException("Wpisz login i hasło.");
+            var target = new LoginTarget(ApiAddress, UserName);
+            var remember = RememberCredentials; var automatic = AutomaticLogin;
+            var warning = ReadLoginPreferences();
+            if (string.IsNullOrEmpty(password) && credentialStore.Contains(target))
+                password = credentialStore.Read(target) ?? "";
+            if (string.IsNullOrEmpty(password)) throw new ArgumentException("Wpisz hasło. Nie znaleziono zapamiętanego poświadczenia dla tego serwera i loginu.");
             ResetSession();
-            api = connect(ApiAddress.Trim());
-            session = await api.Login(UserName.Trim(), password);
+            api = connect(target.ApiAddress);
+            session = await api.Login(target.UserName, password);
+            signedInLoginTarget = target;
+            if (!startingAutomaticLogin) warning = RememberSuccessfulLogin(target, password, remember, automatic) ?? warning;
+            password = "";
             ChangedAll();
             companies = await api.Companies();
+            if (warning != null) message = warning;
+            await OpenDefaultCompanyAfterLogin(target);
             ChangedAll();
         });
         if (session is null) ResetSession();
+        password = "";
     }
 
     public Task RefreshCompanies() => Run(async () =>
@@ -78,7 +91,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         companies = await api.Companies();
     });
 
-    public Task OpenCompany() => Run(async () =>
+    public Task OpenCompany() => Run(OpenCompanyCore);
+
+    private async Task OpenCompanyCore()
     {
         if (api is null || session is null || selectedCompany is null)
             throw new ArgumentException("Wybierz firmę z listy.");
@@ -87,7 +102,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         var result = await api.Profile(id);
         if (result.CompanyId != id) throw new ApiException(502, "API zwróciło dane innej firmy. Odmowa wyświetlenia danych.");
         profile = result;
-    });
+    }
 
     public Task OpenClickedCompany(CompanyResponse company)
     {
@@ -128,16 +143,27 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         if (api is not null) companies = await api.Companies();
     });
 
-    public Task Logout() => Run(async () =>
+    public Task Logout()
     {
-        try { if (api is not null) await api.Logout(); }
-        catch (Exception ex) when (IsExpected(ex))
+        if (busy || disposed) return Task.CompletedTask;
+        // An explicit logout must also disable startup login if CheckExpiry in Run
+        // discovers that the server session has just expired.
+        var preferenceWarning = DisableAutomaticLogin();
+        return Run(async () =>
         {
-            if (ex is not ApiException { StatusCode: 401 })
-                message = "Wylogowano lokalnie. Nie potwierdzono wylogowania na serwerze; sesja wygaśnie zgodnie z terminem ważności.";
-        }
-        finally { ResetSession(); }
-    });
+            try { if (api is not null) await api.Logout(); }
+            catch (Exception ex) when (IsExpected(ex))
+            {
+                if (ex is not ApiException { StatusCode: 401 })
+                    message = "Wylogowano lokalnie. Nie potwierdzono wylogowania na serwerze; sesja wygaśnie zgodnie z terminem ważności.";
+            }
+            finally
+            {
+                ResetSession();
+                if (preferenceWarning != null) message = preferenceWarning + " " + message;
+            }
+        });
+    }
 
     // Nie usuwamy sesji podczas aktywnego żądania. Run ponownie sprawdzi termin po odpowiedzi.
     public void CheckExpiry()
@@ -171,6 +197,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
             }
             message = ex.Message;
         }
+        catch (LocalLoginStorageException ex) { message = ex.Message; }
         catch (ArgumentException ex) { message = ex.Message; }
         catch (Exception ex) when (IsExpected(ex))
         {
@@ -200,6 +227,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         api?.Dispose();
         api = null;
         session = null;
+        signedInLoginTarget = null;
         ResetGusSettings();
         companies = [];
         selectedCompany = null;

@@ -20,6 +20,7 @@
       <StackPanel Grid.Column="1" IsVisible="{Binding !IsLogin}" HorizontalAlignment="Right">
         <TextBlock Text="{Binding CurrentUser}" FontWeight="SemiBold" AutomationProperties.AutomationId="CurrentUser" />
         <TextBlock Text="{Binding SessionExpiry}" Opacity="0.7" />
+        <Button Content="Zapomnij dane logowania" Click="ForgetLoginClick" AutomationProperties.AutomationId="ForgetLoginSignedIn"/>
       </StackPanel>
     </Grid>
 
@@ -33,27 +34,34 @@
           <TextBox x:Name="LoginInput" Text="{Binding UserName, Mode=TwoWay}" MaxLength="256"
                    AutomationProperties.AutomationId="Login" />
           <TextBlock Text="Hasło" />
-          <TextBox x:Name="PasswordInput" PasswordChar="●" MaxLength="1024" KeyDown="PasswordKeyDown"
+          <TextBox x:Name="PasswordInput" PasswordChar="●" MaxLength="1024" KeyDown="PasswordKeyDown" PlaceholderText="{Binding SavedPasswordMask}"
                    AutomationProperties.AutomationId="Password" />
+          <TextBlock Text="{Binding SavedPasswordStatus}" IsVisible="{Binding HasSavedPassword}" AutomationProperties.AutomationId="SavedPasswordStatus"/>
+          <CheckBox Content="Zapamiętaj dane logowania na tym komputerze" IsChecked="{Binding RememberCredentials, Mode=TwoWay}" AutomationProperties.AutomationId="RememberCredentials"/>
+          <CheckBox Content="Loguj automatycznie przy uruchomieniu" IsChecked="{Binding AutomaticLogin, Mode=TwoWay}" IsEnabled="{Binding RememberCredentials}" AutomationProperties.AutomationId="AutomaticLogin"/>
           <Button Content="Zaloguj się" Click="LoginClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                   Margin="0,12,0,0" AutomationProperties.AutomationId="LoginButton" />
-          <TextBlock Text="Hasło i sesja nie są zapisywane w plikach. Wymagany jest zaufany certyfikat HTTPS serwera."
+          <Button Content="Zapomnij dane logowania" Click="ForgetLoginClick" AutomationProperties.AutomationId="ForgetLogin"/>
+          <TextBlock Text="Zapamiętywanie hasła i autologowanie są przeznaczone wyłącznie dla zaufanego konta Windows. Hasło trafia tylko do Windows Credential Manager, sesja pozostaje w pamięci. Puste pole hasła pozwala użyć zapamiętanego poświadczenia dla tego adresu API i loginu. Wymagany jest zaufany certyfikat HTTPS serwera."
                      TextWrapping="Wrap" Opacity="0.7" Margin="0,8,0,0" />
         </StackPanel>
       </ScrollViewer>
 
-      <Grid IsVisible="{Binding IsCompanySelection}" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="14">
+      <Grid IsVisible="{Binding IsCompanySelection}" RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="14">
         <TextBlock Text="Wybierz firmę" FontSize="24" FontWeight="SemiBold" />
         <TextBlock Grid.Row="1" Text="Lista zawiera wyłącznie firmy udostępnione Twojemu kontu. Jeśli jest pusta, odśwież ją lub skontaktuj się z administratorem."
                    TextWrapping="Wrap" />
-        <ListBox Grid.Row="2" ItemsSource="{Binding Companies}" SelectedItem="{Binding SelectedCompany, Mode=TwoWay}" DoubleTapped="CompaniesDoubleTapped"
+        <TextBlock Grid.Row="2" Text="{Binding DefaultCompanyLabel}" FontWeight="SemiBold" TextWrapping="Wrap" AutomationProperties.AutomationId="DefaultCompanyLabel"/>
+        <ListBox Grid.Row="3" ItemsSource="{Binding Companies}" SelectedItem="{Binding SelectedCompany, Mode=TwoWay}" DoubleTapped="CompaniesDoubleTapped"
                  AutomationProperties.AutomationId="Companies" MinHeight="120" />
-        <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="10">
+        <WrapPanel Grid.Row="4">
           <Button Content="Ustawienia instalacji" Click="GusSettingsClick" IsVisible="{Binding IsInstallationAdministrator}" IsEnabled="{Binding CanOpenGusSettings}" AutomationProperties.AutomationId="InstallationSettingsSelection"/>
           <Button Content="Otwórz firmę" Click="OpenCompanyClick" AutomationProperties.AutomationId="OpenCompany" />
+          <Button Content="Ustaw jako domyślną" Click="SetDefaultCompanyClick" IsEnabled="{Binding CanSetDefaultCompany}" AutomationProperties.AutomationId="SetDefaultCompany"/>
+          <Button Content="Usuń firmę domyślną" Click="ClearDefaultCompanyClick" AutomationProperties.AutomationId="ClearDefaultCompany"/>
           <Button Content="Odśwież listę" Click="RefreshCompaniesClick" />
           <Button Content="Wyloguj" Click="LogoutClick" AutomationProperties.AutomationId="LogoutSelection" />
-        </StackPanel>
+        </WrapPanel>
       </Grid>
 
       <Grid IsVisible="{Binding IsBrowsingWorkspace}" RowDefinitions="Auto,Auto,Auto,Auto,Auto,*" RowSpacing="14">

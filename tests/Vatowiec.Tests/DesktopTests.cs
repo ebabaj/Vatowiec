@@ -337,8 +337,18 @@ public sealed partial class DesktopTests
             return Task.FromResult(new DetailResponse(value.Id == 0 ? 1 : value.Id, companyId, contractorId, kind, value.Data, "AAAAAAAAAAE="));
         }
         public (string? Search, string? Country, bool? Active, int Offset, int Limit) LastQuery { get; private set; }
-        public Task<SessionResponse> Login(string userName, string password) => Task.FromResult(new SessionResponse(userName, Expires, InstallationAdmin));
-        public Task<CompanyResponse[]> Companies() => CompanyListError ? throw new HttpRequestException() : Task.FromResult<CompanyResponse[]>(
+        public int LoginCalls { get; private set; }
+        public Exception? LoginError { get; set; }
+        public Task<SessionResponse>? PendingLogin { get; set; }
+        public Action<string, string>? CheckLoginInput { get; set; }
+        public Task<SessionResponse> Login(string userName, string password)
+        {
+            LoginCalls++; CheckLoginInput?.Invoke(userName, password);
+            if (LoginError != null) throw LoginError;
+            return PendingLogin ?? Task.FromResult(new SessionResponse(userName, Expires, InstallationAdmin));
+        }
+        public Task<CompanyResponse[]>? PendingCompanies { get; set; }
+        public Task<CompanyResponse[]> Companies() => CompanyListError ? throw new HttpRequestException() : PendingCompanies ?? Task.FromResult<CompanyResponse[]>(
             [new(A, "Firma A", Permissions), new(B, "Firma B", Permissions)]);
         public List<Guid> ProfileCalls { get; } = [];
         public Task<CompanyProfileResponse>? PendingProfile { get; set; }
