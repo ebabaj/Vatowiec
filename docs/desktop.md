@@ -1,5 +1,9 @@
 # Logowanie i kartoteka kontrahentów w Avalonia
 
+Klienta można zainstalować bez SDK: [Windows 0.1.0-preview](windows-release.md).
+Na drugim stanowisku wymagany jest rzeczywisty adres HTTPS serwera;
+`localhost` oznacza bieżący komputer. [Konfiguracja LAN/VPN](server-lan-vpn.md).
+
 Klient korzysta wyłącznie z API HTTPS. Katalog firm i uprawnienia są w
 Vatowiec_System, a kontrahenci w osobnych Vatowiec_Company_A_Dev/B_Dev.
 Pierwszy etap odczytu opisuje [ADR-016](adr/ADR-016-desktop-logowanie-i-kontekst-firmy.md).

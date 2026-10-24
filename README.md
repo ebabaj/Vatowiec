@@ -1,5 +1,9 @@
 # Otwarty następca VATowca
 
+Lokalne wydanie klienta Windows **0.1.0-preview**: [budowanie, instalacja i aktualizacja](docs/windows-release.md),
+[przygotowanie serwera LAN/VPN](docs/server-lan-vpn.md). Instalator obejmuje tylko klienta,
+bez API/SQL; [wyniki weryfikacji](docs/releases/0.1.0-preview.md).
+
 Projekt wielostanowiskowej aplikacji dla polskich mikrofirm. Obecny stan to
 **kartoteka kontrahentów M0 database-per-company**: logowanie Avalonia,
 wybór firmy, dodawanie/edycja z audytem i konfliktami oraz wyszukiwanie po stronie serwera.

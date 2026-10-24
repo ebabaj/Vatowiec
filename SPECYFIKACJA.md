@@ -7,6 +7,13 @@
 **Główna platforma:** Windows; klient i serwer projektowane także z myślą o Linux  
 **Główny stos:** C# / .NET 10, Avalonia UI, ASP.NET Core, Microsoft SQL Server
 
+ADR-036: lokalny instalator klienta Windows `0.1.0-preview`, per-user, self-contained
+Release win-x64, bez API, SQL i migracji. Aktualizacja i odinstalowanie zachowują
+preferencje oraz Windows Credential Manager. HTTPS i izolacja tożsamości pozostają
+bez zmian. To część dystrybucji E15, bez deklaracji ukończenia M0/E15 lub gotowości
+produkcyjnej. [Budowanie i instalacja](docs/windows-release.md),
+[oddzielne przygotowanie serwera LAN/VPN](docs/server-lan-vpn.md).
+
 > **Cel:** stworzyć bezpłatny w podstawowym użyciu, publicznie rozwijany i realnie rozszerzalny system księgowo-podatkowy dla polskich mikroprzedsiębiorców, jednoosobowych działalności gospodarczych oraz — docelowo — biur rachunkowych. Priorytetem są KPiR, ryczałt, VAT, JPK, deklaracje i KSeF, a nie pełna księgowość.
 
 ---

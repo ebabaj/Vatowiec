@@ -236,7 +236,16 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         catch (ArgumentException ex) { message = ex.Message; }
         catch (Exception ex) when (IsExpected(ex))
         {
-            message = "Nie można połączyć się z API. Sprawdź adres HTTPS, zaufanie certyfikatu i połączenie. Spróbuj ponownie.";
+            message = ex switch
+            {
+                HttpRequestException { HttpRequestError: HttpRequestError.SecureConnectionError } =>
+                    "Nie można potwierdzić bezpiecznego połączenia HTTPS z API. Sprawdź certyfikat serwera: zaufanie, ważność i zgodność nazwy z adresem. Skontaktuj się z administratorem.",
+                TaskCanceledException =>
+                    "Przekroczono czas oczekiwania na API. Sprawdź adres serwera, połączenie LAN lub VPN i dostępność API. Spróbuj ponownie.",
+                JsonException =>
+                    "Serwer nie zwrócił prawidłowej odpowiedzi API VATowca. Sprawdź adres serwera i zgodność wersji klienta oraz API.",
+                _ => "Nie można połączyć się z API. Sprawdź adres HTTPS serwera, połączenie LAN lub VPN i dostępność API. localhost oznacza ten komputer. Spróbuj ponownie."
+            };
         }
         finally
         {

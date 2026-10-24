@@ -32,6 +32,8 @@
           <TextBlock Text="Zaloguj się" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,12" />
           <TextBlock Text="Adres serwera API (HTTPS)" />
           <TextBox Text="{Binding ApiAddress, Mode=TwoWay}" AutomationProperties.AutomationId="ApiAddress" />
+          <TextBlock Text="Na innym komputerze podaj adres HTTPS serwera otrzymany od administratora. localhost oznacza ten komputer."
+                     TextWrapping="Wrap" Opacity="0.7" />
           <TextBlock Text="Login" />
           <TextBox x:Name="LoginInput" Text="{Binding UserName, Mode=TwoWay}" MaxLength="256"
                    AutomationProperties.AutomationId="Login" />
