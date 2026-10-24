@@ -7,6 +7,12 @@
 **Główna platforma:** Windows; klient i serwer projektowane także z myślą o Linux  
 **Główny stos:** C# / .NET 10, Avalonia UI, ASP.NET Core, Microsoft SQL Server
 
+ADR-037: dwa warianty jednego projektu — Personal (Windows, lokalne API i
+SQL Server 2025 Express LocalDB) oraz Network (dotychczasowe API/SQL Server).
+Wspólne modele, migracje, formularze i database-per-company; bez SQLite i bez
+SQL w kliencie. Zweryfikowano izolowany prototyp, nie instalator Personal.
+[Wyniki i brakujące elementy](docs/personal-localdb.md).
+
 ADR-036: lokalny instalator klienta Windows `0.1.0-preview`, per-user, self-contained
 Release win-x64, bez API, SQL i migracji. Aktualizacja i odinstalowanie zachowują
 preferencje oraz Windows Credential Manager. HTTPS i izolacja tożsamości pozostają

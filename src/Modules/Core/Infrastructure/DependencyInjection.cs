@@ -22,12 +22,13 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration,
         bool isDevelopment) =>
-        RegisterInfrastructure(services, _ => configuration.GetConnectionString("VatowiecSystem"), isDevelopment);
+        RegisterInfrastructure(services, _ => configuration.GetConnectionString("VatowiecSystem"), isDevelopment,
+            configuration["Vatowiec:Edition"] == PersonalPrototypeDatabase.Edition);
 
     private static IServiceCollection RegisterInfrastructure(
         IServiceCollection services,
         Func<IServiceProvider, string?> getConnectionString,
-        bool isDevelopment)
+        bool isDevelopment, bool isPersonalPrototype = false)
     {
         services.TryAddScoped<ICompanyContext>(_ => new CompanyContext(null));
         services.AddScoped<IExchangeRateReader, ExchangeRateReader>();
@@ -42,7 +43,7 @@ public static class DependencyInjection
         {
             // Odczyt po złożeniu konfiguracji hosta, w tym nadpisań testowych.
             var connectionString = getConnectionString(provider);
-            DatabaseConnectionPolicy.ValidateSystem(connectionString, isDevelopment);
+            DatabaseConnectionPolicy.ValidateSystem(connectionString, isDevelopment, isPersonalPrototype);
             if (string.IsNullOrWhiteSpace(connectionString))
             {
                 // Konfiguracja providera bez adresu serwera i bez otwierania połączenia.
@@ -64,7 +65,7 @@ public static class DependencyInjection
                 throw new InvalidOperationException("Baza firmy wymaga jawnego wyboru zgodnego z autoryzowanym kontekstem.");
             }
 
-            DatabaseConnectionPolicy.ValidateCompany(selection.ConnectionString, isDevelopment);
+            DatabaseConnectionPolicy.ValidateCompany(selection.ConnectionString, isDevelopment, isPersonalPrototype);
             options.UseSqlServer(selection.ConnectionString);
         });
 

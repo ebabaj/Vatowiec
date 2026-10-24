@@ -4,24 +4,24 @@ namespace Vatowiec.Core.Infrastructure.Persistence;
 
 public static class DatabaseConnectionPolicy
 {
-    public static void ValidateSystem(string? connectionString, bool isDevelopment)
+    public static void ValidateSystem(string? connectionString, bool isDevelopment, bool isPersonalPrototype = false)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
         {
             return; // Status/health i generowanie modelu nadal działają bez SQL.
         }
 
-        var connection = Parse(connectionString, isDevelopment);
-        if (!IsSystemDatabase(connection.InitialCatalog))
+        var connection = Parse(connectionString, isDevelopment, isPersonalPrototype);
+        if (isPersonalPrototype ? !PersonalPrototypeDatabase.IsSystem(connection.InitialCatalog) : !IsSystemDatabase(connection.InitialCatalog))
         {
             throw new InvalidOperationException("Połączenie systemowe musi wskazywać Vatowiec_System lub Vatowiec_System_Test.");
         }
     }
 
-    public static void ValidateCompany(string connectionString, bool isDevelopment)
+    public static void ValidateCompany(string connectionString, bool isDevelopment, bool isPersonalPrototype = false)
     {
-        var connection = Parse(connectionString, isDevelopment);
-        if (IsSystemDatabase(connection.InitialCatalog) ||
+        var connection = Parse(connectionString, isDevelopment, isPersonalPrototype);
+        if (IsSystemDatabase(connection.InitialCatalog) || PersonalPrototypeDatabase.IsSystem(connection.InitialCatalog) ||
             new[] { "Vatowiec_Dev", "master", "model", "msdb", "tempdb" }
                 .Contains(connection.InitialCatalog, StringComparer.OrdinalIgnoreCase))
         {
@@ -33,7 +33,7 @@ public static class DatabaseConnectionPolicy
         string.Equals(database, "Vatowiec_System", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(database, "Vatowiec_System_Test", StringComparison.OrdinalIgnoreCase);
 
-    private static SqlConnectionStringBuilder Parse(string connectionString, bool isDevelopment)
+    private static SqlConnectionStringBuilder Parse(string connectionString, bool isDevelopment, bool isPersonalPrototype)
     {
         SqlConnectionStringBuilder connection;
         try
@@ -51,6 +51,12 @@ public static class DatabaseConnectionPolicy
             connection.Encrypt == SqlConnectionEncryptOption.Optional)
         {
             throw new InvalidOperationException("Wymagany jawny serwer, baza i szyfrowanie SQL; dołączanie plików jest zabronione.");
+        }
+
+        if (isPersonalPrototype)
+        {
+            PersonalPrototypeDatabase.Validate(connection);
+            return connection; // Private LocalDB IPC only; never changes Network SQL/TLS policy.
         }
 
         if (connection.TrustServerCertificate)

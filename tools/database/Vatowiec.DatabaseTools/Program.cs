@@ -1,9 +1,21 @@
 using Vatowiec.DatabaseTools;
 
+// Deliberately before EnsureLocalServer: this command must never contact SQLEXPRESS.
+if (args is ["personal-prototype"])
+{
+    if (!OperatingSystem.IsWindows()) return 2;
+    try { await PersonalPrototype.Run(); return 0; }
+    catch (Exception error)
+    {
+        Console.Error.WriteLine($"Personal prototype failed ({error.GetType().Name}). No reset or automatic cleanup was performed. Inspect the isolated prototype only.");
+        return 1;
+    }
+}
+
 if (args.Length is < 1 or > 2 || (args.Length == 2 && args[0] is not ("verify-users" or "grant-installation-admin")) ||
     (args[0] == "grant-installation-admin" && args.Length != 2) || args[0] is not ("inspect" or "initialize" or "prepare-tests" or "cleanup-tests" or "verify" or "test" or "seed-users" or "backup-system" or "migrate-system" or "migrate-contractors" or "verify-users" or "probe-registries" or "grant-installation-admin"))
 {
-    Console.Error.WriteLine("Użycie: inspect | initialize | prepare-tests | cleanup-tests | verify | test | seed-users | backup-system | migrate-system | migrate-contractors | verify-users [https://localhost:7243] | grant-installation-admin <login>");
+    Console.Error.WriteLine("Użycie: personal-prototype | inspect | initialize | prepare-tests | cleanup-tests | verify | test | seed-users | backup-system | migrate-system | migrate-contractors | verify-users [https://localhost:7243] | grant-installation-admin <login>");
     return 2;
 }
 

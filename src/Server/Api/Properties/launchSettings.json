@@ -8,6 +8,15 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
+    },
+    "PersonalPrototype": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "PersonalPrototype",
+        "DOTNET_ENVIRONMENT": "PersonalPrototype"
+      }
     }
   }
 }

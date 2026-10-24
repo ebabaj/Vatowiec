@@ -1,5 +1,8 @@
 # Otwarty następca VATowca
 
+[VATowiec Personal — sprawdzony prototyp LocalDB 2025](docs/personal-localdb.md):
+wspólny kod z Network, bez gotowego jeszcze instalatora Personal.
+
 Lokalne wydanie klienta Windows **0.1.0-preview**: [budowanie, instalacja i aktualizacja](docs/windows-release.md),
 [przygotowanie serwera LAN/VPN](docs/server-lan-vpn.md). Instalator obejmuje tylko klienta,
 bez API/SQL; [wyniki weryfikacji](docs/releases/0.1.0-preview.md).

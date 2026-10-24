@@ -6,6 +6,8 @@ using System.Text.Json.Serialization;
 using Vatowiec.SharedContracts;
 
 var builder = WebApplication.CreateBuilder(args);
+if (builder.Environment.IsEnvironment(PersonalPrototypeDatabase.Edition))
+    Vatowiec.Api.Hosting.PersonalPrototypeConfiguration.Configure(builder);
 
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();

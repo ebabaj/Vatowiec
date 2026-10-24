@@ -1,5 +1,9 @@
 # Lokalne bazy database-per-company — ADR-018–024
 
+Osobny eksperyment **Personal / LocalDB 2025**: [ADR-037 i wyniki](personal-localdb.md).
+Używa nowej prywatnej instancji i nowych baz; nie uruchamia opisanych poniżej
+historycznych resetów ani operacji na istniejącym SQLEXPRESS.
+
 Wdrożenie używa localhost\SQLEXPRESS, SQL Server 2025 Express i Windows
 Authentication. Wszystkie dane demonstracyjne są fikcyjne i odtwarzalne.
 Decyzje: [ADR-014](adr/ADR-014-database-per-company.md),

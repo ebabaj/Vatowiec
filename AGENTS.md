@@ -2,6 +2,15 @@
 
 Projekt: **Otwarty następca VATowca** (nazwa robocza).  
 Główne źródło wymagań: [`SPECYFIKACJA.md`](./SPECYFIKACJA.md).  
+
+Eksperyment Personal (ADR-037): [docs/personal-localdb.md](docs/personal-localdb.md).
+Nowa prywatna instancja `VatowiecPersonal_Prototype` i trzy bazy
+`Vatowiec_Personal_Prototype_System/Company_A/Company_B` są odrębne od Network.
+Komenda `personal-prototype` nie korzysta z resetującego runnera. Zajęte nazwy
+lub katalog kończą tworzenie; nie usuwaj danych, aby wymusić powtórkę.
+Profil jest jawny, nie zmienia konfiguracji Network, nie instaluje LocalDB
+automatycznie. Przy zadaniach Personal nie migruj ani nie resetuj istniejącego
+SQLEXPRESS i domyślnego MSSQLLocalDB. Build wyłącznie standardowy Debug.
 Status: historia/ważność haseł i archiwizacja tożsamości, 2026-10-24; ADR-035.
 
 **Aktualny etap: użytkownicy i uprawnienia instalacji (ADR-033).**
