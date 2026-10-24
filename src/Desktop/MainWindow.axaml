@@ -3,12 +3,14 @@
         x:Class="Vatowiec.Desktop.MainWindow"
         xmlns:vm="using:Vatowiec.Desktop.ViewModels"
         xmlns:contracts="using:Vatowiec.SharedContracts"
+        xmlns:converters="using:Vatowiec.Desktop.Converters"
         x:DataType="vm:MainViewModel"
         Title="VATowiec — firmy i kontrahenci"
         Width="1180" Height="860"
         MinWidth="900" MinHeight="500"
         KeyDown="WindowKeyDown"
         WindowStartupLocation="CenterScreen">
+  <Window.Resources><converters:FinanceCurrencyLabelConverter x:Key="FinanceCurrencyLabel"/></Window.Resources>
   <Grid RowDefinitions="Auto,*,Auto,Auto" Margin="32" RowSpacing="18">
     <Grid ColumnDefinitions="*,Auto">
       <StackPanel>
@@ -44,7 +46,7 @@
         <TextBlock Text="Wybierz firmę" FontSize="24" FontWeight="SemiBold" />
         <TextBlock Grid.Row="1" Text="Lista zawiera wyłącznie firmy udostępnione Twojemu kontu. Jeśli jest pusta, odśwież ją lub skontaktuj się z administratorem."
                    TextWrapping="Wrap" />
-        <ListBox Grid.Row="2" ItemsSource="{Binding Companies}" SelectedItem="{Binding SelectedCompany, Mode=TwoWay}"
+        <ListBox Grid.Row="2" ItemsSource="{Binding Companies}" SelectedItem="{Binding SelectedCompany, Mode=TwoWay}" DoubleTapped="CompaniesDoubleTapped"
                  AutomationProperties.AutomationId="Companies" MinHeight="120" />
         <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="10">
           <Button Content="Ustawienia instalacji" Click="GusSettingsClick" IsVisible="{Binding IsInstallationAdministrator}" IsEnabled="{Binding CanOpenGusSettings}" AutomationProperties.AutomationId="InstallationSettingsSelection"/>
@@ -138,10 +140,46 @@
         </WrapPanel>
         <ScrollViewer Grid.Row="2" MaxHeight="125"><StackPanel><TextBlock Text="Daty od/do są używane tylko w trybie „Za okres”; to daty publikacji, nie dokumentów. A/B: średni. C: kupna i sprzedaży. NBP nie wymaga klucza. PLN nie jest pobierany." TextWrapping="Wrap" Opacity="0.75"/><TextBlock Text="{Binding RateImportSummary}" TextWrapping="Wrap" AutomationProperties.AutomationId="NbpSummary"/></StackPanel></ScrollViewer>
         <Grid Grid.Row="3" IsVisible="{Binding IsCurrencySettings}" ColumnDefinitions="*,*" ColumnSpacing="18">
-          <Grid RowDefinitions="Auto,*" RowSpacing="6"><TextBox Text="{Binding CurrencySearch, Mode=TwoWay}" PlaceholderText="Szukaj kodu lub nazwy waluty" AutomationProperties.AutomationId="CurrencySearch"/><ListBox Grid.Row="1" ItemsSource="{Binding VisibleCurrencyRows}" SelectedItem="{Binding SelectedCurrency, Mode=TwoWay}" AutomationProperties.AutomationId="CurrencyList"/></Grid>
+          <Grid RowDefinitions="Auto,Auto,*" RowSpacing="6">
+            <TextBox Text="{Binding CurrencySearch, Mode=TwoWay}" PlaceholderText="Szukaj kodu lub nazwy waluty" AutomationProperties.AutomationId="CurrencySearch"/>
+            <StackPanel Grid.Row="1" Spacing="5">
+              <WrapPanel IsEnabled="{Binding CanStartCurrencyActivity}">
+                <Button Content="Zaznacz widoczne" Click="SelectVisibleCurrenciesClick" AutomationProperties.AutomationId="SelectVisibleCurrencies"/>
+                <Button Content="Zaznacz wszystkie" Click="SelectAllCurrenciesClick" AutomationProperties.AutomationId="SelectAllCurrencies"/>
+                <Button Content="Wyczyść zaznaczenie" Click="ClearCurrencySelectionClick" AutomationProperties.AutomationId="ClearCurrencySelection"/>
+              </WrapPanel>
+              <TextBlock Text="{Binding CurrencySelectionCount}" AutomationProperties.AutomationId="CurrencySelectionCount"/>
+            </StackPanel>
+            <ListBox Grid.Row="2" ItemsSource="{Binding VisibleCurrencySelections}" SelectedItem="{Binding SelectedCurrencySelection, Mode=TwoWay}" AutomationProperties.AutomationId="CurrencyList">
+              <ListBox.ItemTemplate><DataTemplate x:DataType="vm:CurrencySelection">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" IsEnabled="{Binding $parent[Window].((vm:MainViewModel)DataContext).CanStartCurrencyActivity}" AutomationProperties.AutomationId="CurrencyBulkCheck" AutomationProperties.Name="{Binding Code}"/>
+                  <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
+                </StackPanel>
+              </DataTemplate></ListBox.ItemTemplate>
+            </ListBox>
+          </Grid>
           <ScrollViewer Grid.Column="1"><StackPanel Spacing="10">
+            <StackPanel Spacing="6" IsEnabled="{Binding CanStartCurrencyActivity}">
+              <TextBlock Text="Zbiorowa zmiana aktywności" FontWeight="SemiBold"/>
+              <WrapPanel>
+                <Button Content="Aktywuj zaznaczone" Click="ActivateCurrenciesClick" AutomationProperties.AutomationId="ActivateCurrencies"/>
+                <Button Content="Dezaktywuj zaznaczone" Click="DeactivateCurrenciesClick" AutomationProperties.AutomationId="DeactivateCurrencies"/>
+                <Button Content="Aktywuj wszystkie" Click="ActivateAllCurrenciesClick" AutomationProperties.AutomationId="ActivateAllCurrencies"/>
+                <Button Content="Dezaktywuj wszystkie" Click="DeactivateAllCurrenciesClick" AutomationProperties.AutomationId="DeactivateAllCurrencies"/>
+              </WrapPanel>
+            </StackPanel>
+            <Border IsVisible="{Binding CurrencyActivityPrompt}" BorderBrush="Orange" BorderThickness="2" Padding="10">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding CurrencyActivityConfirmation}" TextWrapping="Wrap" AutomationProperties.AutomationId="CurrencyActivityConfirmation"/>
+                <WrapPanel IsEnabled="{Binding CanInteract}">
+                  <Button Content="Potwierdź zmianę zbiorczą" Click="ConfirmCurrencyActivityClick" AutomationProperties.AutomationId="ConfirmCurrencyActivity"/>
+                  <Button Content="Anuluj" Click="CancelCurrencyActivityClick" AutomationProperties.AutomationId="CancelCurrencyActivity"/>
+                </WrapPanel>
+              </StackPanel>
+            </Border>
             <TextBlock Text="{Binding CurrencyEditor.Label}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"/>
-            <StackPanel IsEnabled="{Binding CanConfigureCurrencies}" Spacing="7">
+            <StackPanel IsEnabled="{Binding CanEditCurrencySettings}" Spacing="7">
               <CheckBox Content="Waluta aktywna" IsChecked="{Binding CurrencyEditor.IsActive, Mode=TwoWay}" IsEnabled="{Binding !CurrencyEditor.IsPln}" AutomationProperties.AutomationId="CurrencyActive"/>
               <StackPanel IsEnabled="{Binding CanChooseCurrencyTables}">
                 <CheckBox Content="Tabela A — kurs średni" IsChecked="{Binding CurrencyEditor.DownloadA, Mode=TwoWay}" AutomationProperties.AutomationId="CurrencyA"/>
@@ -155,7 +193,8 @@
         </Grid>
         <Grid Grid.Row="3" IsVisible="{Binding IsRateList}" RowDefinitions="Auto,Auto,*,Auto,Auto" RowSpacing="6">
           <WrapPanel>
-            <ComboBox Width="200" ItemsSource="{Binding CurrencyRows}" SelectedItem="{Binding RateCurrencyFilter, Mode=TwoWay}" PlaceholderText="Wszystkie waluty" AutomationProperties.AutomationId="RateCurrencyFilter"/>
+            <ComboBox Width="300" ItemsSource="{Binding RateCurrencyChoices}" SelectedItem="{Binding SelectedRateCurrency, Mode=OneWay}" SelectionChanged="RateCurrencySelectionChanged" ToolTip.Tip="{Binding SelectedRateCurrency}" AutomationProperties.AutomationId="RateCurrencyFilter"/>
+            <CheckBox Content="Pokaż nieaktywne (archiwum)" IsChecked="{Binding ShowInactiveRateCurrencies, Mode=OneWay}" Click="ShowInactiveRateCurrenciesClick" AutomationProperties.AutomationId="ShowInactiveRateCurrencies"/>
             <ComboBox SelectedIndex="{Binding RateTableFilter, Mode=TwoWay}" AutomationProperties.AutomationId="RateTableFilter"><ComboBoxItem Content="Wszystkie tabele"/><ComboBoxItem Content="A — średni"/><ComboBoxItem Content="B — średni"/><ComboBoxItem Content="C — kupna/sprzedaży"/></ComboBox>
             <DatePicker SelectedDate="{Binding RateFromFilter, Mode=TwoWay}" AutomationProperties.AutomationId="RateFilterFrom"/><DatePicker SelectedDate="{Binding RateToFilter, Mode=TwoWay}" AutomationProperties.AutomationId="RateFilterTo"/>
             <CheckBox Content="Najnowsze najpierw" IsChecked="{Binding RateDescending, Mode=TwoWay}"/>
@@ -370,7 +409,7 @@
             <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="24" RowSpacing="14" IsEnabled="{Binding CanEditFinance}">
               <StackPanel Spacing="5"><TextBlock Text="Termin płatności (dni)"/><TextBox Text="{Binding TradeTermsEditor.Days, Mode=TwoWay}" Width="140" HorizontalAlignment="Left" MaxLength="10" PlaceholderText="0–3650" TabIndex="10" AutomationProperties.AutomationId="TradePaymentDays"/></StackPanel>
               <StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="Sposób płatności"/><ComboBox ItemsSource="{Binding TradePaymentChoices}" SelectedItem="{Binding SelectedTradePayment, Mode=OneWay}" SelectionChanged="TradePaymentSelectionChanged" HorizontalAlignment="Stretch" TabIndex="20" AutomationProperties.AutomationId="TradePaymentMethod"/></StackPanel>
-              <StackPanel Grid.Row="1" Spacing="5"><TextBlock Text="Domyślna waluta"/><ComboBox ItemsSource="{Binding TradeCurrencyChoices}" SelectedItem="{Binding SelectedTradeCurrency, Mode=OneWay}" SelectionChanged="TradeCurrencySelectionChanged" HorizontalAlignment="Stretch" TabIndex="30" AutomationProperties.AutomationId="TradeCurrency"/></StackPanel>
+              <StackPanel Grid.Row="1" Spacing="5"><TextBlock Text="Domyślna waluta"/><ComboBox ItemsSource="{Binding TradeCurrencyChoices}" SelectedItem="{Binding SelectedTradeCurrency, Mode=OneWay}" SelectionChanged="TradeCurrencySelectionChanged" HorizontalAlignment="Stretch" TabIndex="30" AutomationProperties.AutomationId="TradeCurrency"><ComboBox.Styles><Style Selector="ComboBoxItem" x:DataType="contracts:FinanceCurrency"><Setter Property="IsEnabled" Value="{Binding IsActive}"/></Style></ComboBox.Styles></ComboBox></StackPanel>
               <StackPanel Grid.Row="1" Grid.Column="1" Spacing="5"><TextBlock Text="Domyślny rabat (%)"/><TextBox Text="{Binding TradeTermsEditor.Discount, Mode=TwoWay}" Width="140" HorizontalAlignment="Left" MaxLength="20" PlaceholderText="0–100" TabIndex="40" AutomationProperties.AutomationId="TradeDiscount"/></StackPanel>
             </Grid>
             <StackPanel Spacing="6" IsEnabled="{Binding CanEditFinance}">
@@ -381,16 +420,16 @@
             <StackPanel Spacing="8">
             <TextBlock Text="Limity kupieckie według waluty" FontSize="19" FontWeight="SemiBold"/>
             <TextBlock Text="Kwoty nie są wykorzystaniem limitu ani saldem. Zapis nie blokuje sprzedaży i nie przelicza walut." TextWrapping="Wrap"/>
-            <Grid ColumnDefinitions="100,*,140" Margin="12,0"><TextBlock Text="Waluta" FontWeight="SemiBold"/><TextBlock Grid.Column="1" Text="Kwota limitu" FontWeight="SemiBold"/><TextBlock Grid.Column="2" Text="Status" FontWeight="SemiBold"/></Grid>
+            <Grid ColumnDefinitions="170,*,140" Margin="12,0"><TextBlock Text="Waluta" FontWeight="SemiBold"/><TextBlock Grid.Column="1" Text="Kwota limitu" FontWeight="SemiBold"/><TextBlock Grid.Column="2" Text="Status" FontWeight="SemiBold"/></Grid>
             <ListBox ItemsSource="{Binding CreditLimits}" SelectedItem="{Binding SelectedCreditLimit, Mode=TwoWay}" MinHeight="70" MaxHeight="180" TabIndex="70" AutomationProperties.AutomationId="CreditLimits">
               <ListBox.Styles><Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style></ListBox.Styles>
-              <ListBox.ItemTemplate><DataTemplate x:DataType="contracts:CreditLimitResponse"><Grid ColumnDefinitions="100,*,140" Margin="4"><TextBlock Text="{Binding CurrencyCode}"/><TextBlock Grid.Column="1" Text="{Binding Amount, StringFormat='{}{0:0.########}'}"/><TextBlock Grid.Column="2" IsVisible="{Binding IsActive}" Text="Aktywny"/><TextBlock Grid.Column="2" IsVisible="{Binding !IsActive}" Text="Nieaktywny"/></Grid></DataTemplate></ListBox.ItemTemplate>
+              <ListBox.ItemTemplate><DataTemplate x:DataType="contracts:CreditLimitResponse"><Grid ColumnDefinitions="170,*,140" Margin="4"><TextBlock><TextBlock.Text><MultiBinding Converter="{StaticResource FinanceCurrencyLabel}"><Binding Path="CurrencyCode"/><Binding Path="$parent[Window].((vm:MainViewModel)DataContext).FinanceCurrencies"/></MultiBinding></TextBlock.Text></TextBlock><TextBlock Grid.Column="1" Text="{Binding Amount, StringFormat='{}{0:0.########}'}"/><TextBlock Grid.Column="2" IsVisible="{Binding IsActive}" Text="Aktywny"/><TextBlock Grid.Column="2" IsVisible="{Binding !IsActive}" Text="Nieaktywny"/></Grid></DataTemplate></ListBox.ItemTemplate>
             </ListBox>
             <WrapPanel><Button Content="Poprzednie" Click="PreviousLimitsClick" IsEnabled="{Binding HasPreviousCreditLimits}"/><TextBlock Text="{Binding CreditLimitPage}" VerticalAlignment="Center"/><Button Content="Następne" Click="NextLimitsClick" IsEnabled="{Binding HasNextCreditLimits}"/></WrapPanel>
             <WrapPanel IsEnabled="{Binding CanEditFinance}"><Button Content="Nowy limit (Ctrl+N)" Click="NewLimitClick" AutomationProperties.AutomationId="NewCreditLimit"/><Button Content="Edytuj limit / dezaktywuj (F2)" Click="EditLimitClick" AutomationProperties.AutomationId="EditCreditLimit"/></WrapPanel>
             <Border IsVisible="{Binding IsCreditLimitEditing}" BorderBrush="#999999" BorderThickness="1" Padding="12">
               <StackPanel Spacing="8" IsEnabled="{Binding CanEditFinance}">
-                <Grid ColumnDefinitions="*,*" ColumnSpacing="24"><StackPanel Spacing="5"><TextBlock Text="Waluta limitu"/><ComboBox ItemsSource="{Binding FinanceCurrencies}" SelectedItem="{Binding SelectedLimitCurrency, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.AutomationId="LimitCurrency"/></StackPanel><StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="Kwota limitu"/><TextBox Text="{Binding CreditLimitEditor.Amount, Mode=TwoWay}" Width="200" HorizontalAlignment="Left" MaxLength="32" AutomationProperties.AutomationId="LimitAmount"/></StackPanel></Grid>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="24"><StackPanel Spacing="5"><TextBlock Text="Waluta limitu"/><ComboBox ItemsSource="{Binding LimitCurrencyChoices}" SelectedItem="{Binding SelectedLimitCurrency, Mode=OneWay}" SelectionChanged="LimitCurrencySelectionChanged" HorizontalAlignment="Stretch" AutomationProperties.AutomationId="LimitCurrency"><ComboBox.Styles><Style Selector="ComboBoxItem" x:DataType="contracts:FinanceCurrency"><Setter Property="IsEnabled" Value="{Binding IsActive}"/></Style></ComboBox.Styles></ComboBox></StackPanel><StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="Kwota limitu"/><TextBox Text="{Binding CreditLimitEditor.Amount, Mode=TwoWay}" Width="200" HorizontalAlignment="Left" MaxLength="32" AutomationProperties.AutomationId="LimitAmount"/></StackPanel></Grid>
                 <CheckBox Content="Limit aktywny" IsChecked="{Binding CreditLimitEditor.IsActive, Mode=TwoWay}" AutomationProperties.AutomationId="LimitActive"/><WrapPanel><Button Content="Zapisz limit" Click="SaveLimitClick" IsEnabled="{Binding CanSaveFinance}" AutomationProperties.AutomationId="SaveCreditLimit"/><Button Content="Anuluj szkic limitu" Click="CancelLimitClick" AutomationProperties.AutomationId="CancelCreditLimit"/></WrapPanel>
               </StackPanel>
             </Border>

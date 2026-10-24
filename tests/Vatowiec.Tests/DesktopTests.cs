@@ -264,12 +264,36 @@ public sealed partial class DesktopTests
         public List<CurrencyWriteRequest> CurrencyWrites { get; } = [];
         public int NbpImports { get; private set; }
         public CurrencyHistoryResponse[] CurrencyHistoryData { get; set; } = [];
-        public Task<CurrencyResponse[]> Currencies(Guid companyId) => Task.FromResult<CurrencyResponse[]>([
+        public CurrencyResponse[]? CurrencyData { get; set; }
+        public CurrencyResponse[] CurrenciesWithRatesData { get; set; } = [];
+        public int ArchiveCurrencyReads { get; private set; }
+        public Task<CurrencyResponse[]> CurrenciesWithRates(Guid companyId)
+        { ArchiveCurrencyReads++; return Task.FromResult(CurrenciesWithRatesData); }
+        public RateResponse[] StoredRates { get; set; } = [];
+        public (string? Code, string? Table, DateOnly? From, DateOnly? To, int Offset, bool Descending) LastRateQuery { get; private set; }
+        public Task<CurrencyResponse[]> Currencies(Guid companyId) => Task.FromResult<CurrencyResponse[]>(CurrencyData ?? [
             new(companyId, "PLN", "złoty", true, false, false, false, "AAAAAAAAAAE="),
             new(companyId, "EUR", "euro", true, true, false, false, "AAAAAAAAAAE=")]);
         public Task<CurrencyResponse> SaveCurrency(Guid companyId, string currencyCode, CurrencyWriteRequest value)
         { CurrencyWrites.Add(value); return Task.FromResult(new CurrencyResponse(companyId, currencyCode, "euro", value.IsActive, value.DownloadA, value.DownloadB, value.DownloadC, "AAAAAAAAAAI=")); }
-        public Task<RatePage> Rates(Guid companyId, string? code, string? table, DateOnly? from, DateOnly? to, int offset, bool descending) => Task.FromResult(new RatePage(companyId, [], null, null, null));
+        public List<CurrencyActivityRequest> ActivityWrites { get; } = [];
+        public Exception? ActivityError { get; set; }
+        public Task<CurrencyActivityResponse> ChangeCurrencyActivity(Guid companyId, CurrencyActivityRequest value)
+        {
+            ActivityWrites.Add(value);
+            if (ActivityError != null) throw ActivityError;
+            var rows = CurrencyData!;
+            var changed = rows.Where(x => value.Currencies.Any(v => v.Code == x.Code) && x.IsActive != value.IsActive && (value.IsActive || x.Code != "PLN"))
+                .Select(x => x with { IsActive = value.IsActive, DownloadA = value.IsActive && x.DownloadA, DownloadB = value.IsActive && x.DownloadB, DownloadC = value.IsActive && x.DownloadC, RowVersion = "AAAAAAAAAAI=" }).ToArray();
+            CurrencyData = rows.Select(x => changed.FirstOrDefault(c => c.Code == x.Code) ?? x).ToArray();
+            return Task.FromResult(new CurrencyActivityResponse(companyId, value.IsActive, changed, value.Currencies.Where(x => changed.All(c => c.Code != x.Code)).Select(x => x.Code).ToArray()));
+        }
+        public Task<RatePage> Rates(Guid companyId, string? code, string? table, DateOnly? from, DateOnly? to, int offset, bool descending)
+        {
+            LastRateQuery = (code, table, from, to, offset, descending);
+            return Task.FromResult(new RatePage(companyId, StoredRates.Where(x => (code == null || x.CurrencyCode == code) &&
+                (table == null || x.TableType == table) && (from == null || x.EffectiveDate >= from) && (to == null || x.EffectiveDate <= to)).Skip(offset).Take(51).ToArray(), null, null, null));
+        }
         public Task<RateImportResponse> ImportRates(Guid companyId, RateImportRequest value)
         { NbpImports++; return Task.FromResult(new RateImportResponse(1, companyId, 0, 0, 0, [], [], [], value.From, value.To, null, null, null)); }
         public Task<CurrencyHistoryResponse[]> CurrencyHistory(Guid companyId, int offset) => Task.FromResult(CurrencyHistoryData);
@@ -316,7 +340,11 @@ public sealed partial class DesktopTests
         public Task<SessionResponse> Login(string userName, string password) => Task.FromResult(new SessionResponse(userName, Expires, InstallationAdmin));
         public Task<CompanyResponse[]> Companies() => CompanyListError ? throw new HttpRequestException() : Task.FromResult<CompanyResponse[]>(
             [new(A, "Firma A", Permissions), new(B, "Firma B", Permissions)]);
-        public Task<CompanyProfileResponse> Profile(Guid id) => Task.FromResult(new CompanyProfileResponse(WrongCompany ? B : id, $"Firma {id}", null, null));
+        public List<Guid> ProfileCalls { get; } = [];
+        public Task<CompanyProfileResponse>? PendingProfile { get; set; }
+        public Exception? ProfileError { get; set; }
+        public Task<CompanyProfileResponse> Profile(Guid id)
+        { ProfileCalls.Add(id); if (ProfileError != null) throw ProfileError; return PendingProfile ?? Task.FromResult(new CompanyProfileResponse(WrongCompany ? B : id, $"Firma {id}", null, null)); }
         public Task<ContractorResponse> Contractor(Guid companyId, int id) => Task.FromResult(new ContractorResponse(id, companyId, "DEMO", "Kontrahent", "PL", RowVersion: "AAAAAAAAAAE="));
         public Task<ContractorResponse> SaveContractor(Guid companyId, ContractorWriteRequest value, bool isNew)
         {

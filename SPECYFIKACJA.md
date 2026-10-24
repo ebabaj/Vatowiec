@@ -127,6 +127,7 @@ Wyłączenie oznacza brak w pierwszym wydaniu, nie zakaz dodania później.
 ### 3.6. Pierwszy scenariusz Avalonia (M0, ADR-016)
 
 - Polski klient loguje przez API HTTPS, pobiera dostępne firmy, otwiera profil wybranej firmy i odczytuje kontrahentów. Zmiana firmy i wylogowanie nie wymagają restartu. Okno pokazuje aktualną firmę, użytkownika i termin sesji.
+- Pojedyncze kliknięcie firmy tylko ją zaznacza. Dwuklik otwiera faktycznie klikniętą pozycję przez istniejące OpenCompany(), z tą samą autoryzacją i ochroną przed równoległym otwarciem co przycisk.
 - Adres API jest konfigurowalny przez VATOWIEC_API_URL i ekran logowania. Klient zachowuje standardową walidację certyfikatów; nie akceptuje HTTP ani przekierowań. Hasło nie jest zapisywane, cookie i CSRF są tylko w pamięci. Login/logout zachowują wymagania ADR-015.
 - ViewContractors jest sprawdzane przez serwer niezależnie od widoczności przycisku. Brak uprawnień, sesja 401, błąd resolvera i utrata połączenia nie powodują wyboru domyślnej firmy. Zmiana firmy i odświeżanie kartoteki usuwają stare rekordy; wygaśnięcie sesji czyści całą sesję także podczas bezczynności. Operacje UI są serializowane, opóźnione dane po terminie sesji są odrzucane.
 - Etap ADR-016 obejmował odczyt; edycję dodaje §3.7. Instrukcja kont i ograniczeń wylogowania offline: docs/desktop.md. Automatyczny provisioning pozostaje kolejnym zadaniem.
@@ -315,6 +316,10 @@ Waluty obu modeli są FK do istniejącego Currencies.Code char(3), z kolacją BI
 Rabat decimal(7,4), limit decimal(24,8), uwagi do 2000 znaków; nadmiar precyzji
 odrzucamy bez cichego zaokrąglania. Nieaktywne odwołanie można zachować, ale
 nowy wybór musi wskazywać aktywną pozycję. Wartość 0 jest odrębna od NULL.
+ComboBoxy walut pokazują aktywne pozycje (warunki także brak indywidualnej waluty).
+Zapisana nieaktywna waluta pozostaje widoczna z oznaczeniem „nieaktywna” w warunkach
+i limitach. Nie można jej wybrać ponownie po zmianie na inną walutę; odświeżenie
+list nie zmienia kodu ani nie oznacza formularza jako zmienionego.
 
 Zakładka Finansowe ma Sprzedaż/Zakup oraz osobne szkice/zapisy warunków, limitu
 oraz słownika. Chronimy przełączanie i opuszczanie niezapisanych szkiców. Zapis
@@ -368,6 +373,24 @@ pozostają zapisem poprzedniego modelu.
 Wartości decimal(24,12), Mid dla A/B, Bid/Ask dla C, daty publikacji i opcjonalnego
 notowania, oryginalny numer tabeli i UTC pobrania. Odczyt/zarządzanie/import mają
 osobne prawa firmowe 64/128/256 oraz CSRF dla mutacji; B pozostaje tylko do odczytu.
+
+Ustawienia Avalonia pozwalają zaznaczać waluty niezależnie od pozycji edytowanej:
+widoczne według filtra, cały słownik lub wyczyścić zaznaczenie. Aktywacja/dezaktywacja
+zaznaczonych i szybkie akcje dla wszystkich wymagają potwierdzenia liczby zmian
+i pominięć. Jedno POST /currencies/activity sprawdza wersje i zapisuje całą partię
+z trwałą idempotencją oraz atomowym audit.CurrencyOperations; konflikt wycofuje
+wszystkie zmiany. PLN jest pomijany przy dezaktywacji. Identyczny stan nie zmienia
+RowVersion; dezaktywacja wyłącza A/B/C bez usuwania kursów, aktywacja zachowuje
+flagi pobierania. Operacja nie odpytuje NBP i odświeża słownik z zachowaniem filtra.
+Bez nowych tabel i migracji.
+
+Filtr kursów zapisanych domyślnie oferuje aktywne waluty bez PLN i opcję wszystkich
+kursów z bieżącego zakresu. „Pokaż nieaktywne (archiwum)” udostępnia dodatkowo
+nieaktywne waluty mające zapisane kursy, przez opcjonalny odczyt słownika
+withRatesOnly=true z dotychczasowym DTO. Zmiana aktywności zachowuje wybrany kod
+filtra, daty, tabelę i sortowanie; istniejący filtr nieaktywnej waluty pozostaje
+widoczny do świadomej zmiany. Ustawienia słownika nadal pokazują wszystkie waluty.
+Filtry kursów nie sterują pobieraniem NBP i nie ograniczają archiwalnego odczytu API.
 
 Publiczny NBP HTTPS/JSON jest pobierany wyłącznie ręcznie: najnowsze publikacje
 lub zakres dzielony po 93 dni włącznie. Nie ma automatyzacji, uzupełniania dni bez

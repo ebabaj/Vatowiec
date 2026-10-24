@@ -38,7 +38,9 @@ public interface IVatowiecApiClient : IDisposable
     Task<GusConfigurationResponse> SaveGusKey(SaveGusKeyRequest value) => throw new NotSupportedException();
     Task<GusConfigurationResponse> DeleteGusKey(DeleteGusKeyRequest value) => throw new NotSupportedException();
     Task<CurrencyResponse[]> Currencies(Guid companyId) => throw new NotSupportedException();
+    Task<CurrencyResponse[]> CurrenciesWithRates(Guid companyId) => throw new NotSupportedException();
     Task<CurrencyResponse> SaveCurrency(Guid companyId, string currencyCode, CurrencyWriteRequest value) => throw new NotSupportedException();
+    Task<CurrencyActivityResponse> ChangeCurrencyActivity(Guid companyId, CurrencyActivityRequest value) => throw new NotSupportedException();
     Task<RatePage> Rates(Guid companyId, string? code, string? table, DateOnly? from, DateOnly? to, int offset, bool descending) => throw new NotSupportedException();
     Task<RateImportResponse> ImportRates(Guid companyId, RateImportRequest value) => throw new NotSupportedException();
     Task<CurrencyHistoryResponse> ResolveRate(Guid companyId, long auditId, RateResolutionRequest value) => throw new NotSupportedException();
@@ -121,7 +123,9 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         return await Send<GusConfigurationResponse>(request);
     }
     public Task<CurrencyResponse[]> Currencies(Guid companyId) => Get<CurrencyResponse[]>($"api/v1/companies/{companyId}/currencies");
+    public Task<CurrencyResponse[]> CurrenciesWithRates(Guid companyId) => Get<CurrencyResponse[]>($"api/v1/companies/{companyId}/currencies?withRatesOnly=true");
     public Task<CurrencyResponse> SaveCurrency(Guid companyId, string currencyCode, CurrencyWriteRequest value) => Write<CurrencyResponse>($"api/v1/companies/{companyId}/currencies/{Uri.EscapeDataString(currencyCode)}", value, true);
+    public Task<CurrencyActivityResponse> ChangeCurrencyActivity(Guid companyId, CurrencyActivityRequest value) => Write<CurrencyActivityResponse>($"api/v1/companies/{companyId}/currencies/activity", value, false);
     public Task<RatePage> Rates(Guid companyId, string? code, string? table, DateOnly? from, DateOnly? to, int offset, bool descending)
     {
         var query = $"offset={offset}&limit=51&descending={descending.ToString().ToLowerInvariant()}";

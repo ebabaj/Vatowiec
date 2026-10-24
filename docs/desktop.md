@@ -43,6 +43,8 @@ następnego logowania; nie zapisuje się w pliku.
 1. Wpisz login **operator.m0** i lokalnie skonfigurowane hasło. Kliknij **Zaloguj się**
    lub naciśnij Enter w polu hasła.
 2. Zaznacz **Firma demonstracyjna A — dane fikcyjne** i kliknij **Otwórz firmę**.
+   Możesz też otworzyć firmę dwuklikiem na jej pozycji. Pojedyncze kliknięcie tylko
+   zaznacza; dwuklik otwiera klikniętą firmę, z taką samą kontrolą dostępu jak przycisk.
 3. Okno pokazuje firmę, użytkownika i termin sesji. Kliknij **Pokaż kontrahentów / odśwież**.
    Zobaczysz kod DEMO, nazwę fikcyjnego kontrahenta A i kraj PL.
 4. Kliknij **Zmień firmę**, wybierz **Firma demonstracyjna B — dane fikcyjne**,

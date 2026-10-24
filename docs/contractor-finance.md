@@ -38,6 +38,15 @@ ustawienia**. Pusta waluta nie podstawia PLN. Dni `0` i rabat `0` są jawnymi
 ustawieniami, odrębnymi od pustego pola. Można wyczyścić wszystkie warunki
 zapisanej konfiguracji; rekord i audyt pozostają, bez fizycznego usuwania.
 
+**Domyślna waluta** oferuje „Brak indywidualnej waluty” i aktywne waluty firmy.
+Nowy limit pozwala wybierać tylko aktywne waluty. Zapisane warunki i limity
+w walucie później dezaktywowanej zachowują kod i kwoty; obok waluty pojawia się
+„nieaktywna”. Podczas edycji można zachować ten kod, zmieniając inne pola,
+albo wybrać aktywną walutę. Nieaktywna pozycja nie jest nowym wyborem.
+Przy aktywnych PLN/EUR i nieaktywnej USD nowy wybór obejmuje tylko PLN/EUR,
+a istniejąca USD pozostaje widoczna. Odświeżanie słowników nie tworzy zmian
+w szkicu; rzeczywista zmiana nadal wymaga zapisu lub świadomego porzucenia.
+
 Termin: liczba całkowita 0–3650. Rabat: decimal 0–100%, do 4 miejsc po przecinku.
 Limit: nieujemny decimal, do 16 cyfr całkowitych i 8 po przecinku. Można wpisać
 przecinek lub kropkę dziesiętną, bez separatorów tysięcy. Nadmiar cyfr po przecinku

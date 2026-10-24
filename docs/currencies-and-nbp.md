@@ -13,6 +13,14 @@ Bez faktur, automatycznego doboru podatkowego kursu, różnic kursowych i harmon
    publikacji. Przycisk Filtruj stosuje filtry, a sortowanie można odwrócić.
    Liczby mają polski przecinek i do 12 miejsc, daty dd.MM.yyyy. A/B pokazują
    kurs średni, C kupna/sprzedaży oraz odrębną datę notowania, jeśli była podana.
+   Filtr walut domyślnie pokazuje tylko aktywne waluty bez PLN. „Wszystkie kursy
+   z bieżącego zakresu” obejmują także historię walut nieaktywnych. Włącz
+   **Pokaż nieaktywne (archiwum)**, aby móc wskazać nieaktywną walutę mającą
+   zapisane kursy. Przy aktywnych PLN/EUR domyślnie dostępna jest tylko EUR,
+   a po włączeniu archiwum także np. USD, jeśli posiada historię.
+   Zmiana aktywności nie kasuje wybranego filtra ani pozostałych kryteriów.
+   Wybrana pozycja archiwalna pozostaje widoczna do świadomego wyboru innego
+   kodu lub wszystkich kursów, także po wyłączeniu opcji archiwum.
 3. **Ustawienia pobierania** otwierają ten sam słownik konfiguracyjny co
    **Ustawienia firmy → Waluty i kursy NBP**. Wyszukaj walutę po kodzie/nazwie,
    wybierz ją z listy i ustaw aktywność oraz flagi A/B/C. Zapisz wybraną walutę.
@@ -46,6 +54,91 @@ Firma B pozostaje tylko do odczytu. Czytelnik ma odczyt kursów w A, bez zmiany
 konfiguracji/importu. Ukrycie lub wyłączenie przycisku jest dodatkowe: każde
 żądanie API sprawdza uprawnienia i fizyczną bazę firmy. Zmiana firmy, odmowa lub
 wygaśnięcie sesji usuwa poprzedni słownik/listę/historię/konflikty z klienta.
+
+### Zbiorowa aktywność walut
+
+Checkboxy przy walutach są niezależne od wyboru waluty do edycji.
+**Zaznacz widoczne** dodaje pozycje pasujące do filtra; **Zaznacz wszystkie**
+obejmuje cały słownik firmy, także ukryte wyniki. **Wyczyść zaznaczenie** usuwa
+wszystkie zaznaczenia. Licznik obejmuje również pozycje ukryte przez filtr.
+**Aktywuj/Dezaktywuj zaznaczone** korzystają z tych checkboxów;
+**Aktywuj wszystkie/Dezaktywuj wszystkie** działają bez zaznaczania.
+
+Przed zapisem panel pokazuje zakres, liczbę zmian i pominięć oraz wymaga
+osobnego potwierdzenia. Dezaktywacja pomija PLN i wyłącza A/B/C, zachowując
+historyczne kursy. Ponowna aktywacja nie włącza A/B/C. Obie operacje zachowują
+pozostałe ustawienia i nigdy nie pobierają kursów NBP. Najpierw zapisz lub porzuć
+niezapisane zmiany edytowanej waluty. Po wykonaniu słownik jest odświeżany,
+a filtr i zaznaczenia pozostają. Po konflikcie anuluj panel, odśwież słownik
+i ponownie sprawdź zakres; nie ma częściowego zapisu ani wymuszenia wersji.
+
+Całą partię obsługuje jedno **POST /currencies/activity**, z ViewExchangeRates,
+ManageCurrencies i CSRF. Żądanie zawiera OperationId, IsActive, All, pary
+Code/RowVersion w Currencies oraz Confirm. All wymaga zgodności z pełnym
+słownikiem firmy. W jednej transakcji sprawdzane są wersje, zapisywane tylko
+rzeczywiste zmiany i jeden niezmienny audyt BulkActivity z wartościami przed/po
+oraz trwałym wynikiem. Powtórzenie tego samego żądania zwraca zapisany wynik;
+inne dane pod tym samym kluczem są odrzucane. Rekordy o zgodnym stanie i PLN
+pominięty przy dezaktywacji zachowują RowVersion. Nie potrzeba migracji.
+
+Weryfikacja usprawnień 2026-10-23:
+
+- `dotnet build Vatowiec.slnx --no-restore`: bez błędów i ostrzeżeń.
+- `dotnet test tests/Vatowiec.Tests/Vatowiec.Tests.csproj --no-restore --filter "Category!=SqlIntegration"`:
+  **389/389**, bez pominięć; w tym wybór widocznych/wszystkich, niezależność
+  zaznaczenia, potwierdzenie, zachowanie filtra, ponowienia, prawa, brak NBP
+  oraz dwuklik właściwej firmy, pojedyncze otwarcie i odmowa dostępu.
+- Nowe `CurrencyActivitySqlTests`, uruchomione osobno z
+  `VATOWIEC_PRESERVED_VAT_SQL=1`: **1/1**, bez pominięć. Rzeczywiste API/SQL,
+  aktywacja/dezaktywacja kilku i wszystkich walut, PLN, zachowanie flag przy
+  braku zmiany, RowVersion, CSRF, firma B i czytelnik, idempotencja, audyt,
+  konflikt wstępny i podczas UPDATE oraz wycofanie po błędzie audytu.
+  Wszystkie zapisy w System/A/B wycofane zewnętrznymi transakcjami i savepointami,
+  bez resetu, DDL, migracji ani destrukcyjnych fixture. Kursy historyczne
+  i słownik B porównane bez zmian; adapter NBP nie został wywołany.
+- Uruchomione rzeczywiste okno MainWindow z atrapą API i 149 walutami;
+  sprawdzone natywne zdarzenia myszy oraz kontrolki przez Windows UI Automation.
+  Checkbox AUD nie zmienił edytowanej EUR; pełny zakres 149 przy filtrze USD;
+  anulowanie bez zapisu, potwierdzenie dezaktywacji 148 z pominięciem PLN,
+  aktywacja bez A/B/C i NBP, zachowany filtr, blokada zapisu w B. Dwuklik B
+  po wybranej A otworzył B raz; pojedyncze kliknięcie nie otworzyło firmy.
+  Zrzuty lokalne: `TestResults/currency-ui-confirm.png`,
+  `TestResults/currency-ui-deactivated.png`, `TestResults/currency-ui-readonly.png`.
+  Próba okna nie używała danych ani sekretów istniejących baz.
+
+Końcowy wspólny przebieg powyższych testów: **390/390**, bez pominięć;
+`TestResults/currency-ui-final.trx`. `dotnet format --verify-no-changes`
+dla zmienionych plików C# i `git diff --check` zakończone poprawnie.
+Pełny destrukcyjny runner pozostał wyłączony. Bez Commit/Push.
+
+### Weryfikacja aktywnych walut w formularzach — 2026-10-24
+
+ORG-012 / DOC-006: nowe listy w Finansowe zawierają tylko aktywne waluty,
+z zachowaniem zapisanych nieaktywnych odwołań. Filtr kursów zawiera aktywne
+waluty bez PLN i świadomie włączane archiwum. Konfiguracja słownika pozostaje
+pełna. DTO, model danych, migracje, reguły importu i uprawnienia bez zmian;
+jedynym rozszerzeniem odczytu API jest opcjonalny filtr withRatesOnly.
+
+- `dotnet build Vatowiec.slnx --no-restore -c Release`: 0 błędów i ostrzeżeń.
+  Wybrano Release, ponieważ działające API/desktop blokowały pliki Debug;
+  bieżących procesów użytkownika nie zatrzymywano ani nie restartowano.
+- Testy `Category!=SqlIntegration` w Release: **399/399**, bez pominięć.
+  Raport: `TestResults/active-currencies-offline.trx`. Obejmują PLN/EUR aktywne,
+  USD nieaktywna, zachowanie USD przy zapisie innych pól, wybór i oznaczenia
+  limitów, stabilność kolekcji, przejściowe callbacki ComboBox, ochronę szkiców,
+  archiwum USD, zachowanie dat/tabeli/sortowania po zmianie aktywności i brak NBP.
+- Rzeczywisty MainWindow Avalonia z atrapą API i pełnym słownikiem 149 pozycji:
+  wybrana USD pozostała widoczna jako nieaktywna w warunkach i limicie;
+  bez fałszywego IsDirty po odświeżeniu, nowe limity tylko PLN/EUR.
+  W filtrze kursów tylko EUR i wszystkie kursy; archiwum umożliwiło wybranie
+  historycznego USD. Wyłączenie archiwum zachowało wybrany kod, a świadomy
+  wybór wszystkich kursów usunął nieaktywną pozycję z listy wyboru.
+  Nieaktywna USD nadal dostępna w ustawieniach, NBP nie został wywołany.
+  Zrzuty: `TestResults/active-currency-finance-initial.png`,
+  `TestResults/active-currency-limit.png`, `TestResults/active-currency-archive.png`,
+  `TestResults/active-currency-rate-default-final.png`.
+- Testów SQL w tym etapie nie uruchamiano. Bez zapisów do istniejących baz,
+  resetu, destrukcyjnych fixture, migracji, Commit i Push.
 
 ## Daty, źródło i wartości
 
@@ -114,7 +207,9 @@ Poniższe ścieżki zaczynają się od `/api/v1/companies/{companyId}`:
 | Endpoint | Znaczenie |
 |---|---|
 | GET /currencies | lokalny słownik i ustawienia, ViewExchangeRates=64 |
+| GET /currencies?withRatesOnly=true | to samo DTO i uprawnienie; wyłącznie kody z istniejącą historią kursów, niezależnie od aktywności; zwykły słownik nadal jest pełny |
 | PUT /currencies/{currencyCode} | np. /currencies/EUR; ustawienia wskazanej kodem waluty, ViewExchangeRates + ManageCurrencies=128, CSRF i RowVersion |
+| POST /currencies/activity | zbiorowa aktywacja/dezaktywacja, pełny zakres Code/RowVersion, potwierdzenie, ViewExchangeRates + ManageCurrencies, CSRF, jedna transakcja i trwała idempotencja |
 | GET /exchange-rates | code/table/from/to/offset/limit/descending; filtry i stronicowanie SQL, maks. 100 |
 | POST /exchange-rates/imports | OperationId i opcjonalne From/To; ViewExchangeRates + ImportExchangeRates=256, CSRF |
 | POST /exchange-rates/imports/{longAuditId}/resolve | OperationId, ConflictIndex, AcceptIncoming, Confirm; odczyt + zarządzanie + import oraz CSRF |

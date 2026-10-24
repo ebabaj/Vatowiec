@@ -2,17 +2,22 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Vatowiec.Desktop.ViewModels;
+using Vatowiec.SharedContracts;
 
 namespace Vatowiec.Desktop;
 
 public partial class MainWindow : Window
 {
-    private readonly MainViewModel model = new();
+    private readonly MainViewModel model;
     private readonly DispatcherTimer expiryTimer = new() { Interval = TimeSpan.FromSeconds(1) };
 
-    public MainWindow()
+    public MainWindow() : this(new MainViewModel()) { }
+
+    public MainWindow(MainViewModel model)
     {
+        this.model = model;
         InitializeComponent();
         DataContext = model;
         model.PropertyChanged += (_, _) => { if (!model.IsDataPortSettings) DataPortKeyInput.Text = ""; };
@@ -43,6 +48,25 @@ public partial class MainWindow : Window
         };
     }
 
+    private async void CompaniesDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is not ListBox list || e.Source is not Avalonia.Visual source) return;
+        var item = source.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault();
+        if (item == null || list.ItemFromContainer(item) is not CompanyResponse company) return;
+        e.Handled = true;
+        await model.OpenClickedCompany(company);
+    }
+
+    private void SelectVisibleCurrenciesClick(object? sender, RoutedEventArgs e) => model.SelectCurrencies(false);
+    private void SelectAllCurrenciesClick(object? sender, RoutedEventArgs e) => model.SelectCurrencies(true);
+    private void ClearCurrencySelectionClick(object? sender, RoutedEventArgs e) => model.ClearCurrencySelection();
+    private void ActivateCurrenciesClick(object? sender, RoutedEventArgs e) => model.BeginCurrencyActivity(true);
+    private void DeactivateCurrenciesClick(object? sender, RoutedEventArgs e) => model.BeginCurrencyActivity(false);
+    private void ActivateAllCurrenciesClick(object? sender, RoutedEventArgs e) => model.BeginCurrencyActivity(true, true);
+    private void DeactivateAllCurrenciesClick(object? sender, RoutedEventArgs e) => model.BeginCurrencyActivity(false, true);
+    private async void ConfirmCurrencyActivityClick(object? sender, RoutedEventArgs e) => await model.ConfirmCurrencyActivity();
+    private void CancelCurrencyActivityClick(object? sender, RoutedEventArgs e) => model.CancelCurrencyActivity();
+
     private async Task Login()
     {
         var password = PasswordInput.Text ?? "";
@@ -70,6 +94,20 @@ public partial class MainWindow : Window
     {
         if (sender is ComboBox { SelectedItem: Vatowiec.SharedContracts.FinanceCurrency item } box &&
             (box.IsDropDownOpen || box.IsKeyboardFocusWithin)) model.SelectedTradeCurrency = item;
+    }
+    private void LimitCurrencySelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is ComboBox { SelectedItem: FinanceCurrency item } box &&
+            (box.IsDropDownOpen || box.IsKeyboardFocusWithin)) model.SelectedLimitCurrency = item;
+    }
+    private void RateCurrencySelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is ComboBox { SelectedItem: FinanceCurrency item } box &&
+            (box.IsDropDownOpen || box.IsKeyboardFocusWithin)) model.SelectedRateCurrency = item;
+    }
+    private async void ShowInactiveRateCurrenciesClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is CheckBox box) await model.ShowInactiveCurrencies(box.IsChecked == true);
     }
     private async void PasswordKeyDown(object? sender, KeyEventArgs e)
     {

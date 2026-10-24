@@ -43,6 +43,7 @@ public sealed partial class MainViewModel
     // during rebinding, replacing a saved code and making an untouched draft dirty.
     public PaymentMethodResponse[] TradePaymentChoices { get; private set; } = [];
     public FinanceCurrency[] TradeCurrencyChoices { get; private set; } = [];
+    public FinanceCurrency[] LimitCurrencyChoices { get; private set; } = [];
     public PaymentMethodResponse? SelectedTradePayment
     {
         get => TradePaymentChoices.FirstOrDefault(x => x.Code == (TradeTermsEditor?.PaymentMethodCode ?? ""));
@@ -58,11 +59,20 @@ public sealed partial class MainViewModel
         set
         {
             if (busy || publishingFinanceChoices || !CanEditFinance || value == null || TradeTermsEditor == null) return;
+            if (value.Code.Length > 0 && value.Code != TradeTermsEditor.CurrencyCode && !FinanceCurrencies.Any(x => x.Code == value.Code && x.IsActive)) return;
             TradeTermsEditor.CurrencyCode = value.Code; NotifyTradeSelection();
         }
     }
     public FinanceCurrency? SelectedLimitCurrency
-    { get => FinanceCurrencies.FirstOrDefault(x => x.Code == CreditLimitEditor?.CurrencyCode); set { if (value != null && CreditLimitEditor != null) CreditLimitEditor.CurrencyCode = value.Code; } }
+    {
+        get => LimitCurrencyChoices.FirstOrDefault(x => x.Code == CreditLimitEditor?.CurrencyCode);
+        set
+        {
+            if (busy || publishingFinanceChoices || !CanEditFinance || value == null || CreditLimitEditor == null) return;
+            if (value.Code != CreditLimitEditor.CurrencyCode && !FinanceCurrencies.Any(x => x.Code == value.Code && x.IsActive)) return;
+            CreditLimitEditor.CurrencyCode = value.Code; Changed(nameof(SelectedLimitCurrency));
+        }
+    }
     public CreditLimitResponse[] CreditLimits { get; private set; } = [];
     public CreditLimitResponse? SelectedCreditLimit { get; set; }
     public PaymentMethodResponse? SelectedPaymentMethod { get; set; }
@@ -78,7 +88,7 @@ public sealed partial class MainViewModel
         await ReadFinanceLookups();
         var row = await api.TradeTerms(profile.CompanyId, editor!.Id, FinanceDirection); CheckTerms(row);
         savedTerms = row; TradeTermsEditor = new(row); CreditLimitEditor = null; PaymentMethodEditor = null; financeConflict = null;
-        PublishTradeChoices();
+        PublishTradeChoices(); PublishLimitChoices();
         await ReadCreditLimits(0);
     });
     private void NotifyTradeSelection()
@@ -92,16 +102,28 @@ public sealed partial class MainViewModel
         try
         {
             TradePaymentChoices = [new(0, "", "Brak indywidualnego sposobu", true, ""), .. PaymentMethods];
-            TradeCurrencyChoices = [new("", "Brak indywidualnej waluty", true), .. FinanceCurrencies];
+            TradeCurrencyChoices = [new("", "Brak indywidualnej waluty", true), .. FinanceCurrencies.Where(x => x.IsActive)];
             if (TradeTermsEditor is { } terms)
             {
                 if (terms.PaymentMethodCode.Length > 0 && !PaymentMethods.Any(x => x.Code == terms.PaymentMethodCode))
                     TradePaymentChoices = [.. TradePaymentChoices, new(0, terms.PaymentMethodCode, $"{terms.PaymentMethodCode} — kod niedostępny w słowniku", false, "")];
-                if (terms.CurrencyCode.Length > 0 && !FinanceCurrencies.Any(x => x.Code == terms.CurrencyCode))
-                    TradeCurrencyChoices = [.. TradeCurrencyChoices, new(terms.CurrencyCode, "kod niedostępny w słowniku", false)];
+                if (terms.CurrencyCode.Length > 0 && !TradeCurrencyChoices.Any(x => x.Code == terms.CurrencyCode))
+                    TradeCurrencyChoices = [.. TradeCurrencyChoices, FinanceCurrencies.FirstOrDefault(x => x.Code == terms.CurrencyCode) ?? new(terms.CurrencyCode, "kod niedostępny w słowniku", false)];
             }
             Changed(nameof(TradePaymentChoices)); Changed(nameof(TradeCurrencyChoices));
             Changed(nameof(TradeTermsEditor)); NotifyTradeSelection();
+        }
+        finally { publishingFinanceChoices = false; }
+    }
+    private void PublishLimitChoices()
+    {
+        publishingFinanceChoices = true;
+        try
+        {
+            LimitCurrencyChoices = FinanceCurrencies.Where(x => x.IsActive).ToArray();
+            if (CreditLimitEditor is { CurrencyCode.Length: > 0 } limit && !LimitCurrencyChoices.Any(x => x.Code == limit.CurrencyCode))
+                LimitCurrencyChoices = [.. LimitCurrencyChoices, FinanceCurrencies.FirstOrDefault(x => x.Code == limit.CurrencyCode) ?? new(limit.CurrencyCode, "kod niedostępny w słowniku", false)];
+            Changed(nameof(LimitCurrencyChoices)); Changed(nameof(SelectedLimitCurrency));
         }
         finally { publishingFinanceChoices = false; }
     }
@@ -109,6 +131,7 @@ public sealed partial class MainViewModel
     {
         var value = await api!.FinanceLookups(profile!.CompanyId);
         FinanceCurrencies = value.Currencies; PaymentMethods = value.PaymentMethods;
+        PublishLimitChoices();
     }
     private async Task ReadCreditLimits(int offset)
     {
@@ -135,14 +158,14 @@ public sealed partial class MainViewModel
     public void NewCreditLimit()
     {
         if (busy || !CanSaveFinance) return;
-        void Open() { CreditLimitEditor = new(); financeConflict = null; ChangedAll(); }
+        void Open() { CreditLimitEditor = new(); financeConflict = null; PublishLimitChoices(); ChangedAll(); }
         if (CreditLimitEditor?.IsDirty == true) RequestDiscard(Open); else Open();
     }
     public void EditCreditLimit()
     {
         if (busy || !CanSaveFinance || SelectedCreditLimit == null) return;
         var row = SelectedCreditLimit;
-        void Open() { CreditLimitEditor = new(row); financeConflict = null; ChangedAll(); }
+        void Open() { CreditLimitEditor = new(row); financeConflict = null; PublishLimitChoices(); ChangedAll(); }
         if (CreditLimitEditor?.IsDirty == true) RequestDiscard(Open); else Open();
     }
     public Task SaveCreditLimit() => Run(async () =>
@@ -191,7 +214,7 @@ public sealed partial class MainViewModel
         if (financeConflict.Terms is { } t) { savedTerms = t; if (keepLocal) { TradeTermsEditor!.Id = t.Id; TradeTermsEditor.RowVersion = t.RowVersion; } else TradeTermsEditor = new(t); }
         if (financeConflict.Limit is { } l) { if (keepLocal) CreditLimitEditor!.RowVersion = l.RowVersion; else CreditLimitEditor = new(l); }
         if (financeConflict.Method is { } m) { if (keepLocal) PaymentMethodEditor!.RowVersion = m.RowVersion; else PaymentMethodEditor = new(m); }
-        financeConflict = null; PublishTradeChoices(); message = "Porównano wersje. Sprawdź pola i ponownie wybierz właściwy przycisk zapisu."; ChangedAll();
+        financeConflict = null; PublishTradeChoices(); PublishLimitChoices(); message = "Porównano wersje. Sprawdź pola i ponownie wybierz właściwy przycisk zapisu."; ChangedAll();
     }
     private void CheckTerms(TradeTermsResponse row)
     { if (profile == null || editor == null || row.CompanyId != profile.CompanyId || row.ContractorId != editor.Id || row.Direction != FinanceDirection) throw new ApiException(502, "Niezgodna firma, kontrahent lub kierunek warunków."); }
@@ -200,5 +223,5 @@ public sealed partial class MainViewModel
     private void ClearFinanceDrafts()
     { TradeTermsEditor = null; CreditLimitEditor = null; PaymentMethodEditor = null; savedTerms = null; financeConflict = null; CreditLimits = []; SelectedCreditLimit = null; SelectedPaymentMethod = null; financeOffset = 0; HasNextCreditLimits = false; }
     private void ResetFinance()
-    { ClearFinanceDrafts(); financeDirectionIndex = 0; FinanceCurrencies = []; PaymentMethods = []; TradePaymentChoices = []; TradeCurrencyChoices = []; }
+    { ClearFinanceDrafts(); financeDirectionIndex = 0; FinanceCurrencies = []; PaymentMethods = []; TradePaymentChoices = []; TradeCurrencyChoices = []; LimitCurrencyChoices = []; }
 }

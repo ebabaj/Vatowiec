@@ -87,6 +87,41 @@ public sealed class ExchangeRateService(CompanyDbContext db, TimeProvider clock)
         await db.SaveChangesAsync(); await transaction.CommitAsync(); return response;
     }
     public sealed record ConfigurationAudit(CurrencyResponse Before, CurrencyResponse After);
+    public sealed record ActivityAudit(CurrencyActivityResponse Result, ConfigurationAudit[] Changes);
+    public async Task<CurrencyActivityResponse> ChangeActivity(Guid company, CurrencyActivityRequest value, CurrencyActor actor)
+    {
+        if (!value.Confirm) throw Error(400, "currency_confirmation", "Potwierdź zbiorową zmianę aktywności walut.");
+        if (value.Currencies is not { Length: > 0 and <= 1000 } || value.Currencies.Any(x => x == null ||
+            !System.Text.RegularExpressions.Regex.IsMatch(x.Code ?? "", "\\A[A-Z]{3}\\z") || string.IsNullOrEmpty(x.RowVersion)) ||
+            value.Currencies.Select(x => x.Code).Distinct(StringComparer.Ordinal).Count() != value.Currencies.Length)
+            throw Error(400, "currency_selection", "Wskaż różne kody walut wraz z ich wersjami.");
+        var hash = Hash(new { Kind = "BulkActivity", value });
+        await using var transaction = await db.Database.BeginTransactionAsync(); await Lock();
+        var previous = await Previous(actor, value.OperationId, hash);
+        if (previous != null) return JsonSerializer.Deserialize<ActivityAudit>(previous.DetailsJson, Json)!.Result;
+        var codes = value.Currencies.Select(x => x.Code).ToArray();
+        var rows = await db.Currencies.Where(x => value.All || codes.Contains(x.Code)).OrderBy(x => x.Code).ToArrayAsync();
+        if (!rows.Select(x => x.Code).ToHashSet(StringComparer.Ordinal).SetEquals(codes))
+            throw Error(409, "currency_selection_changed", "Słownik zmienił się lub brakuje waluty. Odśwież i potwierdź wybór ponownie.");
+        var versions = value.Currencies.ToDictionary(x => x.Code, x => x.RowVersion, StringComparer.Ordinal);
+        // Validate the entire scope before changing anything. PLN is always excluded from deactivation.
+        foreach (var row in rows.Where(x => value.IsActive || x.Code != "PLN"))
+            if (Convert.ToBase64String(row.RowVersion) != versions[row.Code])
+                throw Error(409, "currency_stale", "Ustawienia walut zmieniły się. Nie zapisano żadnej zmiany; odśwież i porównaj wybór.");
+        var changed = rows.Where(x => x.IsActive != value.IsActive && (value.IsActive || x.Code != "PLN")).ToArray();
+        var before = changed.Select(x => Response(x, company)).ToArray();
+        foreach (var row in changed)
+        {
+            row.IsActive = value.IsActive;
+            if (!value.IsActive) row.DownloadA = row.DownloadB = row.DownloadC = false;
+        }
+        await db.SaveChangesAsync();
+        var result = new CurrencyActivityResponse(company, value.IsActive, changed.Select(x => Response(x, company)).ToArray(),
+            rows.Except(changed).Select(x => x.Code).ToArray());
+        Audit(actor, value.OperationId, hash, "BulkActivity", new ActivityAudit(result,
+            before.Zip(result.Changed, (old, current) => new ConfigurationAudit(old, current)).ToArray()));
+        await db.SaveChangesAsync(); await transaction.CommitAsync(); return result;
+    }
     private static string Signature(IEnumerable<Currency> rows) => Hash(rows.OrderBy(x => x.Code).Select(x => new { x.Code, x.IsActive, x.DownloadA, x.DownloadB, x.DownloadC, Version = Convert.ToBase64String(x.RowVersion) }));
     private static RateValue Value(ExchangeRate row) => new(row.TableNumber, row.EffectiveDate, row.TradingDate, row.Mid, row.Bid, row.Ask);
     private static void Apply(ExchangeRate row, RateValue value, DateTimeOffset at)

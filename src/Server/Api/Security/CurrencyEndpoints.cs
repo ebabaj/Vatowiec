@@ -23,6 +23,7 @@ public static class CurrencyEndpoints
             });
         group.MapGet("/currencies", ListCurrencies);
         group.MapPut("/currencies/{currencyCode}", Configure);
+        group.MapPost("/currencies/activity", ChangeActivity);
         group.MapGet("/exchange-rates", ListRates);
         group.MapPost("/exchange-rates/imports", Import).RequireRateLimiting("registries");
         group.MapPost("/exchange-rates/imports/{auditId:long}/resolve", Resolve);
@@ -39,10 +40,12 @@ public static class CurrencyEndpoints
         if (issuer == Guid.Empty || string.IsNullOrWhiteSpace(name)) throw new CurrencyOperationException(503, "currency_actor", "Brak trwałej identyfikacji wykonawcy.");
         return new(ActorId(http), issuer, name);
     }
-    private static async Task<IResult> ListCurrencies(Guid companyId, HttpContext http, CompanyDatabaseResolver resolver, IWebHostEnvironment env)
+    private static async Task<IResult> ListCurrencies(Guid companyId, HttpContext http, CompanyDatabaseResolver resolver, IWebHostEnvironment env, bool withRatesOnly = false)
     {
         await using var access = await Access(companyId, http, resolver, env, CompanyPermission.ViewExchangeRates);
-        var rows = await access.Context.Currencies.AsNoTracking().OrderBy(x => x.Code).ToArrayAsync(http.RequestAborted);
+        var rows = await access.Context.Currencies.AsNoTracking()
+            .Where(x => !withRatesOnly || access.Context.ExchangeRates.Any(rate => rate.CurrencyCode == x.Code))
+            .OrderBy(x => x.Code).ToArrayAsync(http.RequestAborted);
         return Results.Ok(rows.Select(x => ExchangeRateService.Response(x, companyId)));
     }
     private static async Task<IResult> Configure(Guid companyId, string currencyCode, CurrencyWriteRequest value, HttpContext http, CompanyDatabaseResolver resolver,
@@ -51,6 +54,13 @@ public static class CurrencyEndpoints
         await using var access = await Access(companyId, http, resolver, env, CompanyPermission.ViewExchangeRates | CompanyPermission.ManageCurrencies);
         await csrf.ValidateRequestAsync(http);
         return Results.Ok(await new ExchangeRateService(access.Context, clock).Configure(companyId, currencyCode, value, await Actor(http, system)));
+    }
+    private static async Task<IResult> ChangeActivity(Guid companyId, CurrencyActivityRequest value, HttpContext http, CompanyDatabaseResolver resolver,
+        IWebHostEnvironment env, IAntiforgery csrf, SystemDbContext system, TimeProvider clock)
+    {
+        await using var access = await Access(companyId, http, resolver, env, CompanyPermission.ViewExchangeRates | CompanyPermission.ManageCurrencies);
+        await csrf.ValidateRequestAsync(http);
+        return Results.Ok(await new ExchangeRateService(access.Context, clock).ChangeActivity(companyId, value, await Actor(http, system)));
     }
     private static async Task<IResult> Import(Guid companyId, RateImportRequest value, HttpContext http, CompanyDatabaseResolver resolver,
         IWebHostEnvironment env, IAntiforgery csrf, SystemDbContext system, INbpClient client, TimeProvider clock)

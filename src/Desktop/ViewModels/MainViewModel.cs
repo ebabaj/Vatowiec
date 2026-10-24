@@ -89,6 +89,13 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         profile = result;
     });
 
+    public Task OpenClickedCompany(CompanyResponse company)
+    {
+        if (busy || !IsCompanySelection || !companies.Contains(company)) return Task.CompletedTask;
+        SelectedCompany = company;
+        return OpenCompany();
+    }
+
     public Task LoadContractors() => Run(() => LoadPage(0));
 
     private async Task LoadPage(int offset)
