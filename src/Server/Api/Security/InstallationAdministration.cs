@@ -10,10 +10,7 @@ public static class InstallationAdministration
     public const string Role = Vatowiec.Core.Infrastructure.Identity.InstallationRoles.Administrator;
     public const string Policy = "InstallationAdministration";
     public static Task<bool> IsAdministrator(SystemDbContext system, Guid user, CancellationToken ct = default) =>
-        (from membership in system.UserRoles.AsNoTracking()
-         join role in system.Roles.AsNoTracking() on membership.RoleId equals role.Id
-         where membership.UserId == user && role.NormalizedName == "INSTALLATIONADMINISTRATOR"
-         select membership.UserId).AnyAsync(ct);
+        Vatowiec.Core.Infrastructure.Identity.UserAdministrationService.IsAdministrator(system, user, ct);
 }
 
 public sealed class InstallationAdministratorRequirement : IAuthorizationRequirement;

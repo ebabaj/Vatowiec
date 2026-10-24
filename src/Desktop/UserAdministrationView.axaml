@@ -1,0 +1,67 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Vatowiec.Desktop.ViewModels"
+             xmlns:contracts="using:Vatowiec.SharedContracts"
+             x:Class="Vatowiec.Desktop.UserAdministrationView" x:DataType="vm:MainViewModel">
+  <Grid MaxWidth="1040" HorizontalAlignment="Stretch" RowDefinitions="Auto,Auto,*" RowSpacing="12">
+    <WrapPanel><Button Content="Wróć do ustawień instalacji" Click="BackClick" AutomationProperties.AutomationId="CloseUsers"/><TextBlock Text="Użytkownicy i uprawnienia" FontSize="22" Margin="12,0" VerticalAlignment="Center"/></WrapPanel>
+    <TextBlock Grid.Row="1" Text="{Binding AdminDirtyStatus}" Foreground="#9A6700" AutomationProperties.AutomationId="UserDirtyStatus"/>
+    <Grid Grid.Row="2" ColumnDefinitions="260,20,*">
+      <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="8">
+        <TextBox Text="{Binding AdminSearch, Mode=TwoWay}" MaxLength="256" PlaceholderText="Szukaj loginu" KeyDown="SearchKeyDown" AutomationProperties.AutomationId="UserSearch"/>
+        <Button Grid.Row="1" Content="Szukaj" Click="SearchClick" AutomationProperties.AutomationId="SearchUsers"/>
+        <ListBox Grid.Row="2" ItemsSource="{Binding AdminUsers}" SelectedItem="{Binding SelectedAdminUser, Mode=OneWay}" SelectionChanged="UserSelectionChanged" AutomationProperties.AutomationId="UsersList">
+          <ListBox.ItemTemplate><DataTemplate x:DataType="contracts:UserSummary"><StackPanel Spacing="3"><TextBlock Text="{Binding UserName}" FontWeight="SemiBold"/><TextBlock Text="Zablokowane" IsVisible="{Binding IsBlocked}" Foreground="#B42318"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
+        </ListBox>
+        <WrapPanel Grid.Row="3"><Button Content="‹" Click="PreviousClick" IsEnabled="{Binding AdminHasPrevious}"/><TextBlock Text="{Binding AdminPage}" Margin="8"/><Button Content="›" Click="NextClick" IsEnabled="{Binding AdminHasNext}"/></WrapPanel>
+      </Grid>
+      <ScrollViewer Grid.Column="2" HorizontalContentAlignment="Stretch">
+        <StackPanel Spacing="12" MaxWidth="720">
+          <TextBlock Text="Nowe konto" FontSize="18" FontWeight="SemiBold"/>
+          <TextBox Text="{Binding NewUserName, Mode=TwoWay}" MaxLength="256" PlaceholderText="Login nowego użytkownika" AutomationProperties.AutomationId="NewUserName"/>
+          <Button Content="Utwórz konto…" Click="CreateClick" IsEnabled="{Binding CanManageUsers}" AutomationProperties.AutomationId="CreateUser"/>
+          <Separator/>
+          <TextBlock Text="{Binding AdminAccountName}" FontSize="20" FontWeight="SemiBold" AutomationProperties.AutomationId="AdminAccountName"/>
+          <TextBlock Text="{Binding AdminAccountStatus}" TextWrapping="Wrap" AutomationProperties.AutomationId="AdminAccountStatus"/>
+          <StackPanel IsVisible="{Binding HasAdminUser}" Spacing="12">
+            <WrapPanel><Button Content="{Binding AdminBlockAction}" Click="BlockClick" AutomationProperties.AutomationId="BlockUser"/><Button Content="Resetuj hasło…" Click="ResetClick" AutomationProperties.AutomationId="ResetUserPassword"/><Button Content="Odśwież szczegóły" Click="RefreshClick" AutomationProperties.AutomationId="RefreshUser"/></WrapPanel>
+            <TextBlock Text="Role systemowe" FontSize="18" FontWeight="SemiBold"/>
+            <CheckBox Content="Administrator instalacji" IsChecked="{Binding AdministratorRole, Mode=TwoWay}" IsEnabled="{Binding CanEditAdministratorRole}" AutomationProperties.AutomationId="AdministratorRole"/>
+            <TextBlock Text="{Binding AdminRoleStatus}" TextWrapping="Wrap" AutomationProperties.AutomationId="AdminRoleStatus"/>
+            <TextBlock Text="Zarządzanie użytkownikami i ustawieniami całej instalacji. Ta rola nie nadaje dostępu do danych firm. Zmiana wymaga osobnego potwierdzenia i unieważnia sesje tego użytkownika. Własną rolą nie można zarządzać w tym ekranie." TextWrapping="Wrap"/>
+            <Button Content="Zapisz rolę systemową…" Click="RoleClick" IsEnabled="{Binding CanSaveAdministratorRole}" AutomationProperties.AutomationId="SaveAdministratorRole"/>
+            <TextBlock Text="Dostęp do firm" FontSize="18" FontWeight="SemiBold"/>
+            <TextBlock Text="Zaznaczenie prawa dodaje wymagany odczyt. Odznaczenie wymaganego prawa wyłącza prawa zależne. Brak dostępu usuwa przypisanie; zapis unieważnia sesje użytkownika." TextWrapping="Wrap" Opacity="0.75"/>
+            <ItemsControl ItemsSource="{Binding AdminCompanyAccess}">
+              <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:CompanyAccessEditor">
+                <Border BorderBrush="#D0D5DD" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,10">
+                  <StackPanel Spacing="8">
+                    <CheckBox Content="{Binding Name}" IsChecked="{Binding HasAccess, Mode=TwoWay}" FontWeight="SemiBold" AutomationProperties.AutomationId="{Binding Name}"/>
+                    <ItemsControl ItemsSource="{Binding Permissions}" IsEnabled="{Binding HasAccess}">
+                      <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:PermissionChoice">
+                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" AutomationProperties.AutomationId="{Binding Code}" HorizontalAlignment="Stretch">
+                          <StackPanel><TextBlock Text="{Binding Name}"/><TextBlock Text="{Binding Description}" FontSize="12" TextWrapping="Wrap" Opacity="0.75"/></StackPanel>
+                        </CheckBox>
+                      </DataTemplate></ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </Border>
+              </DataTemplate></ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Content="Zapisz uprawnienia" Click="SaveClick" IsEnabled="{Binding CanSaveUserAccess}" AutomationProperties.AutomationId="SaveUserAccess"/>
+          </StackPanel>
+          <Separator/>
+          <WrapPanel><TextBlock Text="Historia administracyjna" FontSize="18" VerticalAlignment="Center"/><Button Content="Odśwież historię" Click="HistoryClick"/></WrapPanel>
+          <ItemsControl ItemsSource="{Binding AdminHistory}">
+            <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:UserAdministrationHistoryRow">
+              <StackPanel Margin="0,0,0,12"><TextBlock Text="{Binding Time}" FontWeight="SemiBold"/><TextBlock Text="{Binding Operation}"/><TextBlock Text="{Binding Actor}"/><TextBlock Text="{Binding Target}"/><TextBlock Text="{Binding Company}"/>
+                <TextBlock Text="{Binding Before}" TextWrapping="Wrap"/><TextBlock Text="{Binding After}" TextWrapping="Wrap"/><TextBlock Text="{Binding State}"/>
+              </StackPanel>
+            </DataTemplate></ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <WrapPanel><Button Content="Nowsze" Click="HistoryPreviousClick" IsEnabled="{Binding AdminHistoryHasPrevious}"/><Button Content="Starsze" Click="HistoryNextClick" IsEnabled="{Binding AdminHistoryHasNext}"/></WrapPanel>
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+  </Grid>
+</UserControl>

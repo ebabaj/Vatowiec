@@ -472,7 +472,7 @@ internal static class LocalDatabases
         await using var system = SystemContext(SystemDatabase);
         await ShowSchema(system, SystemDatabase, ["core.Companies", "core.CompanyDatabases", "dbo.__EFMigrationsHistory",
             "security.Users", "security.Roles", "security.UserRoles", "security.UserClaims", "security.UserLogins",
-            "security.UserTokens", "security.RoleClaims", "security.CompanyAccess", "security.UserSessions", "security.Installation", "security.GusConfiguration", "security.RegistryConfigurations", "audit.RegistryConfigurationChanges", "ref.TaxIdentifierSchemes"], "_ContractorPeselPermission");
+            "security.UserTokens", "security.RoleClaims", "security.CompanyAccess", "security.UserSessions", "security.Installation", "security.GusConfiguration", "security.RegistryConfigurations", "audit.RegistryConfigurationChanges", "audit.UserAdministrationChanges", "security.PasswordPolicy", "audit.PasswordPolicyChanges", "ref.TaxIdentifierSchemes"], "_InstallationPasswordPolicy");
         if (await system.InstallationIdentities.CountAsync() != 1 || (await system.InstallationIdentities.SingleAsync()).Id == Guid.Empty)
             throw new InvalidOperationException("Brak trwałej identyfikacji instalacji.");
         if (await system.Companies.CountAsync() != 2 || await system.CompanyDatabases.CountAsync() != 2)
@@ -513,36 +513,20 @@ internal static class LocalDatabases
         await using var provider = services.BuildServiceProvider();
         var users = provider.GetRequiredService<UserManager<ApplicationUser>>();
         var roles = provider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
-        foreach (var role in new[] { "Operator", "Reader" })
-            if (!await roles.RoleExistsAsync(role))
-                Ensure(await roles.CreateAsync(new IdentityRole<Guid>(role) { Id = Guid.NewGuid() }));
+        var initializer = new DemoUserInitializer(system, users, roles);
         foreach (var (name, password, role) in new[]
                  { (operatorName!, operatorPassword!, "Operator"), (readerName!, readerPassword!, "Reader") })
         {
-            var user = await users.FindByNameAsync(name);
-            if (user is null)
-            {
-                user = new ApplicationUser { Id = Guid.NewGuid(), UserName = name };
-                Ensure(await users.CreateAsync(user, password));
-            }
-            else if (!await users.CheckPasswordAsync(user, password))
-                Ensure(await users.ResetPasswordAsync(user, await users.GeneratePasswordResetTokenAsync(user), password));
-            if (!await users.IsInRoleAsync(user, role)) Ensure(await users.AddToRoleAsync(user, role));
-            foreach (var (id, _, _) in DemoCompanies)
-            {
-                var permissions = role == "Operator"
-                    ? (id == DemoCompanies[0].Id ? (CompanyPermission)511 : (CompanyPermission)67)
-                    : (id == DemoCompanies[0].Id ? (CompanyPermission)65 : CompanyPermission.None);
-                var access = await system.CompanyAccesses.SingleOrDefaultAsync(x => x.UserId == user.Id && x.CompanyId == id);
-                if (permissions == CompanyPermission.None)
-                {
-                    if (access is not null) system.CompanyAccesses.Remove(access);
-                }
-                else if (access is null) system.CompanyAccesses.Add(new CompanyAccess(user.Id, id, permissions));
-                else access.ChangePermissions(permissions);
-            }
-            await system.SaveChangesAsync();
-            Console.WriteLine($"Konto demonstracyjne: {name}; rola {role}; hasło wyłącznie z lokalnej konfiguracji.");
+            var read = CompanyPermission.ViewProfile | CompanyPermission.ViewExchangeRates;
+            var operatorA = read | CompanyPermission.ViewContractors | CompanyPermission.EditContractors |
+                CompanyPermission.AcceptWarnings | CompanyPermission.VerifyRegistries | CompanyPermission.ManageCompanyIntegrations |
+                CompanyPermission.ManageCurrencies | CompanyPermission.ImportExchangeRates;
+            var access = role == "Operator"
+                ? new Dictionary<Guid, CompanyPermission> { [DemoCompanies[0].Id] = operatorA,
+                    [DemoCompanies[1].Id] = read | CompanyPermission.ViewContractors }
+                : new Dictionary<Guid, CompanyPermission> { [DemoCompanies[0].Id] = read };
+            var created = await initializer.CreateIfMissing(name, password, role, access);
+            Console.WriteLine(created ? $"Utworzono brakujące konto demonstracyjne: {name}." : $"Pominięto istniejące konto: {name}; hasło, role i uprawnienia bez zmian.");
         }
     }
 

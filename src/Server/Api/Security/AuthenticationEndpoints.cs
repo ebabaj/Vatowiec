@@ -41,7 +41,7 @@ public static class AuthenticationEndpoints
                 return Results.Json(new { code = "invalid_credentials" }, statusCode: 401);
             }
             var result = await signIn.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
-            if (!result.Succeeded || await users.GetTwoFactorEnabledAsync(user))
+            if (!result.Succeeded || user.IsBlocked || await users.GetTwoFactorEnabledAsync(user))
             {
                 logger.LogWarning("Login rejected for user {UserId}; correlation {CorrelationId}", user.Id, context.TraceIdentifier);
                 return Results.Json(new { code = "invalid_credentials" }, statusCode: 401);
@@ -64,7 +64,8 @@ public static class AuthenticationEndpoints
             {
                 userName = user.UserName,
                 expiresAtUtc = session.ExpiresAtUtc,
-                isInstallationAdministrator = await InstallationAdministration.IsAdministrator(system, user.Id, context.RequestAborted)
+                isInstallationAdministrator = await InstallationAdministration.IsAdministrator(system, user.Id, context.RequestAborted),
+                mustChangePassword = user.MustChangePassword
             });
         }).AllowAnonymous().RequireRateLimiting("login");
 
@@ -92,7 +93,8 @@ public static class AuthenticationEndpoints
                 userName = user.UserName,
                 roles = await users.GetRolesAsync(user),
                 expiresAtUtc = expiry,
-                isInstallationAdministrator = await InstallationAdministration.IsAdministrator(system, user.Id, context.RequestAborted)
+                isInstallationAdministrator = await InstallationAdministration.IsAdministrator(system, user.Id, context.RequestAborted),
+                mustChangePassword = user.MustChangePassword
             });
         }).RequireAuthorization();
     }

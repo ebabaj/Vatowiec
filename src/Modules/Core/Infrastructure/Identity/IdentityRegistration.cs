@@ -17,18 +17,20 @@ public static class IdentityRegistration
         services.TryAddSingleton(TimeProvider.System);
         services.AddDataProtection();
         services.AddHttpContextAccessor();
-        return services.AddIdentityCore<ApplicationUser>(options =>
+        var identity = services.AddIdentityCore<ApplicationUser>(options =>
         {
             options.Stores.MaxLengthForKeys = 128;
-            options.Password.RequiredLength = 12;
-            options.Password.RequireDigit = true;
-            options.Password.RequireLowercase = true;
-            options.Password.RequireUppercase = true;
-            options.Password.RequireNonAlphanumeric = true;
+            // Password validation comes exclusively from the database-backed validator.
+            options.Password.RequiredLength = 1; options.Password.RequiredUniqueChars = 0;
+            options.Password.RequireDigit = options.Password.RequireLowercase = options.Password.RequireUppercase = options.Password.RequireNonAlphanumeric = false;
             options.Lockout.MaxFailedAccessAttempts = 5;
             options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
             options.Lockout.AllowedForNewUsers = true;
         }).AddRoles<IdentityRole<Guid>>().AddSignInManager()
             .AddEntityFrameworkStores<SystemDbContext>().AddDefaultTokenProviders();
+        services.RemoveAll<IPasswordValidator<ApplicationUser>>();
+        services.AddScoped<IPasswordPolicyProvider, DatabasePasswordPolicyProvider>();
+        services.AddScoped<IPasswordValidator<ApplicationUser>, InstallationPasswordValidator>();
+        return identity;
     }
 }

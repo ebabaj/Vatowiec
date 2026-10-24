@@ -21,5 +21,5 @@ public sealed record ContractorResponse(int Id, Guid CompanyId, string Code, str
     [JsonIgnore]
     public string ActivityLabel => IsActive ? "Aktywny" : "Nieaktywny";
 }
-public sealed record SessionResponse(string UserName, DateTimeOffset ExpiresAtUtc, bool IsInstallationAdministrator = false);
+public sealed record SessionResponse(string UserName, DateTimeOffset ExpiresAtUtc, bool IsInstallationAdministrator = false, bool MustChangePassword = false);
 public sealed record CsrfResponse(string Token, string HeaderName);

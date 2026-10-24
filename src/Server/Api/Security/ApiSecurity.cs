@@ -24,6 +24,7 @@ public static class ApiSecurity
         services.AddScoped<CompanyDatabaseResolver>();
         services.AddScoped<ICompanyDatabaseContextFactory, CompanyDatabaseContextFactory>();
         services.AddSingleton<DummyPassword>();
+        services.AddScoped<UserAdministrationService>();
         services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, InstallationAdministratorHandler>();
         services.AddAuthentication(IdentityConstants.ApplicationScheme).AddCookie(IdentityConstants.ApplicationScheme, options =>
         {
@@ -76,7 +77,7 @@ public static class ApiSecurity
         {
             var services = context.HttpContext.RequestServices;
             var user = await services.GetRequiredService<SignInManager<ApplicationUser>>().ValidateSecurityStampAsync(context.Principal);
-            if (user is null || !Guid.TryParse(context.Principal?.FindFirstValue(SessionClaim), out var sessionId) ||
+            if (user is null || user.IsBlocked || !Guid.TryParse(context.Principal?.FindFirstValue(SessionClaim), out var sessionId) ||
                 await services.GetRequiredService<UserManager<ApplicationUser>>().IsLockedOutAsync(user))
             {
                 context.RejectPrincipal();
@@ -87,6 +88,7 @@ public static class ApiSecurity
                 x => x.Id == sessionId && x.UserId == user.Id && x.RevokedAtUtc == null && x.ExpiresAtUtc > now,
                 context.HttpContext.RequestAborted);
             if (!valid) context.RejectPrincipal();
+            else if (user.MustChangePassword) context.HttpContext.Items["Vatowiec:MustChangePassword"] = true;
         }
         catch (Exception error) when (error is SqlException or InvalidOperationException)
         {

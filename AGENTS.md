@@ -2,9 +2,33 @@
 
 Projekt: **Otwarty następca VATowca** (nazwa robocza).  
 Główne źródło wymagań: [`SPECYFIKACJA.md`](./SPECYFIKACJA.md).  
-Status: standardowe warunki finansowe kontrahenta, 2026-10-23; ADR-031.
+Status: polityka haseł i administratorzy instalacji, 2026-10-24; ADR-033/034.
 
-**Aktualny etap: warunki finansowe kontrahenta (ADR-031).**
+**Aktualny etap: użytkownicy i uprawnienia instalacji (ADR-033).**
+Rozszerzamy istniejące Identity/CompanyAccess, bez nowego logowania. Administrator
+instalacji jest sprawdzany świeżo po stronie serwera, nie ma automatycznych praw
+do danych firm. Hasła tymczasowe tylko raz, obowiązkowa zmiana własna; przed nią
+sesja nie może wywoływać API firm ani administracji. Każdy zapis z CSRF, kontrolą
+wersji, atomowym audytem UserAdministrationChanges w System i unieważnieniem
+sesji przy zmianie hasła/blokady/praw. Bez własnej blokady i utraty ostatniego
+aktywnego administratora, bez DELETE użytkowników i edytora własnych ról.
+ADR-034 dodaje wyłącznie nadawanie/odbieranie istniejącej roli administratora
+instalacji innemu kontu: potwierdzenie, wersja, audyt i unieważnienie sesji,
+bez automatycznych CompanyAccess. Wszystkie administracyjne mutacje używają
+wspólnej blokady transakcyjnej SQL. Polityka haseł jest globalna w System,
+z RowVersion i niezmiennym audytem; jeden dynamiczny walidator Identity egzekwuje
+ją przy tworzeniu, resetowaniu i każdej zmianie hasła, bez cache procesu.
+Początkowo 12 znaków i cztery klasy; po świadomym wyłączeniu każde niepuste
+hasło. Zmiana polityki nie unieważnia haseł/sesji. Generator domyślnie 16 znaków.
+Buduj wyłącznie standardowy Debug; przy blokadzie plików zgłoś potrzebę zatrzymania
+procesu, bez niestandardowych OutputPath/BaseOutputPath i katalogów weryfikacyjnych.
+Migracje tylko System po zweryfikowanym backupie. Nie zmieniaj baz firm.
+seed-users tworzy wyłącznie brakujące konta, nigdy nie resetuje zastanych haseł,
+ról ani CompanyAccess. UserAdministrationSqlTests używają rollback/savepoint,
+bez czyszczenia danych; nie uruchamiaj resetującego runnera. Windows Credential
+Manager pozostaje jak w ADR-032. Szczegóły: docs/users-and-permissions.md.
+
+**Poprzedni etap: warunki finansowe kontrahenta (ADR-031).**
 ContractorTradeTerms ma jedną opcjonalną konfigurację ContractorId/Direction
 Sale (nasza sprzedaż) lub Purchase (nasz zakup), z opcjonalnymi dniami 0–3650,
 metodą, walutą, rabatem decimal(7,4) 0–100 i uwagami do 2000 znaków.
@@ -212,6 +236,32 @@ Po kodowaniu:
 8. Uruchom build i odpowiednie testy; opisz dokładnie co zostało sprawdzone oraz co nie było możliwe do sprawdzenia.
 9. Uaktualnij specyfikację, jeśli powstało nowe ustalenie, oraz dopisz ADR dla decyzji architektonicznej.
 10. Nie ogłaszaj gotowości produkcyjnej bez zgodności z definicją wersji z `SPECYFIKACJA.md`.
+
+### Stała zasada: uruchomienie API po zakończeniu zadania
+
+Po każdym zadaniu programistycznym:
+
+1. Najpierw zakończ kompilację w standardowym Debug, wymagane migracje i testy.
+   Nie uruchamiaj API przed zakończeniem migracji i testów wymagających jego zatrzymania.
+2. Sprawdź port 7243 i upewnij się, że nie działa na nim stara instancja API VATowca.
+   Nie uruchamiaj drugiego serwera równolegle. Jeśli proces blokuje kompilację,
+   zgłoś potrzebę jego zatrzymania; nie obchodź blokady innym katalogiem wyjściowym.
+3. Uruchom aktualne API z katalogu repozytorium w osobnym, widocznym i trwałym
+   terminalu PowerShell, pozostającym otwartym po zakończeniu polecenia:
+
+   ```powershell
+   dotnet run --project src/Server/Api -c Debug --no-build --launch-profile https
+   ```
+
+4. Pozostaw API działające po zakończeniu pracy agenta. Nie zamykaj terminala serwera.
+5. Zweryfikuj nasłuchiwanie HTTPS na `https://localhost:7243` i odpowiedź API.
+6. W końcowym raporcie podaj status API i PID procesu serwera nasłuchującego na 7243
+   (nie tylko PID terminala PowerShell lub procesu `dotnet run`).
+7. Jeśli środowisko agenta nie pozwala utrzymać procesu po zakończeniu zadania,
+   powiedz o tym wprost. Nie deklaruj, że serwer pozostaje uruchomiony bez weryfikacji.
+
+Używaj wyłącznie standardowego Debug, bez Release, dodatkowych katalogów kompilacji
+i niestandardowych `OutputPath`/`BaseOutputPath`. Nie wykonuj Commit ani Push.
 
 ## 7. Proponowany szkielet repozytorium (do zatwierdzenia)
 

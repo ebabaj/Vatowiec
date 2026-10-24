@@ -8,6 +8,19 @@ namespace Vatowiec.Desktop.Services;
 public interface IVatowiecApiClient : IDisposable
 {
     Task<SessionResponse> Login(string userName, string password);
+    Task<UserSummary[]> Users(string search, int offset) => throw new NotSupportedException();
+    Task<UserAdministrationLookups> UserLookups() => throw new NotSupportedException();
+    Task<UserAdministrationDetail> UserDetail(Guid id) => throw new NotSupportedException();
+    Task<TemporaryPasswordResponse> CreateUser(UserCreateRequest value) => throw new NotSupportedException();
+    Task<TemporaryPasswordResponse> ResetUserPassword(Guid id, UserVersionRequest value) => throw new NotSupportedException();
+    Task<UserAdministrationDetail> BlockUser(Guid id, UserBlockRequest value) => throw new NotSupportedException();
+    Task<UserAdministrationDetail> SaveUserAccess(Guid id, UserAccessRequest value) => throw new NotSupportedException();
+    Task<UserAdministrationDetail> SaveAdministratorRole(Guid id, AdministratorRoleRequest value) => throw new NotSupportedException();
+    Task<PasswordPolicyResponse> PasswordPolicy() => throw new NotSupportedException();
+    Task<PasswordPolicyResponse> SavePasswordPolicy(PasswordPolicyRequest value) => throw new NotSupportedException();
+    Task<PasswordPolicyHistory[]> PasswordPolicyHistory(int offset) => throw new NotSupportedException();
+    Task<UserAdministrationHistory[]> UserHistory(Guid? id, int offset) => throw new NotSupportedException();
+    Task ChangeOwnPassword(OwnPasswordRequest value) => throw new NotSupportedException();
     Task<CompanyResponse[]> Companies();
     Task<CompanyProfileResponse> Profile(Guid companyId);
     Task<ContractorResponse[]> Contractors(Guid companyId, string? search = null, string? country = null, bool? active = null, int offset = 0, int limit = 50);
@@ -109,6 +122,19 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
     }
 
     public Task<CompanyResponse[]> Companies() => Get<CompanyResponse[]>("api/v1/companies");
+    public Task<UserSummary[]> Users(string search, int offset) => Get<UserSummary[]>($"api/v1/installation/users?search={Uri.EscapeDataString(search)}&offset={offset}");
+    public Task<UserAdministrationLookups> UserLookups() => Get<UserAdministrationLookups>("api/v1/installation/users/lookups");
+    public Task<UserAdministrationDetail> UserDetail(Guid id) => Get<UserAdministrationDetail>($"api/v1/installation/users/{id}");
+    public Task<TemporaryPasswordResponse> CreateUser(UserCreateRequest value) => Post<TemporaryPasswordResponse>("api/v1/installation/users", value);
+    public Task<TemporaryPasswordResponse> ResetUserPassword(Guid id, UserVersionRequest value) => Post<TemporaryPasswordResponse>($"api/v1/installation/users/{id}/password-reset", value);
+    public Task<UserAdministrationDetail> BlockUser(Guid id, UserBlockRequest value) => Write<UserAdministrationDetail>($"api/v1/installation/users/{id}/state", value, true);
+    public Task<UserAdministrationDetail> SaveUserAccess(Guid id, UserAccessRequest value) => Write<UserAdministrationDetail>($"api/v1/installation/users/{id}/access", value, true);
+    public Task<UserAdministrationDetail> SaveAdministratorRole(Guid id, AdministratorRoleRequest value) => Write<UserAdministrationDetail>($"api/v1/installation/users/{id}/administrator-role", value, true);
+    public Task<PasswordPolicyResponse> PasswordPolicy() => Get<PasswordPolicyResponse>("api/v1/installation/security/password-policy");
+    public Task<PasswordPolicyResponse> SavePasswordPolicy(PasswordPolicyRequest value) => Write<PasswordPolicyResponse>("api/v1/installation/security/password-policy", value, true);
+    public Task<PasswordPolicyHistory[]> PasswordPolicyHistory(int offset) => Get<PasswordPolicyHistory[]>($"api/v1/installation/security/password-policy/history?offset={offset}");
+    public Task<UserAdministrationHistory[]> UserHistory(Guid? id, int offset) => Get<UserAdministrationHistory[]>($"api/v1/installation/users/history?offset={offset}" + (id == null ? "" : $"&userId={id}"));
+    public async Task ChangeOwnPassword(OwnPasswordRequest value) => await Post<System.Text.Json.JsonElement>("api/v1/auth/password", value);
     public Task<GusConfigurationResponse> GusConfiguration() => Get<GusConfigurationResponse>("api/v1/installation/integrations/gus");
     public Task<RegistryConfigurationResponse[]> RegistryConfigurations() => Get<RegistryConfigurationResponse[]>("api/v1/installation/integrations/registries");
     public Task<RegistryConfigurationResponse> SaveRegistryConfiguration(string source, RegistryConfigurationRequest value) =>
@@ -212,7 +238,7 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         using var request = new HttpRequestMessage(HttpMethod.Post, "api/v1/auth/logout");
         request.Headers.Add("X-CSRF-TOKEN", csrf.Token);
         using var response = await http.SendAsync(request);
-        await EnsureSuccess(response, false);
+        await EnsureSuccess(response, false, request.RequestUri);
     }
 
     private async Task<T> Get<T>(string path)
@@ -224,7 +250,7 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
     private async Task<T> Send<T>(HttpRequestMessage request, bool login = false)
     {
         using var response = await http.SendAsync(request);
-        await EnsureSuccess(response, login);
+        await EnsureSuccess(response, login, request.RequestUri);
         try
         {
             return await response.Content.ReadFromJsonAsync<T>() ?? throw new JsonException();
@@ -235,14 +261,24 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         }
     }
 
-    private static async Task EnsureSuccess(HttpResponseMessage response, bool login)
+    private static async Task EnsureSuccess(HttpResponseMessage response, bool login, Uri? uri)
     {
         if (response.IsSuccessStatusCode) return;
         ApiError? error = null;
         try { error = await response.Content.ReadFromJsonAsync<ApiError>(); }
         catch (JsonException) { }
+        var userAdministration = uri?.AbsolutePath.StartsWith("/api/v1/installation/users", StringComparison.Ordinal) == true;
         var message = response.StatusCode switch
         {
+            HttpStatusCode.NotFound when error?.Code == "user_missing" => error.Message ?? "Nie znaleziono użytkownika. Odśwież listę użytkowników.",
+            HttpStatusCode.Conflict when error?.Code == "user_stale" => error.Message ?? "Inny administrator zmienił użytkownika lub jego prawa. Odśwież szczegóły i porównaj aktualny stan.",
+            _ when error?.Code?.StartsWith("user_", StringComparison.Ordinal) == true => error.Message ?? "Sprawdź konto, prawa i aktualną wersję danych.",
+            _ when error?.Code?.StartsWith("password_policy_", StringComparison.Ordinal) == true => error.Message ?? "Sprawdź politykę haseł i aktualną wersję ustawień.",
+            HttpStatusCode.ServiceUnavailable when error?.Code == "system_unavailable" => "Baza systemowa instalacji jest niedostępna lub niezgodna. Spróbuj później lub skontaktuj się z administratorem.",
+            HttpStatusCode.NotFound when userAdministration => "API nie udostępnia żądanej operacji zarządzania użytkownikami. Sprawdź zgodność wersji serwera i aplikacji oraz uruchom aktualną wersję API.",
+            HttpStatusCode.Forbidden when userAdministration => "Brak uprawnień do zarządzania użytkownikami. Wymagana jest aktualna rola administratora instalacji.",
+            HttpStatusCode.Conflict when userAdministration => "Inny administrator zmienił użytkownika lub jego prawa. Odśwież szczegóły i porównaj aktualny stan.",
+            HttpStatusCode.ServiceUnavailable when userAdministration => "Zarządzanie użytkownikami jest chwilowo niedostępne. Nie potwierdzono operacji; odśwież stan przed ponowieniem.",
             _ when error?.Code?.StartsWith("currency_", StringComparison.Ordinal) == true => error.Message ?? "Sprawdź ustawienia, daty i aktualną wersję danych walutowych.",
             _ when error?.Code?.StartsWith("finance_", StringComparison.Ordinal) == true => error.Message ?? "Sprawdź ustawienia finansowe i bieżącą wersję.",
             HttpStatusCode.Conflict when error?.Code == "configuration_stale" => error.Message ?? "Ustawienia zmieniły się. Odśwież stan i ponownie sprawdź wartości.",
@@ -263,7 +299,8 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
             HttpStatusCode.TooManyRequests => "Zbyt wiele żądań do API. Odczekaj minutę przed kolejną próbą; to ograniczenie API VATowca, a nie saldo konta DataPort.",
             HttpStatusCode.ServiceUnavailable => "Baza firmy jest niedostępna lub niezgodna. Spróbuj później lub skontaktuj się z administratorem.",
             HttpStatusCode.NotFound when error?.Code == "detail_not_found" => "Nie znaleziono pozycji u tego kontrahenta. Odśwież listę.",
-            HttpStatusCode.NotFound => "Nie znaleziono kontrahenta w tej firmie. Odśwież listę.",
+            HttpStatusCode.NotFound when error?.Code == "contractor_not_found" => "Nie znaleziono kontrahenta w tej firmie. Odśwież listę.",
+            HttpStatusCode.NotFound => "Nie znaleziono żądanego zasobu lub operacji w API. Sprawdź zgodność wersji serwera i aplikacji.",
             HttpStatusCode.Conflict when error?.Code == "contractor_conflict" => "Inna osoba zmieniła kontrahenta. Porównaj wersje i wybierz sposób rozwiązania konfliktu.",
             HttpStatusCode.Conflict when error?.Code == "contractor_code_exists" => "Ten kod jest już zajęty w tej firmie. Wpisz inny kod.",
             HttpStatusCode.Conflict when error?.Code == "operation_payload_mismatch" => "Ta operacja została już zapisana z innymi danymi. Anuluj formularz, wyszukaj kontrahenta i otwórz jego edycję.",

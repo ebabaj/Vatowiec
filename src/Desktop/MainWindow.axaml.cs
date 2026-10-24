@@ -24,6 +24,7 @@ public partial class MainWindow : Window
         model.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(MainViewModel.ApiAddress) or nameof(MainViewModel.UserName)) PasswordInput.Text = "";
+            if (!model.IsOwnPasswordChange) ClearOwnPasswords();
         };
         Activated += (_, _) => model.RefreshSavedPasswordState();
         model.PropertyChanged += (_, _) => { if (!model.IsDataPortSettings) DataPortKeyInput.Text = ""; };
@@ -82,6 +83,32 @@ public partial class MainWindow : Window
     }
 
     private async void LoginClick(object? sender, RoutedEventArgs e) => await Login();
+    private async void UsersSettingsClick(object? sender, RoutedEventArgs e) => await model.OpenUsersSettings();
+    private async void PasswordPolicyClick(object? sender, RoutedEventArgs e) => await model.OpenPasswordPolicy();
+    private async Task SavePasswordPolicy()
+    {
+        if (model.PasswordPolicyEditor == null) return;
+        var confirm = model.PasswordPolicyEditor.IsEnabled || await AdministrationDialogs.Confirm(this,
+            "Wyłączyć wymagania złożoności haseł w całej instalacji? Każde niepuste hasło będzie dozwolone dla wszystkich użytkowników i firm.");
+        if (confirm) await model.SavePasswordPolicy(!model.PasswordPolicyEditor.IsEnabled);
+    }
+    private async void SavePasswordPolicyClick(object? sender, RoutedEventArgs e) => await SavePasswordPolicy();
+    private async void RefreshPasswordPolicyClick(object? sender, RoutedEventArgs e) => await model.RefreshPasswordPolicy();
+    private void ClosePasswordPolicyClick(object? sender, RoutedEventArgs e) => model.ClosePasswordPolicy();
+    private async void PolicyHistoryPreviousClick(object? sender, RoutedEventArgs e) => await model.LoadPolicyHistory(-1);
+    private async void PolicyHistoryRefreshClick(object? sender, RoutedEventArgs e) => await model.LoadPolicyHistory(0);
+    private async void PolicyHistoryNextClick(object? sender, RoutedEventArgs e) => await model.LoadPolicyHistory(1);
+    private void OwnPasswordClick(object? sender, RoutedEventArgs e) => model.OpenOwnPasswordChange();
+    private void ClearOwnPasswords() { OwnCurrentPassword.Text = ""; OwnNewPassword.Text = ""; OwnRepeatPassword.Text = ""; }
+    private void CancelOwnPasswordClick(object? sender, RoutedEventArgs e) { ClearOwnPasswords(); model.CancelOwnPasswordChange(); }
+    private async Task ChangeOwnPassword()
+    {
+        if (OwnNewPassword.Text != OwnRepeatPassword.Text) { model.ReportOwnPasswordMismatch(); return; }
+        var current = OwnCurrentPassword.Text ?? ""; var replacement = OwnNewPassword.Text ?? "";
+        ClearOwnPasswords(); await model.ChangeOwnPassword(current, replacement);
+    }
+    private async void ChangeOwnPasswordClick(object? sender, RoutedEventArgs e) => await ChangeOwnPassword();
+    private async void OwnPasswordKeyDown(object? sender, KeyEventArgs e) { if (e.Key == Key.Enter) { e.Handled = true; await ChangeOwnPassword(); } }
     private async void ForgetLoginClick(object? sender, RoutedEventArgs e) { PasswordInput.Text = ""; await model.ForgetLoginCredentials(); }
     private async void SetDefaultCompanyClick(object? sender, RoutedEventArgs e) => await model.SetDefaultCompany();
     private async void ClearDefaultCompanyClick(object? sender, RoutedEventArgs e) => await model.ClearDefaultCompany();
@@ -257,6 +284,23 @@ public partial class MainWindow : Window
     {
         if (model.IsBusy) return;
         if (model.DiscardPrompt) { if (e.Key == Key.Escape) model.KeepEditing(); e.Handled = true; return; }
+        if (model.IsPasswordPolicyScreen)
+        {
+            if (e.Key == Key.Escape) { e.Handled = true; model.ClosePasswordPolicy(); }
+            else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.S) { e.Handled = true; await SavePasswordPolicy(); }
+            return;
+        }
+        if (model.IsUsersSettings)
+        {
+            if (e.Key == Key.Escape) { e.Handled = true; model.CloseUsersSettings(); }
+            else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.S) { e.Handled = true; await model.SaveAdminUserAccess(); }
+            return;
+        }
+        if (model.IsOwnPasswordChange)
+        {
+            if (e.Key == Key.Escape && model.CanCancelPasswordChange) { e.Handled = true; ClearOwnPasswords(); model.CancelOwnPasswordChange(); }
+            return;
+        }
         if (model.IsCurrencyScreen)
         {
             if (e.Key == Key.Escape) { e.Handled = true; model.CloseCurrencies(); }

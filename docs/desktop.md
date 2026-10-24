@@ -42,6 +42,11 @@ przed zapamiętanym adresem i nie przenosi do niego hasła innego serwera.
 
 ## Zapamiętanie logowania i firmy domyślnej (Windows)
 
+Administrację kontami i prawami w **Ustawieniach instalacji** opisuje
+[Użytkownicy i uprawnienia](users-and-permissions.md), ADR-033. Konto utworzone
+lub zresetowane w tym module musi najpierw ustawić własne hasło. Hasło tymczasowe
+nie jest zapisywane w Windows Credential Manager.
+
 Obie opcje są domyślnie wyłączone. Używaj ich wyłącznie na zaufanym koncie Windows.
 
 1. Wpisz poprawny HTTPS API, login i hasło. Opcjonalnie zaznacz

@@ -15,6 +15,7 @@ internal sealed class PreservedSystemTransaction : IAsyncDisposable
 {
     private readonly SqlConnection connection;
     private readonly SqlTransaction transaction;
+    private bool disposed;
     public DbContextOptions<SystemDbContext> Options { get; }
     public DbContextOptions<CompanyDbContext> CompanyOptions { get; }
     private PreservedSystemTransaction(SqlConnection connection, SqlTransaction transaction)
@@ -53,6 +54,8 @@ internal sealed class PreservedSystemTransaction : IAsyncDisposable
     public SystemDbContext Context() => new(Options);
     public async ValueTask DisposeAsync()
     {
+        if (disposed) return;
+        disposed = true;
         try { await transaction.RollbackAsync(); }
         finally { await transaction.DisposeAsync(); await connection.DisposeAsync(); }
     }

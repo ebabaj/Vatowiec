@@ -14,6 +14,9 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
     public DbSet<CompanyDatabaseRegistration> CompanyDatabases => Set<CompanyDatabaseRegistration>();
     public DbSet<CompanyAccess> CompanyAccesses => Set<CompanyAccess>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
+    public DbSet<PasswordPolicy> PasswordPolicies => Set<PasswordPolicy>();
+    public DbSet<PasswordPolicyChange> PasswordPolicyChanges => Set<PasswordPolicyChange>();
+    public DbSet<UserAdministrationChange> UserAdministrationChanges => Set<UserAdministrationChange>();
     public DbSet<InstallationIdentity> InstallationIdentities => Set<InstallationIdentity>();
     public DbSet<TaxIdentifierScheme> TaxIdentifierSchemes => Set<TaxIdentifierScheme>();
     public DbSet<GusConfiguration> GusConfigurations => Set<GusConfiguration>();
@@ -23,6 +26,27 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<PasswordPolicy>(b =>
+        {
+            b.ToTable("PasswordPolicy", "security", t => t.HasCheckConstraint("CK_PasswordPolicy_Values", "[SingletonKey]=1 AND [MinimumLength] BETWEEN 1 AND 1024"));
+            b.HasKey(x => x.SingletonKey); b.Property(x => x.SingletonKey).ValueGeneratedNever(); b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasData(new { SingletonKey = 1, IsEnabled = true, MinimumLength = 12, RequireUppercase = true,
+                RequireLowercase = true, RequireDigit = true, RequireSpecialCharacter = true });
+        });
+        modelBuilder.Entity<PasswordPolicyChange>(b =>
+        {
+            b.ToTable("PasswordPolicyChanges", "audit", t => t.HasTrigger("TR_PasswordPolicyChanges_Immutable"));
+            b.HasKey(x => x.Id); b.Property(x => x.ActorName).HasMaxLength(256);
+            b.Property(x => x.BeforeJson).HasMaxLength(2048); b.Property(x => x.AfterJson).HasMaxLength(2048);
+        });
+        modelBuilder.Entity<UserAdministrationChange>(b =>
+        {
+            b.ToTable("UserAdministrationChanges", "audit", t => t.HasTrigger("TR_UserAdministrationChanges_Immutable"));
+            b.HasKey(x => x.Id);
+            b.Property(x => x.ActorName).HasMaxLength(256); b.Property(x => x.TargetName).HasMaxLength(256);
+            b.Property(x => x.Operation).HasMaxLength(48);
+            b.HasIndex(x => new { x.TargetId, x.Id });
+        });
         modelBuilder.ApplyConfiguration(new RegistryConfigurationMapping());
         modelBuilder.ApplyConfiguration(new RegistryConfigurationChangeMapping());
         modelBuilder.Entity<GusConfiguration>(entity =>
@@ -89,6 +113,10 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
     }
     private void ProtectRegistryAudit()
     {
+        if (ChangeTracker.Entries<PasswordPolicyChange>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Historia polityki haseł jest niezmienna.");
+        if (ChangeTracker.Entries<UserAdministrationChange>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Historia administracji użytkownikami jest niezmienna.");
         if (ChangeTracker.Entries<RegistryConfigurationChange>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("Audyt konfiguracji rejestrów jest niezmienny.");
     }

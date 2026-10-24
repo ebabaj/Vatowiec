@@ -29,7 +29,8 @@ public sealed class CompanyAccess : ITrackedEntity
 
     public void ChangePermissions(CompanyPermission permissions)
     {
-        if (permissions == CompanyPermission.None || (permissions & ~(CompanyPermission)1023) != 0)
+        var known = Enum.GetValues<CompanyPermission>().Aggregate(CompanyPermission.None, (all, item) => all | item);
+        if (permissions == CompanyPermission.None || (permissions & ~known) != 0)
             throw new ArgumentException("Nieprawidłowe uprawnienia firmy.", nameof(permissions));
         Permissions = permissions;
     }

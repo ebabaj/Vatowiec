@@ -37,7 +37,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
     public bool IsBusy => busy;
     public bool CanInteract => !busy;
     public bool IsLogin => session is null;
-    public bool IsCompanySelection => session is not null && profile is null && !gusSettings;
+    public bool IsCompanySelection => session is not null && profile is null && !gusSettings && !usersSettings && !IsOwnPasswordChange && !passwordPolicyScreen;
     public bool IsWorkspace => session is not null && profile is not null;
     public string CurrentUser => session?.UserName ?? "";
     public string CurrentCompany => profile?.Name ?? "";
@@ -71,6 +71,12 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
             api = connect(target.ApiAddress);
             session = await api.Login(target.UserName, password);
             signedInLoginTarget = target;
+            if (session.MustChangePassword)
+            {
+                password = "";
+                message = "Przed dalszą pracą ustaw własne hasło. Hasło tymczasowe nie zostanie zapamiętane.";
+                ChangedAll(); return;
+            }
             if (!startingAutomaticLogin) warning = RememberSuccessfulLogin(target, password, remember, automatic) ?? warning;
             password = "";
             ChangedAll();
@@ -188,6 +194,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         try { await action(); }
         catch (ApiException ex)
         {
+            if (ex.StatusCode == 403 && (IsUsersSettings || IsPasswordPolicyScreen))
+            {
+                ResetUsersSettings(); ResetGusSettings(); ResetPasswordPolicy();
+                if (session != null) session = session with { IsInstallationAdministrator = false };
+            }
             if (ex.StatusCode == 401) ResetSession();
             if (ex.StatusCode == 403) ClearCompanyData();
             if (ex.StatusCode == 403 && gusSettings)
@@ -228,6 +239,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         api = null;
         session = null;
         signedInLoginTarget = null;
+        ownPasswordForm = false; ResetUsersSettings();
+        ResetPasswordPolicy();
         ResetGusSettings();
         companies = [];
         selectedCompany = null;

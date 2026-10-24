@@ -118,6 +118,42 @@ Wyłączenie oznacza brak w pierwszym wydaniu, nie zakaz dodania później.
 
 ### 3.5. Uwierzytelnianie i autoryzowany kontekst firmy (M0, ADR-015)
 
+ADR-033 (ORG-003/004/008, T-012): Ustawienia instalacji → Użytkownicy i uprawnienia
+rozszerzają istniejące Identity i CompanyAccess. Aktualna centralna rola administratora
+jest wymagana na serwerze; nie nadaje danych firmowych. Tworzenie, blokowanie,
+reset hasła i prawa per firma wymagają CSRF, wersji, walidacji zależności i atomowego,
+niezmiennego audytu w System. Hasło tymczasowe domyślnie ma 16 losowych znaków
+zgodnych z Identity, prezentowanych w grupach po 4 (kopiowanie bez separatorów).
+Administrator może podać własne hasło według tej samej polityki. Okno wyniku ma
+Pokaż/Ukryj i Kopiuj, bez utrwalania sekretu w VM lub preferencjach; jest dostępne tylko raz;
+pierwszy login wymaga zmiany własnego hasła przed dostępem do innych API.
+Po administracyjnym resecie okno jednorazowego odczytu i kopiowania otwiera się
+wyłącznie dla hasła wygenerowanego. Własnego hasła administratora nie pokazujemy
+ponownie; zwykły komunikat o zmianie i obowiązku ustawienia własnego hasła pojawia
+się dopiero po potwierdzeniu zapisu przez API.
+Blokada/zmiana hasła/praw unieważniają istniejące sesje. Chronimy własne konto
+i ostatniego aktywnego administratora. Bez DELETE użytkowników i edytora własnych ról.
+Zwykłe seed-users nie nadpisuje istniejących kont. Migracja wyłącznie System;
+szczegóły i weryfikacja: docs/users-and-permissions.md.
+
+ADR-034 (ORG-003/004/008, T-012): Ustawienia instalacji → Bezpieczeństwo →
+Polityka haseł przechowują globalne wymagania w Vatowiec_System, z RowVersion
+i atomowym, niezmiennym audytem. Początkowo minimum 12 znaków i wszystkie cztery
+niezależne wymagania: wielka/mała litera, cyfra, znak specjalny. Wyłączenie wymaga
+ostrzeżenia i potwierdzenia; dopuszcza każde niepuste hasło. Jeden dynamiczny
+walidator Identity stosuje bieżące ustawienia przy tworzeniu, resecie oraz
+wymuszonej i zwykłej zmianie hasła, bez restartu i bez unieważniania istniejących
+haseł czy sesji. Generator pozostaje kryptograficzny, domyślnie 16 znaków.
+Role systemowe w edytorze konta pozwalają nadać istniejącą rolę administratora
+innemu aktywnemu kontu i odebrać ją innemu kontu. API sprawdza świeżą rolę aktora,
+CSRF, potwierdzenie i wersję, unieważnia sesje celu i zapisuje audyt w transakcji.
+Wspólna blokada SQL chroni równoległe operacje przed utratą ostatniego aktywnego
+administratora. Nie można odebrać roli sobie; rola nie przyznaje CompanyAccess.
+Nieudany odczyt polityki nie może wyświetlać ani zapisywać domyślnych wartości.
+Formularz wymaga konfiguracji i wersji odczytanej z System; poprawna zmiana
+aktywuje zapis, po którym ponownie odczytujemy konfigurację i rzeczywisty audyt.
+Błędy bazy systemowej mają kontekst instalacji, niezależny od wybranej firmy.
+
 - ASP.NET Core Identity w bazie systemowej przechowuje użytkowników, hashe haseł, role i przypisania do firm. CompanyAccess określa uprawnienia ViewProfile, ViewContractors, EditContractors; rola globalna sama nie nadaje dostępu do firmy.
 - API udostępnia HTTPS login/logout, token CSRF, dane własnej sesji i listę dostępnych firm. Sesja jest chroniona cookie Secure/HttpOnly/SameSite=Strict i centralnym rekordem; absolutne wygaśnięcie domyślnie 30 minut, bez sliding expiration. Logout unieważnia konkretną sesję także dla replay cookie. SecurityStamp i uprawnienia sprawdza się na serwerze przy kolejnych żądaniach.
 - Firma pochodzi wyłącznie ze ścieżki operacji API. Alternatywne query companyId i X-Company-Id oraz dodatkowe pola JSON są odrzucane. Po sprawdzeniu uprawnień resolver weryfikuje konfigurację serwera, CompanyProfile.CompanyId i fizyczną historię migracji. Brak uprawnienia daje 403; brak ważnej sesji 401; niedostępna/obca baza 503. Nie ma bazy domyślnej.
@@ -1044,6 +1080,8 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | [ADR-015](docs/adr/ADR-015-identity-i-autoryzowany-wybor-bazy.md) | Identity, sesje i autoryzowany wybór bazy | Wdrożone API logowania, uprawnienia do firm, resolver i sprawdzanie rzeczywistego profilu; bez UI Avalonia |
 | [ADR-016](docs/adr/ADR-016-desktop-logowanie-i-kontekst-firmy.md) | Avalonia: logowanie i kontekst firmy | Wdrożony scenariusz desktopowy, odczyt kontrahentów, zmiana firmy i wylogowanie |
 | [ADR-032](docs/adr/ADR-032-lokalne-logowanie-i-firma-domyslna.md) | Opcjonalne zapamiętywanie logowania i domyślnej firmy | Windows Credential Manager, niesekretne preferencje per API/login, jednorazowy start przez istniejące API; bez utrwalania sesji |
+| [ADR-033](docs/adr/ADR-033-uzytkownicy-i-uprawnienia.md) | Użytkownicy i uprawnienia instalacji | Istniejące Identity/CompanyAccess, blokady, wymuszona zmiana hasła, unieważnianie sesji, atomowy audyt System i niedestrukcyjny seed |
+| [ADR-034](docs/adr/ADR-034-polityka-hasel-i-rola-administratora.md) | Polityka haseł i delegowanie administracji | Dynamiczna polityka Identity w System, niezależne wymagania, zarządzanie istniejącą rolą administratora z audytem, wersją i ochroną równoległych zmian |
 | [ADR-017](docs/adr/ADR-017-kartoteka-kontrahentow-i-audyt.md) | Edycja kontrahentów, filtry, rowversion i atomowy audyt | Wdrożony formularz, serwerowe filtrowanie/strony i autoryzowany zapis; jawne migracje systemowa i firmowa |
 | [ADR-022](docs/adr/ADR-022-dataport-i-sekrety-firmy.md) | DataPort i ustawienia firmy | Osobny adapter pośrednika, szyfrowany lokalny klucz, kontrola uprawnień i selektywny import do szkicu; bez zmiany oficjalnych adapterów TEST |
 | [ADR-023](docs/adr/ADR-023-waluty-i-reczne-kursy-nbp.md) | Waluty i ręczne kursy NBP | Lokalny słownik/ustawienia A/B/C, kursy decimal, jawne konflikty i audyt, stronicowany ekran Avalonia; bez harmonogramu i reguł faktur |

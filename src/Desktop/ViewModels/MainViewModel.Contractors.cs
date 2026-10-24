@@ -18,8 +18,8 @@ public sealed partial class MainViewModel
     public int FilterActivity { get; set; }
     public bool CanEditContractors => CanViewContractors && selectedCompany?.CanEditContractors == true;
     public bool CanManagePesel => selectedCompany?.Permissions.Contains("ManageContractorPesel", StringComparer.Ordinal) == true;
-    public bool CanBrowse => CanViewContractors && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !IsGusSettings;
-    public bool IsBrowsingWorkspace => IsWorkspace && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !IsGusSettings;
+    public bool CanBrowse => CanViewContractors && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !IsGusSettings && !IsUsersSettings && !IsOwnPasswordChange && !IsPasswordPolicyScreen;
+    public bool IsBrowsingWorkspace => IsWorkspace && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !IsGusSettings && !IsUsersSettings && !IsOwnPasswordChange && !IsPasswordPolicyScreen;
     public bool IsEditing => editor is not null;
     public bool CanSaveContractor => IsMainTab && IsEditing && !HasConflict && CanEditContractors && DetailEditor is null;
     public bool HasConflict => conflictCurrent is not null;
@@ -41,7 +41,7 @@ public sealed partial class MainViewModel
 
     public void NewContractor()
     {
-        if (busy || !CanEditContractors || IsEditing || IsDataPortSettings || IsCurrencyScreen || IsGusSettings) return;
+        if (busy || !CanEditContractors || IsEditing || IsDataPortSettings || IsCurrencyScreen || IsGusSettings || IsUsersSettings || IsOwnPasswordChange || IsPasswordPolicyScreen) return;
         editor = new ContractorEditor();
         ObserveIdentifierEdits();
         conflictCurrent = null;

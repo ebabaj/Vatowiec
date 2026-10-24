@@ -54,8 +54,8 @@ public sealed partial class MainViewModel
         });
     }
     public bool IsInstallationAdministrator => session?.IsInstallationAdministrator == true;
-    public bool IsGusSettings => session != null && gusSettings;
-    public bool CanOpenGusSettings => IsInstallationAdministrator && !busy && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !gusSettings;
+    public bool IsGusSettings => session != null && gusSettings && !IsOwnPasswordChange;
+    public bool CanOpenGusSettings => IsInstallationAdministrator && !busy && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !gusSettings && !IsUsersSettings && !IsOwnPasswordChange && !IsPasswordPolicyScreen;
     public bool CanManageGus => IsGusSettings && IsInstallationAdministrator && !busy && gusConfiguration != null;
     public bool CanDeleteGusKey => CanManageGus && gusConfiguration?.IsConfigured == true;
     public bool ConfirmGusDelete => confirmGusDelete;

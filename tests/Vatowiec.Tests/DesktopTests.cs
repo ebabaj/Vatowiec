@@ -345,7 +345,7 @@ public sealed partial class DesktopTests
         {
             LoginCalls++; CheckLoginInput?.Invoke(userName, password);
             if (LoginError != null) throw LoginError;
-            return PendingLogin ?? Task.FromResult(new SessionResponse(userName, Expires, InstallationAdmin));
+            return PendingLogin ?? Task.FromResult(new SessionResponse(userName, Expires, InstallationAdmin, PasswordChangeRequired));
         }
         public Task<CompanyResponse[]>? PendingCompanies { get; set; }
         public Task<CompanyResponse[]> Companies() => CompanyListError ? throw new HttpRequestException() : PendingCompanies ?? Task.FromResult<CompanyResponse[]>(

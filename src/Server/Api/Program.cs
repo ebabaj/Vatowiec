@@ -48,14 +48,35 @@ app.Use(async (context, next) =>
         context.Response.StatusCode = error.Forbidden ? 403 : 503;
         await context.Response.WriteAsJsonAsync(new { code = error.Code });
     }
-    catch (SqlException)
+    catch (SqlException error)
     {
+        // Log diagnostic metadata, never SQL text, parameters or connection strings.
+        app.Logger.LogError("Database operation failed: SQL {SqlNumber}, route {Route}, correlation {CorrelationId}",
+            error.Number, context.Request.Path.Value, context.TraceIdentifier);
+        var passwordPolicy = context.Request.Path.StartsWithSegments("/api/v1/installation/security/password-policy");
         context.Response.StatusCode = 503;
-        await context.Response.WriteAsJsonAsync(new { code = "system_unavailable" });
+        await context.Response.WriteAsJsonAsync(new
+        {
+            code = passwordPolicy ? error.Number == 208 ? "password_policy_schema_missing" : "password_policy_unavailable" : "system_unavailable",
+            message = passwordPolicy ? error.Number == 208
+                ? "Brak schematu polityki haseł w bazie systemowej instalacji. Administrator musi wykonać przygotowaną migrację System po sprawdzeniu backupu."
+                : "Nie można odczytać lub zapisać polityki haseł w bazie systemowej instalacji. Nie potwierdzono operacji." : null
+        });
     }
 });
 app.UseHttpsRedirection();
 app.UseAuthentication();
+app.Use(async (context, next) =>
+{
+    if (context.Items.ContainsKey("Vatowiec:MustChangePassword") && context.Request.Path.Value is not
+        ("/api/v1/auth/csrf" or "/api/v1/auth/me" or "/api/v1/auth/logout" or "/api/v1/auth/password"))
+    {
+        context.Response.StatusCode = 403;
+        await context.Response.WriteAsJsonAsync(new { code = "user_password_change_required", message = "Przed dalszą pracą ustaw własne hasło." });
+        return;
+    }
+    await next(context);
+});
 app.UseAuthorization();
 app.UseRateLimiter();
 
@@ -69,6 +90,7 @@ app.MapGet("/api/v1/status", () => new ApiStatusResponse("Vatowiec", "M0-skeleto
     .WithName("GetApiStatus").AllowAnonymous();
 
 app.MapAuthentication();
+app.MapUserAdministration();
 app.MapGusConfiguration();
 app.MapRegistryConfiguration();
 app.MapCompanies();

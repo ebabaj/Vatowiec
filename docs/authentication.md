@@ -6,6 +6,33 @@ CompanyProfile i Contractors pozostają wyłącznie w bazach firmowych.
 Interfejs logowania, wyboru firmy i odczytu kartoteki opisuje [desktop](desktop.md).
 Nie ma operacji księgowych ani provisioningu firm.
 
+Aktualizacja ADR-033: [Użytkownicy i uprawnienia](users-and-permissions.md) opisuje
+administrację Identity/CompanyAccess w Avalonia, hasła tymczasowe i obowiązkową
+zmianę własnego hasła, natychmiastowe unieważnianie sesji i niezmienny audyt System.
+`seed-users` od tego etapu inicjalizuje wyłącznie brakujące konta.
+
+ADR-034 dodaje globalną politykę haseł w `security.PasswordPolicy` z RowVersion
+i atomowym, niezmiennym audytem. Początkowo minimum 12 i wszystkie cztery klasy;
+po potwierdzonym wyłączeniu każde niepuste hasło. Jedyny walidator Identity czyta
+bieżący rekord przy tworzeniu, resecie i obu rodzajach zmiany hasła, bez restartu.
+Neutralne PasswordOptions nie tworzą drugiego, sztywnego wymagania 12 znaków.
+Zmiana polityki nie unieważnia dotychczasowych haseł, stempli ani sesji.
+Hashowanie, blokady, CSRF i autoryzacja pozostają aktywne. Generator nadal jest
+kryptograficzny, domyślnie 16 znaków, również po wyłączeniu złożoności.
+
+Istniejącą rolę administratora można nadać/odebrać innemu kontu w osobnej sekcji
+Role systemowe. API ponownie sprawdza aktora w bazie po uzyskaniu wspólnej blokady
+transakcyjnej, weryfikuje wersję i potwierdzenie, unieważnia sesje celu oraz
+zapisuje trwały audyt. Nie można odebrać roli sobie ani ostatniemu aktywnemu
+administratorowi; nadanie wymaga aktywnego celu. Nie powstają CompanyAccess.
+Szczegóły i wdrożenie: [instrukcja administratora](users-and-permissions.md).
+
+Przed użyciem ADR-034 wymagana jest jawna migracja System po zweryfikowanym backupie.
+Brak jej schematu lub rekordu konfiguracji nie uruchamia domyślnej polityki w API.
+Endpointy konfiguracji i historii zwracają konkretny błąd instalacyjny, a formularz
+bez udanego odczytu pozostaje niedostępny. Diagnostyka SQL zapisuje tylko numer,
+ścieżkę operacji bez query oraz korelację, bez parametrów i tekstu SQL.
+
 ## Opcjonalne zapamiętanie w kliencie Windows — ADR-032
 
 [ADR-032](adr/ADR-032-lokalne-logowanie-i-firma-domyslna.md) dodaje opcjonalne
@@ -111,16 +138,17 @@ poleceń, w lokalnym PowerShell użyj Read-Host -AsSecureString, zbuduj JSON w p
 i przekaż go na stdin dotnet user-secrets set --project src/Server/Api.
 Nie zapisuj JSON z hasłami w plikach projektu.
 
-Ponowne ustawienie kont/uprawnień z lokalnej konfiguracji:
+Inicjalizacja wyłącznie brakujących kont z lokalnej konfiguracji:
 
 ```powershell
 dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- seed-users
 ```
 
 Narzędzie używa UserManager/RoleManager, weryfikuje politykę haseł i nie wypisuje
-ich wartości. Jeśli lokalne hasło różni się od zapisanego, resetuje je przez Identity;
-zmiana SecurityStamp odbiera ważność starym sesjom. Polecenie dotyczy lokalnego
-demonstratora i przywraca zdefiniowane wyżej przypisania dwóch kont.
+ich wartości. Istniejące konto pomija w całości, zachowując hasło, role, prawa
+i stan ustawiony przez administratora. Zmiana hasła w konfiguracji nie resetuje
+konta. Początkowe przypisania z powyższej tabeli dotyczą wyłącznie nowych kont.
+Reset hasła i edycja praw są jawne w module administracji ADR-033.
 
 ## Szybka próba dwóch użytkowników
 

@@ -4,6 +4,7 @@
         xmlns:vm="using:Vatowiec.Desktop.ViewModels"
         xmlns:contracts="using:Vatowiec.SharedContracts"
         xmlns:converters="using:Vatowiec.Desktop.Converters"
+        xmlns:desktop="using:Vatowiec.Desktop"
         x:DataType="vm:MainViewModel"
         Title="VATowiec — firmy i kontrahenci"
         Width="1180" Height="860"
@@ -20,6 +21,7 @@
       <StackPanel Grid.Column="1" IsVisible="{Binding !IsLogin}" HorizontalAlignment="Right">
         <TextBlock Text="{Binding CurrentUser}" FontWeight="SemiBold" AutomationProperties.AutomationId="CurrentUser" />
         <TextBlock Text="{Binding SessionExpiry}" Opacity="0.7" />
+        <Button Content="Zmień własne hasło" Click="OwnPasswordClick" IsVisible="{Binding CanOpenOwnPasswordChange}" AutomationProperties.AutomationId="OwnPassword"/>
         <Button Content="Zapomnij dane logowania" Click="ForgetLoginClick" AutomationProperties.AutomationId="ForgetLoginSignedIn"/>
       </StackPanel>
     </Grid>
@@ -224,6 +226,8 @@
       </Grid>
       <ScrollViewer IsVisible="{Binding IsGusSettings}">
         <StackPanel Spacing="12" MaxWidth="740" HorizontalAlignment="Left">
+          <Button Content="Użytkownicy i uprawnienia" Click="UsersSettingsClick" AutomationProperties.AutomationId="OpenUsers"/>
+          <Button Content="Bezpieczeństwo → Polityka haseł" Click="PasswordPolicyClick" AutomationProperties.AutomationId="OpenPasswordPolicy"/>
           <TextBlock Text="Ustawienia instalacji → Integracje zewnętrzne" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>
           <ComboBox SelectedIndex="{Binding RegistryServiceIndex, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.AutomationId="RegistryService">
             <ComboBoxItem Content="GUS BIR1.2"/><ComboBoxItem Content="MF — wykaz VAT i WL2"/><ComboBoxItem Content="VIES"/>
@@ -264,6 +268,49 @@
           <TextBlock Text="Po przeniesieniu instalacji lub utracie ochrony kryptograficznej wpisz klucz ponownie. Sama kopia bazy SQL nie wystarcza do odszyfrowania sekretu." TextWrapping="Wrap"/>
           </StackPanel>
           <WrapPanel><Button Content="Wróć" Click="CloseGusSettingsClick" AutomationProperties.AutomationId="CloseGusSettings"/><Button Content="Wyloguj" Click="LogoutClick"/></WrapPanel>
+        </StackPanel>
+      </ScrollViewer>
+      <desktop:UserAdministrationView IsVisible="{Binding IsUsersSettings}"/>
+      <ScrollViewer IsVisible="{Binding IsPasswordPolicyScreen}">
+        <StackPanel MaxWidth="740" HorizontalAlignment="Left" Spacing="14">
+          <TextBlock Text="Ustawienia instalacji → Bezpieczeństwo → Polityka haseł" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>
+          <TextBlock Text="Wspólne wymagania dla wszystkich użytkowników i firm. Zmiana obowiązuje przy następnym ustawieniu hasła; nie zmienia dotychczasowych haseł i nie wylogowuje użytkowników." TextWrapping="Wrap"/>
+          <TextBlock IsVisible="{Binding !HasPasswordPolicy}" Text="Nie wczytano konfiguracji z bazy systemowej instalacji. Formularz pozostaje niedostępny; sprawdź komunikat i wybierz Odśwież." TextWrapping="Wrap" AutomationProperties.AutomationId="PasswordPolicyNotLoaded"/>
+          <Border IsVisible="{Binding HasPasswordPolicy}">
+          <StackPanel DataContext="{Binding PasswordPolicyEditor}" x:DataType="vm:PasswordPolicyEditor" Spacing="12">
+            <CheckBox Content="Włącz politykę złożoności haseł" IsChecked="{Binding IsEnabled, Mode=TwoWay}" AutomationProperties.AutomationId="PasswordPolicyEnabled"/>
+            <StackPanel IsEnabled="{Binding IsEnabled}" Spacing="10">
+              <TextBlock Text="Minimalna długość hasła"/>
+              <NumericUpDown Minimum="1" Maximum="1024" Increment="1" FormatString="0" Value="{Binding MinimumLength, Mode=TwoWay}" Width="160" HorizontalAlignment="Left" AutomationProperties.AutomationId="PasswordMinimumLength"/>
+              <CheckBox Content="Wymagaj wielkiej litery" IsChecked="{Binding RequireUppercase, Mode=TwoWay}" AutomationProperties.AutomationId="PasswordRequireUppercase"/>
+              <CheckBox Content="Wymagaj małej litery" IsChecked="{Binding RequireLowercase, Mode=TwoWay}" AutomationProperties.AutomationId="PasswordRequireLowercase"/>
+              <CheckBox Content="Wymagaj cyfry" IsChecked="{Binding RequireDigit, Mode=TwoWay}" AutomationProperties.AutomationId="PasswordRequireDigit"/>
+              <CheckBox Content="Wymagaj znaku specjalnego" IsChecked="{Binding RequireSpecialCharacter, Mode=TwoWay}" AutomationProperties.AutomationId="PasswordRequireSpecial"/>
+            </StackPanel>
+            <TextBlock IsVisible="{Binding !IsEnabled}" Text="Uwaga: po wyłączeniu każde niepuste hasło będzie dozwolone dla wszystkich użytkowników. Zapis wymaga osobnego potwierdzenia." Foreground="#B42318" TextWrapping="Wrap"/>
+            <TextBlock Text="{Binding Status}" Foreground="#9A6700" AutomationProperties.AutomationId="PasswordPolicyStatus"/>
+          </StackPanel>
+          </Border>
+          <WrapPanel><Button Content="Zapisz politykę haseł" Click="SavePasswordPolicyClick" IsEnabled="{Binding CanSavePasswordPolicy}" AutomationProperties.AutomationId="SavePasswordPolicy"/><Button Content="Odśwież" Click="RefreshPasswordPolicyClick" AutomationProperties.AutomationId="RefreshPasswordPolicy"/><Button Content="Wróć" Click="ClosePasswordPolicyClick" AutomationProperties.AutomationId="ClosePasswordPolicy"/></WrapPanel>
+          <TextBlock Text="Historia zmian polityki" FontSize="18"/>
+          <TextBlock IsVisible="{Binding !HasPolicyHistory}" Text="Historia zmian nie została wczytana." AutomationProperties.AutomationId="PasswordPolicyHistoryNotLoaded"/>
+          <TextBlock IsVisible="{Binding IsPolicyHistoryEmpty}" Text="Nie ma zapisanych zmian polityki haseł."/>
+          <Button Content="Odśwież historię" Click="PolicyHistoryRefreshClick" AutomationProperties.AutomationId="RefreshPolicyHistory"/>
+          <ItemsControl ItemsSource="{Binding PasswordPolicyHistory}" AutomationProperties.AutomationId="PasswordPolicyHistory"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:PasswordPolicyHistoryRow">
+            <StackPanel Spacing="4" Margin="0,0,0,14"><TextBlock Text="{Binding Time}" FontWeight="SemiBold"/><TextBlock Text="{Binding Actor}"/><TextBlock Text="{Binding Before}" TextWrapping="Wrap"/><TextBlock Text="{Binding After}" TextWrapping="Wrap"/></StackPanel>
+          </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+          <WrapPanel><Button Content="Nowsze" Click="PolicyHistoryPreviousClick" IsEnabled="{Binding PolicyHistoryHasPrevious}"/><Button Content="Starsze" Click="PolicyHistoryNextClick" IsEnabled="{Binding PolicyHistoryHasNext}"/></WrapPanel>
+        </StackPanel>
+      </ScrollViewer>
+      <ScrollViewer IsVisible="{Binding IsOwnPasswordChange}">
+        <StackPanel MaxWidth="460" HorizontalAlignment="Left" Spacing="12" Margin="0,20">
+          <TextBlock Text="Ustaw własne hasło" FontSize="24" FontWeight="SemiBold"/>
+          <TextBlock Text="Wpisz bieżące (lub tymczasowe) i nowe hasło. Po zapisie wszystkie sesje zostaną unieważnione. Zaloguj się ponownie nowym hasłem." TextWrapping="Wrap"/>
+          <TextBlock Text="Bieżące hasło"/><TextBox x:Name="OwnCurrentPassword" PasswordChar="●" MaxLength="1024" AutomationProperties.AutomationId="CurrentPassword"/>
+          <TextBlock Text="Nowe hasło"/><TextBox x:Name="OwnNewPassword" PasswordChar="●" MaxLength="1024" AutomationProperties.AutomationId="NewPassword"/>
+          <TextBlock Text="Powtórz nowe hasło"/><TextBox x:Name="OwnRepeatPassword" PasswordChar="●" MaxLength="1024" KeyDown="OwnPasswordKeyDown" AutomationProperties.AutomationId="RepeatPassword"/>
+          <TextBlock Text="Obowiązują aktualne wymagania haseł ustawione dla instalacji. Hasło nie może być puste." TextWrapping="Wrap"/>
+          <WrapPanel><Button Content="Zmień hasło" Click="ChangeOwnPasswordClick" AutomationProperties.AutomationId="SaveOwnPassword"/><Button Content="Anuluj" Click="CancelOwnPasswordClick" IsVisible="{Binding CanCancelPasswordChange}"/><Button Content="Wyloguj" Click="LogoutClick"/></WrapPanel>
         </StackPanel>
       </ScrollViewer>
       <ScrollViewer IsVisible="{Binding IsDataPortSettings}">

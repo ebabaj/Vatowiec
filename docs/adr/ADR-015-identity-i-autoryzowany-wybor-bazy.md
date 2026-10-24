@@ -7,6 +7,11 @@ Uzupełnia ADR-014; nie zmienia fizycznego rozdzielenia baz.
 
 ## Decyzja i model
 
+Aktualizacja 2026-10-24: ADR-033 rozszerza ten mechanizm o administrację kontami
+i prawami w Avalonia, audyt System oraz wymuszoną zmianę hasła. Zastępuje również
+historyczne resetowanie kont przez seed opisane niżej: obecny seed-users pomija
+istniejące konta w całości. Instrukcja: [użytkownicy i uprawnienia](../users-and-permissions.md).
+
 ASP.NET Core Identity 10.0.13 działa w SystemDbContext jako
 IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>. Hasła obsługuje
 UserManager i standardowy PasswordHasher Identity; nie implementujemy własnej
