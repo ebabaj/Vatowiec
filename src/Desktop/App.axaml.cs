@@ -12,7 +12,13 @@ public partial class App : Avalonia.Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new MainWindow();
+            if (desktop.Args?.Contains("--personal", StringComparer.Ordinal) == true)
+            {
+                var backend = new Services.PersonalBackend();
+                desktop.MainWindow = new PersonalSetupWindow(backend);
+                desktop.Exit += (_, _) => backend.Dispose();
+            }
+            else desktop.MainWindow = new MainWindow();
         }
 
         base.OnFrameworkInitializationCompleted();

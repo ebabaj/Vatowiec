@@ -5,7 +5,23 @@ using Microsoft.Data.SqlClient;
 using System.Text.Json.Serialization;
 using Vatowiec.SharedContracts;
 
-var builder = WebApplication.CreateBuilder(args);
+Vatowiec.Api.Hosting.PersonalWorker? personalWorker = null;
+if (args is ["--personal-worker", _, _])
+{
+    if (!OperatingSystem.IsWindows()) return;
+    personalWorker = await Vatowiec.Api.Hosting.PersonalWorker.Prepare(args);
+    if (personalWorker == null) return;
+}
+using var personalLifetime = personalWorker;
+var builder = personalWorker == null ? WebApplication.CreateBuilder(args) :
+    WebApplication.CreateBuilder(new WebApplicationOptions { Args = [], EnvironmentName = PersonalDatabaseTarget.Edition });
+if (personalWorker != null)
+{
+    if (!OperatingSystem.IsWindows()) return;
+    personalWorker.Configure(builder);
+}
+else if (builder.Environment.IsEnvironment(PersonalDatabaseTarget.Edition))
+    throw new InvalidOperationException("Personal wymaga uruchomienia przez lokalny klient VATowiec.");
 if (builder.Environment.IsEnvironment(PersonalPrototypeDatabase.Edition))
     Vatowiec.Api.Hosting.PersonalPrototypeConfiguration.Configure(builder);
 
@@ -102,6 +118,7 @@ app.MapGusConfiguration();
 app.MapRegistryConfiguration();
 app.MapCompanies();
 
+if (personalWorker != null && OperatingSystem.IsWindows()) personalWorker.Attach(app);
 app.Run();
 
 // Punkt wejścia udostępniony hostowi testowemu bez uruchamiania zewnętrznego procesu.

@@ -23,12 +23,14 @@ public static class DependencyInjection
         IConfiguration configuration,
         bool isDevelopment) =>
         RegisterInfrastructure(services, _ => configuration.GetConnectionString("VatowiecSystem"), isDevelopment,
-            configuration["Vatowiec:Edition"] == PersonalPrototypeDatabase.Edition);
+            configuration["Vatowiec:Edition"] == PersonalPrototypeDatabase.Edition,
+            configuration["Vatowiec:Edition"] == PersonalDatabaseTarget.Edition
+                ? new PersonalDatabaseTarget(Guid.Parse(configuration["Personal:InstallationId"]!)) : null);
 
     private static IServiceCollection RegisterInfrastructure(
         IServiceCollection services,
         Func<IServiceProvider, string?> getConnectionString,
-        bool isDevelopment, bool isPersonalPrototype = false)
+        bool isDevelopment, bool isPersonalPrototype = false, PersonalDatabaseTarget? personal = null)
     {
         services.TryAddScoped<ICompanyContext>(_ => new CompanyContext(null));
         services.AddScoped<IExchangeRateReader, ExchangeRateReader>();
@@ -43,7 +45,7 @@ public static class DependencyInjection
         {
             // Odczyt po złożeniu konfiguracji hosta, w tym nadpisań testowych.
             var connectionString = getConnectionString(provider);
-            DatabaseConnectionPolicy.ValidateSystem(connectionString, isDevelopment, isPersonalPrototype);
+            DatabaseConnectionPolicy.ValidateSystem(connectionString, isDevelopment, isPersonalPrototype, personal);
             if (string.IsNullOrWhiteSpace(connectionString))
             {
                 // Konfiguracja providera bez adresu serwera i bez otwierania połączenia.
@@ -65,7 +67,7 @@ public static class DependencyInjection
                 throw new InvalidOperationException("Baza firmy wymaga jawnego wyboru zgodnego z autoryzowanym kontekstem.");
             }
 
-            DatabaseConnectionPolicy.ValidateCompany(selection.ConnectionString, isDevelopment, isPersonalPrototype);
+            DatabaseConnectionPolicy.ValidateCompany(selection.ConnectionString, isDevelopment, isPersonalPrototype, personal);
             options.UseSqlServer(selection.ConnectionString);
         });
 

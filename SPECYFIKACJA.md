@@ -13,6 +13,15 @@ Wspólne modele, migracje, formularze i database-per-company; bez SQLite i bez
 SQL w kliencie. Zweryfikowano izolowany prototyp, nie instalator Personal.
 [Wyniki i brakujące elementy](docs/personal-localdb.md).
 
+ADR-038 (ORG-003/004/008/009/011, T-012/T-016): pierwszy start Personal przez
+kreator Avalonia. Inicjalizacja ma prywatny odziedziczony kanał do własnego
+API, bez endpointu HTTP i bez SQL w kliencie. Nowe prywatne bazy mają znaczniki
+własności i checkpointy; pierwszy administrator, rola, CompanyAccess i audyt
+są atomowe. Zapisane w SQL zakończenie trwale zamyka bootstrap. Restart
+wznawia te same identyfikatory albo otwiera normalne logowanie. Network bez zmian;
+instalator i certyfikat Personal pozostają kolejnymi etapami.
+[Działanie kreatora i wyniki](docs/personal-first-run.md).
+
 ADR-036: lokalny instalator klienta Windows `0.1.0-preview`, per-user, self-contained
 Release win-x64, bez API, SQL i migracji. Aktualizacja i odinstalowanie zachowują
 preferencje oraz Windows Credential Manager. HTTPS i izolacja tożsamości pozostają

@@ -58,7 +58,9 @@ public sealed class CompanyDatabaseResolver(SystemDbContext system, IConfigurati
                 throw new CompanyResolutionException("company_unavailable");
             connection.InitialCatalog = registration.DatabaseName;
             DatabaseConnectionPolicy.ValidateCompany(connection.ConnectionString, isDevelopment,
-                configuration["Vatowiec:Edition"] == PersonalPrototypeDatabase.Edition);
+                configuration["Vatowiec:Edition"] == PersonalPrototypeDatabase.Edition,
+                configuration["Vatowiec:Edition"] == PersonalDatabaseTarget.Edition
+                    ? new PersonalDatabaseTarget(Guid.Parse(configuration["Personal:InstallationId"]!)) : null);
             context = (contexts ?? new CompanyDatabaseContextFactory()).Create(connection.ConnectionString, companyId);
             var identity = await context.CompanyProfiles.IgnoreQueryFilters().AsNoTracking()
                 .SingleOrDefaultAsync(cancellationToken);

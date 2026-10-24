@@ -1,0 +1,30 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Vatowiec.Desktop.PersonalSetupWindow" Title="VATowiec Personal — pierwsze uruchomienie"
+        Width="700" Height="760" MinWidth="540" MinHeight="600" WindowStartupLocation="CenterScreen">
+  <ScrollViewer>
+    <StackPanel Margin="28" Spacing="14">
+      <TextBlock Text="Witaj w VATowiec Personal" FontSize="26" FontWeight="SemiBold" />
+      <TextBlock Text="Przygotujemy prywatną instalację na tym komputerze: konto administratora oraz oddzielną bazę pierwszej firmy." TextWrapping="Wrap" />
+      <Border Background="#12808080" Padding="12" CornerRadius="6">
+        <TextBlock Text="1. Sprawdzenie LocalDB → 2. Instancja → 3. Baza systemowa → 4. Firma → 5. Administrator i uprawnienia" TextWrapping="Wrap" />
+      </Border>
+      <TextBlock x:Name="SetupStatus" AutomationProperties.AutomationId="PersonalSetupStatus" Text="Sprawdzanie środowiska…" TextWrapping="Wrap" />
+      <ProgressBar x:Name="SetupProgress" IsIndeterminate="True" Height="4" />
+      <StackPanel x:Name="SetupForm" IsEnabled="False" Spacing="8">
+        <TextBlock Text="Administrator instalacji" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock Text="Login" /><TextBox x:Name="SetupLogin" AutomationProperties.AutomationId="PersonalSetupLogin" MaxLength="128" />
+        <TextBlock Text="Hasło" /><TextBox x:Name="SetupPassword" AutomationProperties.AutomationId="PersonalSetupPassword" PasswordChar="●" />
+        <TextBlock Text="Powtórz hasło" /><TextBox x:Name="SetupPasswordConfirmation" AutomationProperties.AutomationId="PersonalSetupPasswordConfirmation" PasswordChar="●" />
+        <TextBlock Text="Co najmniej 12 znaków, wielka i mała litera, cyfra oraz znak specjalny. Hasło nie zostanie zapisane w plikach." TextWrapping="Wrap" FontSize="12" />
+        <TextBlock Text="Pierwsza firma" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
+        <TextBlock Text="Nazwa firmy" /><TextBox x:Name="SetupCompany" AutomationProperties.AutomationId="PersonalSetupCompany" MaxLength="256" />
+        <TextBlock Text="NIP (opcjonalny, 10 cyfr)" /><TextBox x:Name="SetupNip" AutomationProperties.AutomationId="PersonalSetupNip" MaxLength="10" />
+        <TextBlock Text="Administrator otrzyma wszystkie uprawnienia do tej firmy, w tym do PESEL. Dostęp można później zmienić w ustawieniach użytkowników." TextWrapping="Wrap" FontSize="12" />
+        <Button x:Name="InitializePersonal" AutomationProperties.AutomationId="InitializePersonal" Content="Przygotuj instalację" Click="InitializeClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+      </StackPanel>
+      <Button x:Name="OpenPersonalLogin" AutomationProperties.AutomationId="OpenPersonalLogin" Content="Przejdź do logowania" IsVisible="False" Click="LoginClick" />
+      <Button x:Name="RetryPersonalCheck" Content="Sprawdź ponownie" IsVisible="False" Click="RetryClick" />
+      <TextBlock Text="Przerwaną konfigurację można wznowić po ponownym uruchomieniu. Kreator nie resetuje danych ani nie instaluje dodatkowych programów." TextWrapping="Wrap" FontSize="12" />
+    </StackPanel>
+  </ScrollViewer>
+</Window>

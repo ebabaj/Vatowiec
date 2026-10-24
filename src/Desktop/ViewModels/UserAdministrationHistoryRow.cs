@@ -7,6 +7,9 @@ public sealed class UserAdministrationHistoryRow(UserAdministrationHistory value
     public string Time => value.OccurredAtUtc.ToLocalTime().ToString("g");
     public string Operation => value.Operation switch
     {
+        "PersonalInitialized" => "Pierwsze uruchomienie instalacji Personal",
+        "Created" => "Utworzenie konta", "AdministratorGranted" => "Nadanie roli administratora instalacji",
+        "CompanyAccessGranted" => "Nadanie dostępu do pierwszej firmy",
         "CreateUser" => "Utworzenie konta", "ResetPassword" => "Administracyjny reset hasła",
         "ChangeOwnPassword" => "Zmiana własnego hasła", "BlockUser" => "Zablokowanie konta",
         "GrantInstallationAdministrator" => "Nadanie roli administratora instalacji", "RevokeInstallationAdministrator" => "Odebranie roli administratora instalacji",

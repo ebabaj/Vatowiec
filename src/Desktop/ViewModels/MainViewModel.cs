@@ -23,13 +23,13 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
     private bool disposed;
 
     public MainViewModel(Func<string, IVatowiecApiClient>? connect = null, TimeProvider? clock = null,
-        ILoginPreferencesStore? preferencesStore = null, ILoginCredentialStore? credentialStore = null)
+        ILoginPreferencesStore? preferencesStore = null, ILoginCredentialStore? credentialStore = null, string? apiAddressOverride = null)
     {
         this.connect = connect ?? VatowiecApiClient.Connect;
         this.clock = clock ?? TimeProvider.System;
         this.preferencesStore = preferencesStore ?? new MemoryLoginPreferencesStore();
         this.credentialStore = credentialStore ?? new UnavailableLoginCredentialStore();
-        configuredApiAddress = Environment.GetEnvironmentVariable("VATOWIEC_API_URL");
+        configuredApiAddress = apiAddressOverride ?? Environment.GetEnvironmentVariable("VATOWIEC_API_URL");
         apiAddress = configuredApiAddress ?? "https://localhost:7243";
     }
 

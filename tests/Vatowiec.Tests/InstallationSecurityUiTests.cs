@@ -119,6 +119,8 @@ public sealed class InstallationSecurityUiTests
                                 Assert.Equal("1", Environment.GetEnvironmentVariable("VATOWIEC_PRESERVED_VAT_SQL"));
                                 await UserAdministrationSqlTests.VerifyPolicyThroughNativeWindow(lifetime);
                             }
+                            if (Environment.GetEnvironmentVariable("VATOWIEC_PERSONAL_SETUP_TESTS") == "1")
+                                await PersonalSetupUiVerification.Run(lifetime);
                             finished.TrySetResult();
                         }
                         catch (Exception e) { finished.TrySetException(e); }
@@ -134,7 +136,7 @@ public sealed class InstallationSecurityUiTests
             catch (Exception e) { finished.TrySetException(e); }
         }) { IsBackground = true, Name = "Avalonia installation security verification" };
         thread.SetApartmentState(ApartmentState.STA); thread.Start();
-        await finished.Task.WaitAsync(TimeSpan.FromSeconds(40));
+        await finished.Task.WaitAsync(TimeSpan.FromSeconds(Environment.GetEnvironmentVariable("VATOWIEC_PERSONAL_SETUP_TESTS") == "1" ? 240 : 40));
         Assert.True(thread.Join(TimeSpan.FromSeconds(5)));
     }
     internal static T Find<T>(Window window, string id) where T : Control => window.GetVisualDescendants().OfType<T>()

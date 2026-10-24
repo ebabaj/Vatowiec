@@ -4,6 +4,12 @@ Data: 2026-10-24. Status: przyjęty kierunek i sprawdzony prototyp techniczny;
 instalator Personal pozostaje następnym etapem. Wymagania ORG-003/004/008/010/011,
 T-012/T-014, dystrybucja E15. Uzupełnia ADR-014/015/016/032/035/036.
 
+Etap 2 uzupełnia [ADR-038](ADR-038-personal-pierwsze-uruchomienie.md): normalny
+kreator Avalonia, prywatny kanał inicjalizacji, checkpointy i zamknięcie
+bootstrapu po pierwszym administratorze. Zweryfikowano nowe bazy, wznowienie,
+restart, logowanie i graceful shutdown. Poniższe granice prototypu opisują etap 1;
+aktualne działanie i wyniki: [pierwsze uruchomienie](../personal-first-run.md).
+
 ## Kontekst i decyzja
 
 Personal: jeden komputer Windows, Avalonia, lokalne API ASP.NET Core i prywatna

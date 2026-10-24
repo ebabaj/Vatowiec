@@ -194,6 +194,14 @@ nie był wykonywany. [Ograniczenia SQL Server 2025](https://learn.microsoft.com/
 
 ## Pierwsza instalacja i warunki kolejnego etapu
 
+Aktualizacja etapu 2: [kreator pierwszego uruchomienia](personal-first-run.md)
+oraz [ADR-038](adr/ADR-038-personal-pierwsze-uruchomienie.md) realizują bootstrap
+administratora i pierwszej firmy, checkpointy, pojedynczy serwer i jego
+poprawne zamknięcie. Sprawdzono je na nowych instancjach LocalDB oraz w Avalonia.
+Poniższa lista opisuje braki po eksperymencie etapu 1; punkty 2–3 są obecnie
+zaimplementowane w zakresie etapu 2. Instalator, certyfikat bez SDK, aktualizacje
+i pełne restore nadal pozostają do wykonania.
+
 Do przygotowania Personal 0.1.0-preview potrzebny jest jeszcze odrębny etap:
 
 1. Instalator rozróżniający wariant, wykrywający LocalDB 17 i oferujący jawnie

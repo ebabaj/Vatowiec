@@ -4,8 +4,9 @@ namespace Vatowiec.Core.Infrastructure.Persistence;
 
 public static class DatabaseConnectionPolicy
 {
-    public static void ValidateSystem(string? connectionString, bool isDevelopment, bool isPersonalPrototype = false)
+    public static void ValidateSystem(string? connectionString, bool isDevelopment, bool isPersonalPrototype = false, PersonalDatabaseTarget? personal = null)
     {
+        if (personal != null) { personal.Validate(connectionString, true); return; }
         if (string.IsNullOrWhiteSpace(connectionString))
         {
             return; // Status/health i generowanie modelu nadal działają bez SQL.
@@ -18,8 +19,9 @@ public static class DatabaseConnectionPolicy
         }
     }
 
-    public static void ValidateCompany(string connectionString, bool isDevelopment, bool isPersonalPrototype = false)
+    public static void ValidateCompany(string connectionString, bool isDevelopment, bool isPersonalPrototype = false, PersonalDatabaseTarget? personal = null)
     {
+        if (personal != null) { personal.Validate(connectionString, false); return; }
         var connection = Parse(connectionString, isDevelopment, isPersonalPrototype);
         if (IsSystemDatabase(connection.InitialCatalog) || PersonalPrototypeDatabase.IsSystem(connection.InitialCatalog) ||
             new[] { "Vatowiec_Dev", "master", "model", "msdb", "tempdb" }
