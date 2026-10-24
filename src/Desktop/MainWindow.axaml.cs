@@ -89,7 +89,7 @@ public partial class MainWindow : Window
     {
         if (model.PasswordPolicyEditor == null) return;
         var confirm = model.PasswordPolicyEditor.IsEnabled || await AdministrationDialogs.Confirm(this,
-            "Wyłączyć wymagania złożoności haseł w całej instalacji? Każde niepuste hasło będzie dozwolone dla wszystkich użytkowników i firm.");
+            "Wyłączyć wymagania złożoności haseł w całej instalacji? Nie będzie ograniczeń długości ani klas znaków. Historia i ważność hasła pozostają niezależne.");
         if (confirm) await model.SavePasswordPolicy(!model.PasswordPolicyEditor.IsEnabled);
     }
     private async void SavePasswordPolicyClick(object? sender, RoutedEventArgs e) => await SavePasswordPolicy();

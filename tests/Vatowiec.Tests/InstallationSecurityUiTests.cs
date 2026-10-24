@@ -55,6 +55,16 @@ public sealed class InstallationSecurityUiTests
                             Click(window, "SavePasswordPolicy"); await Dialog(lifetime, "ConfirmAdministration");
                             await Until(() => api.PolicyWrites == 2 && !model.IsBusy);
                             Assert.False(api.Policy.IsEnabled); Assert.True(api.DisableConfirmed);
+                            Find<CheckBox>(window, "PreventPasswordReuse").IsChecked = true;
+                            Find<NumericUpDown>(window, "PreviousPasswordCount").Value = 2;
+                            Find<CheckBox>(window, "EnforcePasswordExpiration").IsChecked = true;
+                            Find<NumericUpDown>(window, "PasswordValidityDays").Value = 30;
+                            Assert.True(Find<NumericUpDown>(window, "PreviousPasswordCount").IsEffectivelyEnabled);
+                            Assert.True(model.CanSavePasswordPolicy);
+                            Click(window, "SavePasswordPolicy"); await Dialog(lifetime, "ConfirmAdministration");
+                            await Until(() => api.PolicyWrites == 3 && !model.IsBusy);
+                            Assert.True(api.Policy.PreventPasswordReuse && api.Policy.EnforcePasswordExpiration);
+                            Assert.Equal(2, api.Policy.PreviousPasswordCount); Assert.Equal(30, api.Policy.PasswordValidityDays);
                             Find<CheckBox>(window, "PasswordPolicyEnabled").IsChecked = true;
                             Click(window, "ClosePasswordPolicy"); Assert.True(model.DiscardPrompt);
                             model.KeepEditing(); Assert.True(model.IsPasswordPolicyScreen);
@@ -139,7 +149,7 @@ public sealed class InstallationSecurityUiTests
         var until = DateTime.UtcNow.AddSeconds(5);
         while (!predicate()) { if (DateTime.UtcNow > until) throw new TimeoutException("Avalonia operation did not finish."); await Task.Delay(15); }
     }
-    private static async Task Dialog(IClassicDesktopStyleApplicationLifetime lifetime, string action)
+    internal static async Task Dialog(IClassicDesktopStyleApplicationLifetime lifetime, string action)
     {
         await Until(() => lifetime.Windows.Any(x => x.Title == "Potwierdzenie operacji"));
         var dialog = lifetime.Windows.Single(x => x.Title == "Potwierdzenie operacji");
@@ -156,18 +166,19 @@ public sealed class InstallationSecurityUiTests
         public int PolicyWrites, RoleWrites;
         public bool DisableConfirmed;
         public bool FailRole;
-        public Task<SessionResponse> Login(string u, string p) => Task.FromResult(new SessionResponse(u, DateTimeOffset.UtcNow.AddMinutes(30), true));
+        public Task<SessionResponse> Login(string u, string p) => Task.FromResult(new SessionResponse(u, DateTimeOffset.UtcNow.AddMinutes(30), true, UserId: Guid.Parse("dddddddd-0000-4000-8000-000000000001")));
         public Task<CompanyResponse[]> Companies() => Task.FromResult<CompanyResponse[]>([]);
         public Task<PasswordPolicyResponse> PasswordPolicy() => Task.FromResult(Policy);
         public Task<PasswordPolicyResponse> SavePasswordPolicy(PasswordPolicyRequest v)
         {
             Assert.Equal(Policy.RowVersion, v.RowVersion); PolicyWrites++; DisableConfirmed = v.ConfirmDisable;
-            Policy = new(v.IsEnabled, v.MinimumLength, v.RequireUppercase, v.RequireLowercase, v.RequireDigit, v.RequireSpecialCharacter, PolicyWrites.ToString());
+            Policy = new(v.IsEnabled, v.MinimumLength, v.RequireUppercase, v.RequireLowercase, v.RequireDigit, v.RequireSpecialCharacter, PolicyWrites.ToString(),
+                v.PreventPasswordReuse, v.PreviousPasswordCount, v.EnforcePasswordExpiration, v.PasswordValidityDays);
             return Task.FromResult(Policy);
         }
         public Task<PasswordPolicyHistory[]> PasswordPolicyHistory(int offset) => Task.FromResult<PasswordPolicyHistory[]>([]);
         public Task<UserAdministrationLookups> UserLookups() => Task.FromResult(new UserAdministrationLookups([], []));
-        public Task<UserSummary[]> Users(string search, int offset) => Task.FromResult(new[] { Target.User });
+        public Task<UserSummary[]> Users(string search, int offset, bool includeArchived = false) => Task.FromResult(new[] { Target.User });
         public Task<UserAdministrationDetail> UserDetail(Guid id) => Task.FromResult(Target);
         public Task<UserAdministrationHistory[]> UserHistory(Guid? id, int offset) => Task.FromResult<UserAdministrationHistory[]>([]);
         public Task<UserAdministrationDetail> SaveAdministratorRole(Guid id, AdministratorRoleRequest value)

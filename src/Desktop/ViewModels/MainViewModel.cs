@@ -64,17 +64,32 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
             var target = new LoginTarget(ApiAddress, UserName);
             var remember = RememberCredentials; var automatic = AutomaticLogin;
             var warning = ReadLoginPreferences();
-            if (string.IsNullOrEmpty(password) && credentialStore.Contains(target))
+            target = new(target.ApiAddress, target.UserName, loginPreferences.Find(target)?.UserId);
+            if (string.IsNullOrEmpty(password) && target.UserId != null && credentialStore.Contains(target))
                 password = credentialStore.Read(target) ?? "";
             if (string.IsNullOrEmpty(password)) throw new ArgumentException("Wpisz hasło. Nie znaleziono zapamiętanego poświadczenia dla tego serwera i loginu.");
             ResetSession();
             api = connect(target.ApiAddress);
             session = await api.Login(target.UserName, password);
+            if (session.UserId == Guid.Empty) { ResetSession(); throw new ApiException(502, "API nie zwróciło identyfikatora użytkownika. Wymagana jest aktualna wersja serwera."); }
+            if (target.UserId != null && target.UserId != session.UserId)
+            {
+                var newId = session.UserId;
+                try { await api.Logout(); } catch (Exception ex) when (IsExpected(ex)) { }
+                try { credentialStore.Delete(target); } catch (LocalLoginStorageException) { }
+                ResetSession(); rememberCredentials = automaticLogin = false;
+                var clean = new LoginProfilePreferences(target.ApiAddress, target.UserName, UserId: newId);
+                loginPreferences = loginPreferences.WithProfile(clean, makeLast: true);
+                try { preferencesStore.Save(loginPreferences); } catch (LocalLoginStorageException) { }
+                message = "Ten login należy do innej tożsamości użytkownika. Odrzucono zapamiętane dane, autologowanie i firmę domyślną. Zaloguj się ponownie ręcznie.";
+                password = ""; return;
+            }
+            target = new(target.ApiAddress, target.UserName, session.UserId);
             signedInLoginTarget = target;
             if (session.MustChangePassword)
             {
                 password = "";
-                message = "Przed dalszą pracą ustaw własne hasło. Hasło tymczasowe nie zostanie zapamiętane.";
+                message = "Przed dalszą pracą ustaw nowe własne hasło. Poświadczenie nie zostanie zapamiętane przed zakończeniem zmiany.";
                 ChangedAll(); return;
             }
             if (!startingAutomaticLogin) warning = RememberSuccessfulLogin(target, password, remember, automatic) ?? warning;
@@ -103,6 +118,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         if (api is null || session is null || selectedCompany is null)
             throw new ArgumentException("Wybierz firmę z listy.");
+        if (signedInLoginTarget?.UserId != session.UserId || session.UserId == Guid.Empty)
+            throw new ApiException(401, "Nie potwierdzono tożsamości użytkownika. Zaloguj się ponownie.");
         var id = selectedCompany.CompanyId;
         ClearCompanyData();
         var result = await api.Profile(id);
@@ -194,6 +211,13 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         try { await action(); }
         catch (ApiException ex)
         {
+            if (ex.StatusCode == 403 && ex.Code == "user_password_change_required")
+            {
+                ClearCompanyData(); ResetUsersSettings(); ResetGusSettings(); ResetPasswordPolicy();
+                if (session != null) session = session with { MustChangePassword = true };
+                message = "Hasło wymaga zmiany. Ustaw własne hasło przed dalszą pracą.";
+                return;
+            }
             if (ex.StatusCode == 403 && (IsUsersSettings || IsPasswordPolicyScreen))
             {
                 ResetUsersSettings(); ResetGusSettings(); ResetPasswordPolicy();

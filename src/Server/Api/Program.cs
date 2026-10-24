@@ -48,6 +48,11 @@ app.Use(async (context, next) =>
         context.Response.StatusCode = error.Forbidden ? 403 : 503;
         await context.Response.WriteAsJsonAsync(new { code = error.Code });
     }
+    catch (Vatowiec.Core.Infrastructure.Identity.UserAdministrationException error)
+    {
+        context.Response.StatusCode = error.Status;
+        await context.Response.WriteAsJsonAsync(new { code = error.Code, message = error.Message });
+    }
     catch (SqlException error)
     {
         // Log diagnostic metadata, never SQL text, parameters or connection strings.

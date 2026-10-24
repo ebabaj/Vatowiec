@@ -2,7 +2,7 @@
 
 Projekt: **Otwarty następca VATowca** (nazwa robocza).  
 Główne źródło wymagań: [`SPECYFIKACJA.md`](./SPECYFIKACJA.md).  
-Status: polityka haseł i administratorzy instalacji, 2026-10-24; ADR-033/034.
+Status: historia/ważność haseł i archiwizacja tożsamości, 2026-10-24; ADR-035.
 
 **Aktualny etap: użytkownicy i uprawnienia instalacji (ADR-033).**
 Rozszerzamy istniejące Identity/CompanyAccess, bez nowego logowania. Administrator
@@ -11,7 +11,20 @@ do danych firm. Hasła tymczasowe tylko raz, obowiązkowa zmiana własna; przed 
 sesja nie może wywoływać API firm ani administracji. Każdy zapis z CSRF, kontrolą
 wersji, atomowym audytem UserAdministrationChanges w System i unieważnieniem
 sesji przy zmianie hasła/blokady/praw. Bez własnej blokady i utraty ostatniego
-aktywnego administratora, bez DELETE użytkowników i edytora własnych ról.
+aktywnego administratora, bez fizycznego DELETE użytkowników i edytora własnych ról.
+ADR-035 dodaje niezależne, domyślnie wyłączone historię haseł (aktualne + 1–20
+poprzednich) i ważność (1–3650 dni). Historię trzymamy jako do 20 zastąpionych
+hashy Identity na UserId; sprawdzamy PasswordHasher, nigdy równość hashy.
+VatowiecUserManager zapisuje hasło/datę UTC/historię atomowo we wszystkich ścieżkach.
+Ważność ma datę włączenia zapewniającą starym kontom pełny okres na zmianę;
+każde żądanie istniejącej sesji sprawdza termin i ogranicza dostęp do zmiany hasła.
+Archiwizacja zachowuje UserId/login historyczny/audyt, odbiera role i CompanyAccess
+i unieważnia sesje. A przywraca tę samą osobę z nowym hasłem bez dawnych praw;
+B atomowo przekazuje login nowemu UserId, bez historii haseł, sesji i preferencji.
+Stare konto po B pozostaje w archiwum; seed nigdy go nie odtwarza.
+ADR-032 wiąże preferencje i Credential Manager v2 z UserId API. Stare wpisy bez
+tożsamości wymagają ręcznego logowania. Niezgodność UserId odrzuca sesję i lokalne
+dane przed pobraniem firm. Szczegóły i wdrożenie: ADR-035 i docs/users-and-permissions.md.
 ADR-034 dodaje wyłącznie nadawanie/odbieranie istniejącej roli administratora
 instalacji innemu kontu: potwierdzenie, wersja, audyt i unieważnienie sesji,
 bez automatycznych CompanyAccess. Wszystkie administracyjne mutacje używają

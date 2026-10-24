@@ -7,6 +7,23 @@ namespace Vatowiec.Desktop.ViewModels;
 public sealed partial class MainViewModel
 {
     private bool usersSettings, ownPasswordForm;
+    private bool showArchivedUsers;
+    public bool ShowArchivedUsers
+    {
+        get => showArchivedUsers;
+        set
+        {
+            if (busy || value == showArchivedUsers) return;
+            void Apply() { showArchivedUsers = value; NewUserName = ""; _ = Run(() => ReadAdminUsers(0)); }
+            if (HasAdminChanges) { RequestDiscard(Apply); Changed(nameof(ShowArchivedUsers)); } else Apply();
+        }
+    }
+    public bool IsArchivedAdminUser => adminUser?.User.IsArchived == true;
+    public bool CanChangeSelectedAccount => CanManageUsers && adminUser != null && !IsArchivedAdminUser;
+    public bool CanArchiveUser => CanChangeSelectedAccount && !string.Equals(adminUser!.User.UserName, CurrentUser, StringComparison.OrdinalIgnoreCase);
+    public bool CanRestoreAdminUser => CanManageUsers && IsArchivedAdminUser && adminUser?.User.IsLoginReleased == false;
+    public string ArchivedUserInfo => !IsArchivedAdminUser ? "" : $"Konto usunięte: {adminUser!.User.ArchivedAtUtc?.ToLocalTime():g}; administrator: {adminUser.User.ArchivedByName}. " +
+        (adminUser.User.IsLoginReleased ? "Login przekazano nowej osobie; tego konta nie można już przywrócić." : "Login pozostaje zarezerwowany. Wybierz świadomie tę samą albo nową osobę.");
     private readonly ObservableCollection<UserSummary> adminUsers = [];
     private UserSummary? selectedAdminUser;
     private UserAdministrationDetail? adminUser;
@@ -14,7 +31,7 @@ public sealed partial class MainViewModel
     private bool adminRoleUnconfirmed;
     public bool AdministratorRole { get => administratorRole; set { if (busy) return; administratorRole = value; Changed(); Changed(nameof(CanSaveAdministratorRole)); Changed(nameof(AdminRoleStatus)); Changed(nameof(AdminDirtyStatus)); Changed(nameof(HasUnsavedChanges)); } }
     public bool HasRoleChanges => adminUser != null && administratorRole != adminUser.User.IsInstallationAdministrator;
-    public bool CanEditAdministratorRole => CanManageUsers && adminUser != null && !adminRoleUnconfirmed && !string.Equals(adminUser.User.UserName, CurrentUser, StringComparison.OrdinalIgnoreCase);
+    public bool CanEditAdministratorRole => CanChangeSelectedAccount && !adminRoleUnconfirmed && !string.Equals(adminUser!.User.UserName, CurrentUser, StringComparison.OrdinalIgnoreCase);
     public bool CanSaveAdministratorRole => CanEditAdministratorRole && HasRoleChanges;
     public string AdminRoleStatus => adminUser == null ? "" : adminRoleUnconfirmed
         ? "Aktualny stan roli nie został potwierdzony. Checkbox pokazuje ostatni odczytany stan. Odśwież szczegóły użytkownika przed kolejną zmianą."
@@ -35,7 +52,7 @@ public sealed partial class MainViewModel
     public bool CanManageUsers => IsUsersSettings && IsInstallationAdministrator && !busy;
     public bool HasAdminUser => IsUsersSettings && adminUser != null;
     public bool HasAdminChanges => HasRoleChanges || adminCompanyAccess.Any(x => x.IsDirty) || !string.IsNullOrWhiteSpace(NewUserName);
-    public bool CanSaveUserAccess => CanManageUsers && adminUser != null && adminCompanyAccess.Any(x => x.IsDirty);
+    public bool CanSaveUserAccess => CanChangeSelectedAccount && adminCompanyAccess.Any(x => x.IsDirty);
     public ObservableCollection<UserSummary> AdminUsers => adminUsers;
     public CompanyAccessEditor[] AdminCompanyAccess => adminCompanyAccess;
     public UserAdministrationHistoryRow[] AdminHistory => adminHistory;
@@ -44,9 +61,9 @@ public sealed partial class MainViewModel
     public string AdminPage => $"Strona {adminOffset / 50 + 1}";
     public bool AdminHistoryHasNext { get; private set; }
     public bool AdminHistoryHasPrevious => adminHistoryOffset > 0;
-    public string AdminAccountName => adminUser?.User.UserName ?? "Wybierz konto lub utwórz nowe";
+    public string AdminAccountName => adminUser?.User.DisplayName ?? "Wybierz konto lub utwórz nowe";
     public string AdminAccountStatus => adminUser == null ? "" :
-        (adminUser.User.IsBlocked ? "Konto zablokowane" : "Konto aktywne") +
+        (adminUser.User.IsArchived ? "Konto usunięte" : adminUser.User.IsBlocked ? "Konto zablokowane" : "Konto aktywne") +
         (adminUser.User.MustChangePassword ? " · wymagana zmiana hasła" : "") +
         (adminUser.User.IsInstallationAdministrator ? " · administrator instalacji (bez automatycznych praw do firm)" : "");
     public string AdminBlockAction => adminUser?.User.IsBlocked == true ? "Aktywuj konto…" : "Zablokuj konto…";
@@ -75,7 +92,7 @@ public sealed partial class MainViewModel
     {
         if (api == null || !IsUsersSettings) return;
         var text = AdminSearch.Trim(); if (text != loadedAdminSearch) offset = 0;
-        var rows = await api.Users(text, offset); loadedAdminSearch = text; adminOffset = offset;
+        var rows = await api.Users(text, offset, showArchivedUsers); loadedAdminSearch = text; adminOffset = offset;
         adminUsers.Clear(); foreach (var row in rows.Take(50)) adminUsers.Add(row); AdminHasNext = rows.Length > 50;
         selectedAdminUser = null; adminUser = null; adminCompanyAccess = []; adminHistory = [];
     }
@@ -106,7 +123,7 @@ public sealed partial class MainViewModel
     }
     public Task SaveAdminUserAccess() => Run(async () =>
     {
-        if (api == null || adminUser == null || !IsUsersSettings) return;
+        if (api == null || adminUser == null || !IsUsersSettings || IsArchivedAdminUser) return;
         if (HasRoleChanges) throw new ArgumentException("Zapisz lub porzuć zmianę roli systemowej przed zapisem praw firmowych.");
         var result = await api.SaveUserAccess(adminUser.User.Id, new(adminUser.ConcurrencyStamp, adminCompanyAccess.Select(x => x.Request()).ToArray()));
         AcceptAdminUser(result); await ReadAdminHistory(0);
@@ -133,7 +150,7 @@ public sealed partial class MainViewModel
     public async Task<TemporaryPasswordResponse?> ResetAdminPassword(string? temporaryPassword = null)
     {
         TemporaryPasswordResponse? result = null;
-        if (!CanManageUsers || adminUser == null) return null;
+        if (!CanChangeSelectedAccount || adminUser == null) return null;
         if (HasAdminChanges) { message = "Zapisz lub porzuć niezapisane zmiany przed resetem hasła."; ChangedAll(); return null; }
         await Run(async () =>
         {
@@ -148,14 +165,14 @@ public sealed partial class MainViewModel
     }
     public Task ToggleAdminBlock() => Run(async () =>
     {
-        if (api == null || adminUser == null || !IsUsersSettings) return;
+        if (api == null || adminUser == null || !IsUsersSettings || IsArchivedAdminUser) return;
         if (HasAdminChanges) throw new ArgumentException("Zapisz lub porzuć niezapisane zmiany przed zmianą stanu konta.");
         AcceptAdminUser(await api.BlockUser(adminUser.User.Id, new(adminUser.ConcurrencyStamp, !adminUser.User.IsBlocked, true)));
         await ReadAdminHistory(0); message = "Zapisano stan konta i unieważniono dotychczasowe sesje.";
     });
     public Task SaveAdministratorRole() => Run(async () =>
     {
-        if (api == null || adminUser == null || !IsUsersSettings) return;
+        if (api == null || adminUser == null || !IsUsersSettings || IsArchivedAdminUser) return;
         if (adminCompanyAccess.Any(x => x.IsDirty) || !string.IsNullOrWhiteSpace(NewUserName))
             throw new ArgumentException("Zapisz lub porzuć pozostałe zmiany przed zmianą roli systemowej.");
         if (!IsInstallationAdministrator || adminRoleUnconfirmed || string.Equals(adminUser.User.UserName, CurrentUser, StringComparison.OrdinalIgnoreCase)) return;
@@ -198,7 +215,7 @@ public sealed partial class MainViewModel
     }
     private void ResetUsersSettings()
     {
-        usersSettings = false; adminUsers.Clear(); selectedAdminUser = null; adminUser = null; adminLookups = null; administratorRole = false; adminRoleUnconfirmed = false;
+        usersSettings = false; showArchivedUsers = false; adminUsers.Clear(); selectedAdminUser = null; adminUser = null; adminLookups = null; administratorRole = false; adminRoleUnconfirmed = false;
         adminCompanyAccess = []; adminHistory = []; adminOffset = adminHistoryOffset = 0; NewUserName = ""; AdminSearch = loadedAdminSearch = "";
     }
     public void OpenOwnPasswordChange()

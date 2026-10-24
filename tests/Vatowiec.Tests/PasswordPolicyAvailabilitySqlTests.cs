@@ -25,10 +25,10 @@ public sealed partial class UserAdministrationSqlTests
         setup.AddScoped<IPasswordPolicyProvider>(_ => new FixedPasswordPolicyProvider());
         using var provider = setup.BuildServiceProvider();
         var password = "Fixture!1a-" + Guid.NewGuid().ToString("N"); var actor = await Account(provider, true, password);
-        var exists = await db.Database.SqlQueryRaw<int>("SELECT CASE WHEN OBJECT_ID(N'security.PasswordPolicy') IS NULL THEN 0 ELSE 1 END AS [Value]").SingleAsync();
-        var logs = new SqlNumberLogs(); var unavailable = new MissingPolicyRead { Enabled = exists == 1 };
+        var logs = new SqlNumberLogs(); var unavailable = new MissingPolicyRead();
         using var app = App(tx, unavailable, logs); using var client = Client(app);
         await Login(client, actor.UserName!, password);
+        unavailable.Enabled = true; unavailable.ReadsToSkip = 1; // Session validation reads the real policy before the endpoint's failed read.
         var response = await client.GetAsync(PolicyRoute);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         var error = (await response.Content.ReadFromJsonAsync<JsonElement>());
@@ -40,11 +40,13 @@ public sealed partial class UserAdministrationSqlTests
     private sealed class MissingPolicyRead : DbCommandInterceptor
     {
         public bool Enabled;
+        public int ReadsToSkip;
         public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command, CommandEventData data,
             InterceptionResult<DbDataReader> result, CancellationToken ct = default)
         {
             // Real SQL error without DDL, deleting data or changing existing configuration.
-            if (Enabled) command.CommandText = command.CommandText.Replace("[security].[PasswordPolicy]", "[security].[UnavailablePasswordPolicyForTest]", StringComparison.Ordinal);
+            if (Enabled && command.CommandText.Contains("[security].[PasswordPolicy]", StringComparison.Ordinal) && --ReadsToSkip < 0)
+                command.CommandText = command.CommandText.Replace("[security].[PasswordPolicy]", "[security].[UnavailablePasswordPolicyForTest]", StringComparison.Ordinal);
             return ValueTask.FromResult(result);
         }
     }

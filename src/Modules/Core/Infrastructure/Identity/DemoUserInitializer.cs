@@ -11,7 +11,7 @@ public sealed class DemoUserInitializer(SystemDbContext db, UserManager<Applicat
     public async Task<bool> CreateIfMissing(string name, string password, string role, IReadOnlyDictionary<Guid, CompanyPermission> initialAccess)
     {
         await using var tx = await db.Database.BeginTransactionAsync(); await UserAdministrationService.Lock(db, default);
-        if (await users.FindByNameAsync(name) != null) return false;
+        if (await users.FindByNameAsync(name) != null || await db.Users.AnyAsync(x => x.IsArchived && x.HistoricalNormalizedUserName == users.NormalizeName(name))) return false;
         if (!await roles.RoleExistsAsync(role)) Ensure(await roles.CreateAsync(new IdentityRole<Guid>(role) { Id = Guid.NewGuid() }));
         var user = new ApplicationUser { UserName = name };
         Ensure(await users.CreateAsync(user, password)); Ensure(await users.AddToRoleAsync(user, role));

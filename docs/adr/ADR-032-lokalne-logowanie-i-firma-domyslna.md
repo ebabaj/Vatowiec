@@ -6,6 +6,15 @@ Wymagania: ORG-003, ORG-008, UX §10, bezpieczeństwo §11.1.
 Uzupełnia ADR-015/016; zastępuje wyłącznie dotychczasowy zakaz opcjonalnego
 zapamiętywania hasła w kliencie. Bez zmian uwierzytelniania serwera i SQL.
 
+Aktualizacja [ADR-035](ADR-035-historia-hasel-i-archiwizacja-tozsamosci.md):
+preferencje zawierają niezmienny UserId zwrócony przez API. Credential Manager
+używa przestrzeni v2 z dodatkowym UserId. Opisana poniżej v1 jest historyczna:
+nie używamy jej do logowania, a dawne preferencje bez UserId tracą autostart
+i firmę domyślną oraz wymagają ręcznego logowania. Niezgodność UserId po loginie
+unieważnia nową sesję klienta i usuwa dawne poświadczenie/preferencje, zanim
+pobierzemy listę firm. Przywrócenie tej samej osoby zachowuje UserId, a nowa
+osoba wykorzystująca ten sam login zawsze otrzymuje inną tożsamość.
+
 ## Decyzja
 
 Hasło może być zapisane dopiero po udanym Login() i wyłącznie przez

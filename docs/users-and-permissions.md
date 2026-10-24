@@ -1,4 +1,4 @@
-# Użytkownicy i uprawnienia — ADR-033/034
+# Użytkownicy i uprawnienia — ADR-033/034/035
 
 Moduł rozszerza istniejące ASP.NET Identity, SystemDbContext i CompanyAccess.
 Wymagania: ORG-003/004/008 i T-012; [decyzja](adr/ADR-033-uzytkownicy-i-uprawnienia.md).
@@ -85,7 +85,7 @@ Wielkie i małe litery oraz cyfry odpowiadają dotychczasowym klasom Identity
 A–Z, a–z, 0–9. Nie dokonujemy normalizacji treści hasła.
 
 Wyłączenie złożoności pokazuje ostrzeżenie i wymaga świadomego potwierdzenia.
-Wówczas każde niepuste hasło jest dozwolone, także jednoznakowe; puste nadal
+Wówczas każde niepuste hasło spełnia wymagania złożoności, także jednoznakowe; puste nadal
 jest odrzucane. Zachowany limit transportowy 1024 znaków służy ochronie żądań.
 Hashowanie, CSRF, kontrola dostępu, blokady kont i sesje działają nadal.
 
@@ -315,3 +315,95 @@ wyłącznie przy generowaniu oraz brak ponownego pokazania ręcznie wpisanego ha
 Testy asynchroniczne sprawdzają komunikat dopiero po odpowiedzi API oraz brak
 sukcesu po odrzuceniu zapisu. Bez zmian serwera, bazy i mechanizmów Identity.
 Raport: `TestResults/password-reset-presentation-debug.trx`.
+
+## Historia i ważność haseł — ADR-035
+
+W **Ustawienia instalacji → Bezpieczeństwo → Polityka haseł** są dwie dodatkowe,
+niezależne od złożoności opcje. Domyślnie obie są wyłączone:
+
+- **Nie pozwalaj ponownie używać poprzednich haseł**: ustaw liczbę 1–20
+  (wartość pomocnicza 5). Zablokowane są aktualne hasło i N poprzednich.
+- **Wymuszaj okresową zmianę hasła**: ustaw ważność 1–3650 dni
+  (wartość pomocnicza 90). Włączenie daje dotychczasowym kontom pełny okres
+  od daty włączenia; późniejsze zmiany hasła rozpoczynają nowy okres.
+
+Przy wyłączonej złożoności nadal obowiązują włączone historia i ważność.
+System przechowuje do 20 hashy zastąpionych haseł Identity na UserId, również
+gdy blokada ponownego użycia jest wyłączona, aby zachować kolejność przyszłych
+zmian. Nie odtwarzamy brakującej wcześniejszej historii. Hashe nie trafiają do
+DTO, audytu ani klienta; kandydat jest sprawdzany przez PasswordHasher,
+a nie równość hashy. Rehash podczas logowania nie przedłuża ważności.
+
+Tworzenie, reset, przywrócenie i własna zmiana hasła zapisują datę UTC i historię
+w tej samej transakcji co hasło. Nieudany zapis/audyt wycofuje całość. Starym
+kontom nie dopisujemy fikcyjnych dat zmiany. Każde żądanie serwera sprawdza
+ważność, również w istniejących sesjach: po terminie dostępne są tylko własny
+stan, CSRF, wylogowanie i zmiana hasła. Klient przechodzi do istniejącego
+ograniczonego formularza. Nie zmieniono hashowania, blokad ani długości sesji.
+
+## Usunięcie logiczne i dwie operacje przywrócenia
+
+**Usuń użytkownika…** wymaga potwierdzenia. Konto znika ze zwykłej listy;
+zachowujemy UserId, login historyczny, datę, administratora i cały audyt.
+Wszystkie role, przypisania firmowe i sesje są wyłączane atomowo. Nie można
+usunąć siebie ani ostatniego aktywnego administratora. Login pozostaje
+zarezerwowany: zwykłe tworzenie użytkownika nie może go ponownie użyć.
+
+Zaznacz **Pokaż usuniętych**, wybierz konto i świadomie wybierz jedną z dwóch
+odrębnych operacji:
+
+- **To ta sama osoba — przywróć konto** zachowuje oryginalny UserId i login.
+  Wybierz nowe hasło tymczasowe (generowane albo własne). Wymagana jest zmiana
+  przy następnym logowaniu. Dawne role i dostęp do firm nie wracają; nadaj je
+  świadomie. Historia haseł i poprzednich operacji pozostaje przy tej osobie.
+- **To nowa osoba — wykorzystaj login** pozostawia starą tożsamość na zawsze
+  w archiwum i tworzy nowe konto z nowym UserId. Konto archiwalne otrzymuje
+  unikalną nazwę wewnętrzną, a oryginalny login pozostaje w osobnym polu.
+  Nowa osoba nie otrzymuje dawnych praw, historii haseł ani sesji. Operacja
+  jest atomowa; obie powiązane tożsamości są wskazane w audycie. Starego konta
+  po zwolnieniu loginu nie można przywrócić operacją A.
+
+W obu przypadkach własne hasło nie jest pokazywane ponownie. Wygenerowane
+ma jednorazowe okno odczytu/kopiowania. Nie ma fizycznego usuwania kont ani
+przepisywania właściciela dawnych zdarzeń. `seed-users` pomija także archiwalne
+oraz historyczne loginy i nigdy nie reaktywuje konta.
+
+## Zapamiętana tożsamość klienta
+
+API zwraca UserId, a preferencje i wpis Credential Manager v2 są z nim związane
+oprócz adresu HTTPS/loginu. Po wykryciu innego UserId dla tej samej nazwy klient
+odrzuca sesję, usuwa stare poświadczenie i preferencje firmy, wyłącza autologowanie
+i wymaga ponownego ręcznego logowania **przed pobraniem firm**. Nowa osoba nie
+dziedziczy danych poprzednika nawet przy przypadkowo takim samym haśle.
+Wpisy v1 i preferencje bez tożsamości wymagają ręcznego logowania po aktualizacji.
+Nie kopiujemy sekretów do pliku preferencji. Przy tej samej osobie UserId nie
+zmienia się; nowe hasło trzeba wpisać, a firmy nadal wymagają świeżego CompanyAccess.
+
+## Wdrożenie ADR-035
+
+Zastosowano wyłącznie addytywną migrację System
+**20261024120721_PasswordLifecycleAndArchivedUsers**: nowe pola Users/PasswordPolicy,
+nullable RelatedUserId w audycie i security.UserPasswordHistory. Bez zmian baz firm,
+starych hashy, dat zmiany hasła i dotychczasowych ustawień złożoności. Nowe opcje
+są wyłączone. Przed migracją wykonano COPY_ONLY/CHECKSUM i VERIFYONLY/CHECKSUM:
+`C:\Program Files\Microsoft SQL Server\MSSQL17.SQLEXPRESS\MSSQL\Backup\Vatowiec_System_before_contractors_e915c1309ac84893826531947e88b8cf.bak`.
+Log: `TestResults/adr035-backup.txt`; skrypt: `TestResults/adr035-migration.sql`.
+Nie stosuj Down z danymi: usuwa historię haseł i metadane archiwizacji. API
+i klient aktualizuj razem; zapis polityki wymaga jawnych nowych pól kontraktu,
+aby stary klient nie mógł przypadkowo wyłączyć nieznanych mu zabezpieczeń.
+
+Weryfikacja: standardowy Debug; testy jednostkowe, transport/Windows Credential
+Manager, niedestrukcyjne SQL z rollbackiem oraz natywna Avalonia z rzeczywistym
+Kestrelem/HTTPS/Identity/SQL. Scenariusze obejmują N i retencję 20, reset/obie
+zmiany hasła, okres ochronny i wygaśnięcie w istniejących sesjach, archiwizację,
+przywrócenie tej samej osoby i nowego UserId, brak dziedziczenia danych, CSRF,
+wersje, rolę aktora, seed i awarie audytu. Natywne UI sprawdza niezależność nowych
+checkboxów od złożoności, filtr archiwum i obie wyraźne operacje przywrócenia.
+Raport: `TestResults/adr035-regression-debug.trx`; ślad: `TestResults/adr035-native-api.txt`.
+
+Wynik ADR-035: standardowy Debug całego rozwiązania — **0 błędów i 0 ostrzeżeń**;
+**495/495 testów**, 0 pominiętych: 479 bez SQL, 15 niedestrukcyjnych SQL/API
+i natywna Avalonia z rzeczywistym API/SQL. Po rollbacku pozostały 3 zastane konta,
+5 przypisań firmowych, brak zarchiwizowanych kont i brak dopisanych dat/historii
+starych haseł. Nie uruchamiano resetującego runnera ani migracji baz firm.
+Nie wykonano Commit ani Push.

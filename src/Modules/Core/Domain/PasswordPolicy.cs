@@ -10,6 +10,24 @@ public sealed class PasswordPolicy
     public bool RequireDigit { get; private set; } = true;
     public bool RequireSpecialCharacter { get; private set; } = true;
     public byte[] RowVersion { get; private set; } = [];
+    public bool PreventPasswordReuse { get; private set; }
+    public int PreviousPasswordCount { get; private set; } = 5;
+    public bool EnforcePasswordExpiration { get; private set; }
+    public int PasswordValidityDays { get; private set; } = 90;
+    public DateTimeOffset? PasswordExpirationEnabledAtUtc { get; private set; }
+    public void UpdateLifetime(bool history, int count, bool expiration, int days, DateTimeOffset now)
+    {
+        if (count is < 1 or > 20) throw new ArgumentException("Liczba poprzednich haseł musi wynosić od 1 do 20.");
+        if (days is < 1 or > 3650) throw new ArgumentException("Ważność hasła musi wynosić od 1 do 3650 dni.");
+        if (expiration && (!EnforcePasswordExpiration || PasswordExpirationEnabledAtUtc == null)) PasswordExpirationEnabledAtUtc = now.ToUniversalTime();
+        PreventPasswordReuse = history; PreviousPasswordCount = count; EnforcePasswordExpiration = expiration; PasswordValidityDays = days;
+    }
+    public bool IsExpired(DateTimeOffset? changedAt, DateTimeOffset now)
+    {
+        if (!EnforcePasswordExpiration || PasswordExpirationEnabledAtUtc == null) return false;
+        var baseline = changedAt.HasValue && changedAt.Value > PasswordExpirationEnabledAtUtc.Value ? changedAt.Value : PasswordExpirationEnabledAtUtc.Value;
+        return now >= baseline.AddDays(PasswordValidityDays);
+    }
     public void Update(bool enabled, int minimum, bool upper, bool lower, bool digit, bool special)
     {
         if (minimum is < 1 or > 1024) throw new ArgumentException("Minimalna długość musi wynosić od 1 do 1024 znaków.");

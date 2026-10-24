@@ -472,7 +472,7 @@ internal static class LocalDatabases
         await using var system = SystemContext(SystemDatabase);
         await ShowSchema(system, SystemDatabase, ["core.Companies", "core.CompanyDatabases", "dbo.__EFMigrationsHistory",
             "security.Users", "security.Roles", "security.UserRoles", "security.UserClaims", "security.UserLogins",
-            "security.UserTokens", "security.RoleClaims", "security.CompanyAccess", "security.UserSessions", "security.Installation", "security.GusConfiguration", "security.RegistryConfigurations", "audit.RegistryConfigurationChanges", "audit.UserAdministrationChanges", "security.PasswordPolicy", "audit.PasswordPolicyChanges", "ref.TaxIdentifierSchemes"], "_InstallationPasswordPolicy");
+            "security.UserTokens", "security.RoleClaims", "security.CompanyAccess", "security.UserSessions", "security.Installation", "security.GusConfiguration", "security.RegistryConfigurations", "audit.RegistryConfigurationChanges", "audit.UserAdministrationChanges", "security.PasswordPolicy", "audit.PasswordPolicyChanges", "security.UserPasswordHistory", "ref.TaxIdentifierSchemes"], "_PasswordLifecycleAndArchivedUsers");
         if (await system.InstallationIdentities.CountAsync() != 1 || (await system.InstallationIdentities.SingleAsync()).Id == Guid.Empty)
             throw new InvalidOperationException("Brak trwałej identyfikacji instalacji.");
         if (await system.Companies.CountAsync() != 2 || await system.CompanyDatabases.CountAsync() != 2)

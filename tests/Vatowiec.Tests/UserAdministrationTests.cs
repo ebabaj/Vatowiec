@@ -104,7 +104,7 @@ public sealed partial class DesktopTests
         public int PasswordChanges { get; private set; }
         private UserAdministrationDetail? adminDetail;
         public Task<UserAdministrationLookups> UserLookups() => Task.FromResult(UserAdministrationService.Lookups([new(A, "Firma A"), new(B, "Firma B")]));
-        public Task<UserSummary[]> Users(string search, int offset) => Task.FromResult<UserSummary[]>([new(AdminOne, "operator", false, false, false), new(adminTwo, "reader", false, false, false)]);
+        public Task<UserSummary[]> Users(string search, int offset, bool includeArchived = false) => Task.FromResult<UserSummary[]>([new(AdminOne, "operator", false, false, false), new(adminTwo, "reader", false, false, false)]);
         public Task<UserAdministrationDetail> UserDetail(Guid id)
         {
             UserDetailReads++;

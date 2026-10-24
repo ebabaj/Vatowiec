@@ -154,6 +154,19 @@ Formularz wymaga konfiguracji i wersji odczytanej z System; poprawna zmiana
 aktywuje zapis, po którym ponownie odczytujemy konfigurację i rzeczywisty audyt.
 Błędy bazy systemowej mają kontekst instalacji, niezależny od wybranej firmy.
 
+ADR-035 (ORG-003/004/008, T-012): niezależne od złożoności, domyślnie wyłączone
+historia (bieżące i N poprzednich haseł, N=1–20) i ważność (1–3650 dni). Tylko
+hashe Identity na UserId, weryfikowane PasswordHasher; atomowy zapis z hasłem
+i datą UTC, bez rekonstrukcji dawnej historii. Ważność liczymy od późniejszej
+z dat zmiany hasła i włączenia opcji, z pełnym okresem dla starych kont.
+Istniejące sesje po terminie mają wyłącznie ograniczony tryb zmiany hasła.
+Logiczne usunięcie zachowuje UserId, historyczny login i audyt; odbiera prawa
+i sesje. Login pozostaje zarezerwowany. Operacja A przywraca tę samą osobę bez
+dawnych praw i z nowym hasłem tymczasowym. Operacja B atomowo pozostawia starą
+tożsamość w archiwum i tworzy nowy UserId z tym loginem, bez dziedziczenia praw,
+haseł, sesji ani danych klienta. API/klient wiążą ADR-032 z UserId; niezgodność
+czyści zapamiętane dane i wymaga ponownego logowania przed dostępem do firm.
+
 - ASP.NET Core Identity w bazie systemowej przechowuje użytkowników, hashe haseł, role i przypisania do firm. CompanyAccess określa uprawnienia ViewProfile, ViewContractors, EditContractors; rola globalna sama nie nadaje dostępu do firmy.
 - API udostępnia HTTPS login/logout, token CSRF, dane własnej sesji i listę dostępnych firm. Sesja jest chroniona cookie Secure/HttpOnly/SameSite=Strict i centralnym rekordem; absolutne wygaśnięcie domyślnie 30 minut, bez sliding expiration. Logout unieważnia konkretną sesję także dla replay cookie. SecurityStamp i uprawnienia sprawdza się na serwerze przy kolejnych żądaniach.
 - Firma pochodzi wyłącznie ze ścieżki operacji API. Alternatywne query companyId i X-Company-Id oraz dodatkowe pola JSON są odrzucane. Po sprawdzeniu uprawnień resolver weryfikuje konfigurację serwera, CompanyProfile.CompanyId i fizyczną historię migracji. Brak uprawnienia daje 403; brak ważnej sesji 401; niedostępna/obca baza 503. Nie ma bazy domyślnej.
@@ -1082,6 +1095,7 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | [ADR-032](docs/adr/ADR-032-lokalne-logowanie-i-firma-domyslna.md) | Opcjonalne zapamiętywanie logowania i domyślnej firmy | Windows Credential Manager, niesekretne preferencje per API/login, jednorazowy start przez istniejące API; bez utrwalania sesji |
 | [ADR-033](docs/adr/ADR-033-uzytkownicy-i-uprawnienia.md) | Użytkownicy i uprawnienia instalacji | Istniejące Identity/CompanyAccess, blokady, wymuszona zmiana hasła, unieważnianie sesji, atomowy audyt System i niedestrukcyjny seed |
 | [ADR-034](docs/adr/ADR-034-polityka-hasel-i-rola-administratora.md) | Polityka haseł i delegowanie administracji | Dynamiczna polityka Identity w System, niezależne wymagania, zarządzanie istniejącą rolą administratora z audytem, wersją i ochroną równoległych zmian |
+| [ADR-035](docs/adr/ADR-035-historia-hasel-i-archiwizacja-tozsamosci.md) | Historia/ważność haseł i archiwizacja tożsamości | Hash history Identity, ograniczone sesje po terminie, logiczne usunięcie, odrębne przywrócenie tej samej i nowej osoby, preferencje związane z UserId |
 | [ADR-017](docs/adr/ADR-017-kartoteka-kontrahentow-i-audyt.md) | Edycja kontrahentów, filtry, rowversion i atomowy audyt | Wdrożony formularz, serwerowe filtrowanie/strony i autoryzowany zapis; jawne migracje systemowa i firmowa |
 | [ADR-022](docs/adr/ADR-022-dataport-i-sekrety-firmy.md) | DataPort i ustawienia firmy | Osobny adapter pośrednika, szyfrowany lokalny klucz, kontrola uprawnień i selektywny import do szkicu; bez zmiany oficjalnych adapterów TEST |
 | [ADR-023](docs/adr/ADR-023-waluty-i-reczne-kursy-nbp.md) | Waluty i ręczne kursy NBP | Lokalny słownik/ustawienia A/B/C, kursy decimal, jawne konflikty i audyt, stronicowany ekran Avalonia; bez harmonogramu i reguł faktur |

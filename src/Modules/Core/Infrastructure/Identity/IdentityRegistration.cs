@@ -27,7 +27,7 @@ public static class IdentityRegistration
             options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
             options.Lockout.AllowedForNewUsers = true;
         }).AddRoles<IdentityRole<Guid>>().AddSignInManager()
-            .AddEntityFrameworkStores<SystemDbContext>().AddDefaultTokenProviders();
+            .AddEntityFrameworkStores<SystemDbContext>().AddDefaultTokenProviders().AddUserManager<VatowiecUserManager>();
         services.RemoveAll<IPasswordValidator<ApplicationUser>>();
         services.AddScoped<IPasswordPolicyProvider, DatabasePasswordPolicyProvider>();
         services.AddScoped<IPasswordValidator<ApplicationUser>, InstallationPasswordValidator>();

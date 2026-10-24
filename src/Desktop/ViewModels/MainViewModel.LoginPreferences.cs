@@ -45,7 +45,7 @@ public sealed partial class MainViewModel
     {
         hasSavedPassword = false;
         var target = FormLoginTarget();
-        if (target != null)
+        if (target?.UserId != null)
         {
             try { hasSavedPassword = credentialStore.Contains(target); }
             catch (LocalLoginStorageException e) { message = e.Message; Changed(nameof(Message)); }
@@ -64,14 +64,14 @@ public sealed partial class MainViewModel
     }
     private LoginTarget? FormLoginTarget()
     {
-        try { return new(ApiAddress, UserName); }
+        try { var target = new LoginTarget(ApiAddress, UserName); return new(ApiAddress, UserName, loginPreferences.Find(target)?.UserId); }
         catch (ArgumentException) { return null; }
     }
     private void NotifyLoginFlags() { Changed(nameof(RememberCredentials)); Changed(nameof(AutomaticLogin)); }
     private void ApplyLoginFlags()
     {
         var target = FormLoginTarget(); var row = target == null ? null : loginPreferences.Find(target);
-        rememberCredentials = row?.RememberCredentials == true; automaticLogin = row?.AutomaticLogin == true && rememberCredentials;
+        rememberCredentials = row?.UserId != null && row.RememberCredentials; automaticLogin = row?.UserId != null && row.AutomaticLogin && rememberCredentials;
         UpdateSavedPasswordState();
         NotifyLoginFlags();
     }
@@ -79,7 +79,18 @@ public sealed partial class MainViewModel
     {
         if (loginPreferencesLoaded) return null;
         loginPreferencesLoaded = true;
-        try { loginPreferences = preferencesStore.Load(); return null; }
+        try
+        {
+            loginPreferences = preferencesStore.Load();
+            var legacy = loginPreferences.Profiles?.Where(x => (x.UserId == null || x.UserId == Guid.Empty) && (x.RememberCredentials || x.AutomaticLogin || x.DefaultCompanyId != null)).ToArray() ?? [];
+            foreach (var profile in legacy)
+            {
+                try { credentialStore.Delete(profile.Target); } catch (LocalLoginStorageException) { }
+                loginPreferences = loginPreferences.WithProfile(profile with { RememberCredentials = false, AutomaticLogin = false, DefaultCompanyId = null });
+            }
+            if (legacy.Length > 0) preferencesStore.Save(loginPreferences);
+            return null;
+        }
         catch (LocalLoginStorageException e) { return e.Message; }
     }
     private void SaveLoginProfile(LoginProfilePreferences profile, bool makeLast = false)
@@ -87,7 +98,7 @@ public sealed partial class MainViewModel
         var updated = loginPreferences.WithProfile(profile, makeLast);
         preferencesStore.Save(updated); loginPreferences = updated;
     }
-    private LoginProfilePreferences ProfileFor(LoginTarget target) => loginPreferences.Find(target) ?? new(target.ApiAddress, target.UserName);
+    private LoginProfilePreferences ProfileFor(LoginTarget target) => loginPreferences.Find(target) ?? new(target.ApiAddress, target.UserName, UserId: target.UserId);
 
     // Called once by the window. Expiry timers, company switches and form changes never call it.
     public async Task InitializeLogin()
@@ -104,7 +115,7 @@ public sealed partial class MainViewModel
         }
         ApplyLoginFlags(); ChangedAll();
         var target = FormLoginTarget();
-        if (!AutomaticLogin || target == null) return;
+        if (!AutomaticLogin || target?.UserId == null) return;
         string? password = null;
         try
         {
@@ -128,7 +139,7 @@ public sealed partial class MainViewModel
     private async Task OpenDefaultCompanyAfterLogin(LoginTarget target)
     {
         if (disposed || !IsCompanySelection || signedInLoginTarget?.Key != target.Key ||
-            session == null || clock.GetUtcNow() >= session.ExpiresAtUtc) return;
+            session == null || target.UserId != session.UserId || loginPreferences.Find(target)?.UserId != session.UserId || clock.GetUtcNow() >= session.ExpiresAtUtc) return;
         var companyId = loginPreferences.Find(target)?.DefaultCompanyId;
         if (companyId == null) return;
         var company = companies.FirstOrDefault(x => x.CompanyId == companyId);
@@ -140,7 +151,7 @@ public sealed partial class MainViewModel
 
     private string? RememberSuccessfulLogin(LoginTarget target, string password, bool remember, bool automatic)
     {
-        var previous = ProfileFor(target); string? warning = null;
+        var previous = ProfileFor(target) with { UserId = target.UserId }; string? warning = null;
         try
         {
             if (remember) credentialStore.Write(target, password);

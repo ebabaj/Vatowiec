@@ -56,7 +56,8 @@ public sealed partial class DesktopTests
         public Task<PasswordPolicyResponse> SavePasswordPolicy(PasswordPolicyRequest value)
         {
             PolicyWrites++; PolicyData = new(value.IsEnabled, value.MinimumLength, value.RequireUppercase, value.RequireLowercase, value.RequireDigit,
-                value.RequireSpecialCharacter, "version-" + PolicyWrites); return Task.FromResult(PolicyData);
+                value.RequireSpecialCharacter, "version-" + PolicyWrites, value.PreventPasswordReuse, value.PreviousPasswordCount,
+                value.EnforcePasswordExpiration, value.PasswordValidityDays); return Task.FromResult(PolicyData);
         }
         public Task<PasswordPolicyHistory[]> PasswordPolicyHistory(int offset)
         { if (PolicyHistoryError != null) throw PolicyHistoryError; return Task.FromResult<PasswordPolicyHistory[]>([]); }

@@ -48,6 +48,24 @@ public partial class UserAdministrationView : UserControl
     {
         if (await AdministrationDialogs.Confirm(Owner, Model.AdminBlockAction + " Konto: „" + Model.AdminAccountName + "”. Dotychczasowe sesje zostaną unieważnione.")) await Model.ToggleAdminBlock();
     }
+    private async void ArchiveClick(object? s, RoutedEventArgs e)
+    {
+        if (await AdministrationDialogs.Confirm(Owner, "Usunąć logicznie użytkownika „" + Model.AdminAccountName + "”? Wszystkie sesje, role i prawa do firm zostaną wyłączone. Tożsamość i historia pozostaną w archiwum."))
+            await Model.ArchiveAdminUser();
+    }
+    private async Task Restore(bool newPerson)
+    {
+        var action = newPerson ? "To nowa osoba — wykorzystaj login" : "To ta sama osoba — przywróć konto";
+        var explanation = newPerson ? "Stara tożsamość pozostanie na zawsze w archiwum. Powstanie nowa osoba bez dawnych praw, haseł i sesji."
+            : "Zachowasz oryginalną tożsamość i historię. Dawne uprawnienia nie zostaną przywrócone.";
+        var choice = await AdministrationDialogs.ChooseTemporaryPassword(Owner, action, "Konto: „" + Model.AdminAccountName + "”. " + explanation);
+        if (choice == null) return;
+        var result = await Model.RestoreAdminUser(newPerson, choice.Password);
+        if (choice.Password == null && result is { IsGenerated: true })
+            await AdministrationDialogs.TemporaryPassword(Owner, result.User.User.DisplayName, result.TemporaryPassword);
+    }
+    private async void RestoreSameClick(object? s, RoutedEventArgs e) => await Restore(false);
+    private async void ReuseLoginClick(object? s, RoutedEventArgs e) => await Restore(true);
     private async void RoleClick(object? s, RoutedEventArgs e)
     {
         var text = Model.AdministratorRole ? "Nadać rolę administratora instalacji" : "Odebrać rolę administratora instalacji";

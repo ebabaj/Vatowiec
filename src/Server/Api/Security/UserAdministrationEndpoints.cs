@@ -15,15 +15,18 @@ public static class UserAdministrationEndpoints
         var group = app.MapGroup("/api/v1/installation/users").RequireAuthorization(InstallationAdministration.Policy);
         group.MapGet("/lookups", async (SystemDbContext db, CancellationToken ct) => Results.Ok(UserAdministrationService.Lookups(
             await db.Companies.AsNoTracking().OrderBy(x => x.Name).Select(x => new AdministrationCompany(x.Id, x.Name)).ToArrayAsync(ct))));
-        group.MapGet("", async (string? search, int? offset, SystemDbContext db, CancellationToken ct) =>
+        group.MapGet("", async (string? search, int? offset, bool? includeArchived, SystemDbContext db, CancellationToken ct) =>
         {
             if (search?.Length > 256 || offset is < 0 or > 1000000) return Results.BadRequest();
             var text = search?.Trim();
-            var rows = await db.Users.AsNoTracking().Where(x => text == null || text == "" || x.UserName!.Contains(text))
+            var rows = await db.Users.AsNoTracking().Where(x => (includeArchived == true || !x.IsArchived) &&
+                (text == null || text == "" || x.UserName!.Contains(text) || (x.IsArchived && x.HistoricalUserName != null && x.HistoricalUserName.Contains(text))))
                 .OrderBy(x => x.UserName).ThenBy(x => x.Id).Skip(offset ?? 0).Take(51)
-                .Select(x => new { x.Id, x.UserName, x.IsBlocked, x.MustChangePassword }).ToArrayAsync(ct);
+                .Select(x => new UserSummary(x.Id, x.UserName!, x.IsBlocked, x.MustChangePassword, false,
+                    x.IsArchived, x.HistoricalUserName, x.ArchivedAtUtc, x.ArchivedByName, x.IsLoginReleased))
+                .ToArrayAsync(ct);
             var result = new List<UserSummary>();
-            foreach (var row in rows) result.Add(new(row.Id, row.UserName!, row.IsBlocked, row.MustChangePassword, await UserAdministrationService.IsAdministrator(db, row.Id, ct)));
+            foreach (var row in rows) result.Add(row with { IsInstallationAdministrator = await UserAdministrationService.IsAdministrator(db, row.Id, ct) });
             return Results.Ok(result);
         });
         group.MapGet("/{id:guid}", (Guid id, UserAdministrationService service, CancellationToken ct) => Execute(async () => await service.Detail(id, ct)));
@@ -34,12 +37,18 @@ public static class UserAdministrationEndpoints
                 .OrderByDescending(x => x.Id).Skip(offset ?? 0).Take(51).ToArrayAsync(ct);
             return Results.Ok(rows.Select(x => new UserAdministrationHistory(x.Id, x.ActorId, x.ActorName, x.TargetId, x.TargetName,
                 x.CompanyId, x.OccurredAtUtc, x.Operation, x.PermissionsBefore == null ? null : UserAdministrationService.Codes(x.PermissionsBefore.Value),
-                x.PermissionsAfter == null ? null : UserAdministrationService.Codes(x.PermissionsAfter.Value), x.BlockedBefore, x.BlockedAfter)));
+                x.PermissionsAfter == null ? null : UserAdministrationService.Codes(x.PermissionsAfter.Value), x.BlockedBefore, x.BlockedAfter, x.RelatedUserId)));
         });
         group.MapPost("", (UserCreateRequest value, HttpContext http, IAntiforgery csrf, UserAdministrationService service, CancellationToken ct) =>
             Write(http, csrf, () => service.Create(Actor(http), Session(http), value, ct)));
         group.MapPost("/{id:guid}/password-reset", (Guid id, UserVersionRequest value, HttpContext http, IAntiforgery csrf, UserAdministrationService service, CancellationToken ct) =>
             Write(http, csrf, () => service.ResetPassword(Actor(http), Session(http), id, value, ct)));
+        group.MapPost("/{id:guid}/archive", (Guid id, UserVersionRequest value, HttpContext http, IAntiforgery csrf, UserAdministrationService service, CancellationToken ct) =>
+            Write(http, csrf, () => service.Archive(Actor(http), Session(http), id, value, ct)));
+        group.MapPost("/{id:guid}/restore", (Guid id, UserVersionRequest value, HttpContext http, IAntiforgery csrf, UserAdministrationService service, CancellationToken ct) =>
+            Write(http, csrf, () => service.Restore(Actor(http), Session(http), id, value, false, ct)));
+        group.MapPost("/{id:guid}/reuse-login", (Guid id, UserVersionRequest value, HttpContext http, IAntiforgery csrf, UserAdministrationService service, CancellationToken ct) =>
+            Write(http, csrf, () => service.Restore(Actor(http), Session(http), id, value, true, ct)));
         group.MapPut("/{id:guid}/state", (Guid id, UserBlockRequest value, HttpContext http, IAntiforgery csrf, UserAdministrationService service, CancellationToken ct) =>
             Write(http, csrf, () => service.Block(Actor(http), Session(http), id, value, ct)));
         group.MapPut("/{id:guid}/access", (Guid id, UserAccessRequest value, HttpContext http, IAntiforgery csrf, UserAdministrationService service, CancellationToken ct) =>

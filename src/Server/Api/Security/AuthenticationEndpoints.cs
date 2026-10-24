@@ -26,7 +26,7 @@ public static class AuthenticationEndpoints
         group.MapPost("/login", async (LoginRequest request, HttpContext context, IAntiforgery csrf,
             UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signIn,
             SystemDbContext system, TimeProvider clock, IOptionsMonitor<CookieAuthenticationOptions> options, DummyPassword dummy,
-            ILoggerFactory loggers) =>
+            ILoggerFactory loggers, IPasswordPolicyProvider policies) =>
         {
             if (!await ValidCsrf(context, csrf)) return Results.BadRequest(new { code = "csrf_invalid" });
             if (string.IsNullOrWhiteSpace(request.UserName) || request.UserName.Length > 256 ||
@@ -34,14 +34,14 @@ public static class AuthenticationEndpoints
                 return Results.Json(new { code = "invalid_credentials" }, statusCode: 401);
             var user = await users.FindByNameAsync(request.UserName);
             var logger = loggers.CreateLogger("Vatowiec.Authentication");
-            if (user is null)
+            if (user is null || user.IsArchived)
             {
                 dummy.Verify(request.Password);
                 logger.LogWarning("Login rejected; correlation {CorrelationId}", context.TraceIdentifier);
                 return Results.Json(new { code = "invalid_credentials" }, statusCode: 401);
             }
             var result = await signIn.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
-            if (!result.Succeeded || user.IsBlocked || await users.GetTwoFactorEnabledAsync(user))
+            if (!result.Succeeded || user.IsArchived || user.IsBlocked || await users.GetTwoFactorEnabledAsync(user))
             {
                 logger.LogWarning("Login rejected for user {UserId}; correlation {CorrelationId}", user.Id, context.TraceIdentifier);
                 return Results.Json(new { code = "invalid_credentials" }, statusCode: 401);
@@ -63,9 +63,10 @@ public static class AuthenticationEndpoints
             return Results.Ok(new
             {
                 userName = user.UserName,
+                userId = user.Id,
                 expiresAtUtc = session.ExpiresAtUtc,
                 isInstallationAdministrator = await InstallationAdministration.IsAdministrator(system, user.Id, context.RequestAborted),
-                mustChangePassword = user.MustChangePassword
+                mustChangePassword = user.MustChangePassword || (await policies.Read(context.RequestAborted)).IsExpired(user.PasswordChangedAtUtc, now)
             });
         }).AllowAnonymous().RequireRateLimiting("login");
 
@@ -83,7 +84,7 @@ public static class AuthenticationEndpoints
             return Results.NoContent();
         }).RequireAuthorization();
 
-        group.MapGet("/me", async (HttpContext context, UserManager<ApplicationUser> users, SystemDbContext system) =>
+        group.MapGet("/me", async (HttpContext context, UserManager<ApplicationUser> users, SystemDbContext system, IPasswordPolicyProvider policies, TimeProvider clock) =>
         {
             var user = (await users.GetUserAsync(context.User))!;
             var sessionId = Guid.Parse(context.User.FindFirstValue(ApiSecurity.SessionClaim)!);
@@ -91,10 +92,11 @@ public static class AuthenticationEndpoints
             return Results.Ok(new
             {
                 userName = user.UserName,
+                userId = user.Id,
                 roles = await users.GetRolesAsync(user),
                 expiresAtUtc = expiry,
                 isInstallationAdministrator = await InstallationAdministration.IsAdministrator(system, user.Id, context.RequestAborted),
-                mustChangePassword = user.MustChangePassword
+                mustChangePassword = user.MustChangePassword || (await policies.Read(context.RequestAborted)).IsExpired(user.PasswordChangedAtUtc, clock.GetUtcNow())
             });
         }).RequireAuthorization();
     }

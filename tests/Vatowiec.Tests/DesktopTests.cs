@@ -341,11 +341,12 @@ public sealed partial class DesktopTests
         public Exception? LoginError { get; set; }
         public Task<SessionResponse>? PendingLogin { get; set; }
         public Action<string, string>? CheckLoginInput { get; set; }
+        public Guid LoginUserId { get; set; } = FixtureUserId;
         public Task<SessionResponse> Login(string userName, string password)
         {
             LoginCalls++; CheckLoginInput?.Invoke(userName, password);
             if (LoginError != null) throw LoginError;
-            return PendingLogin ?? Task.FromResult(new SessionResponse(userName, Expires, InstallationAdmin, PasswordChangeRequired));
+            return PendingLogin ?? Task.FromResult(new SessionResponse(userName, Expires, InstallationAdmin, PasswordChangeRequired, LoginUserId));
         }
         public Task<CompanyResponse[]>? PendingCompanies { get; set; }
         public Task<CompanyResponse[]> Companies() => CompanyListError ? throw new HttpRequestException() : PendingCompanies ?? Task.FromResult<CompanyResponse[]>(

@@ -27,13 +27,14 @@ public sealed partial class UserAdministrationSqlTests
     private static readonly Guid A = Guid.Parse("aaaaaaaa-0000-4000-8000-000000000001");
     private static readonly Guid B = Guid.Parse("bbbbbbbb-0000-4000-8000-000000000002");
     private static readonly string[] Read = ["ViewProfile", "ViewContractors"];
-    private static WebApplicationFactory<Program> App(PreservedSystemTransaction tx, DbCommandInterceptor? failure = null, ILoggerProvider? logs = null) => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+    private static WebApplicationFactory<Program> App(PreservedSystemTransaction tx, DbCommandInterceptor? failure = null, ILoggerProvider? logs = null, TimeProvider? clock = null) => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
     {
         builder.UseEnvironment("Development"); builder.ConfigureLogging(x => { x.ClearProviders(); if (logs != null) x.AddProvider(logs); });
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<SystemDbContext>(); services.AddScoped(_ => failure == null ? tx.Context() : new SystemDbContext(new DbContextOptionsBuilder<SystemDbContext>(tx.Options).AddInterceptors(failure).Options));
             services.AddDataProtection().UseEphemeralDataProtectionProvider();
+            if (clock != null) services.AddSingleton(clock);
         });
     });
     private static HttpClient Client(WebApplicationFactory<Program> app) => app.CreateClient(new() { BaseAddress = new("https://localhost"), AllowAutoRedirect = false });

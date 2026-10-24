@@ -37,7 +37,9 @@ public sealed partial class UserAdministrationSqlTests
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync(PolicyRoute)).StatusCode);
         await Login(admin, adminUser.UserName!, strong);
         var policy = (await admin.GetFromJsonAsync<PasswordPolicyResponse>(PolicyRoute))!;
-        var initial = policy; Assert.True(policy.IsEnabled && policy.MinimumLength == 12 && policy.RequireUppercase && policy.RequireLowercase && policy.RequireDigit && policy.RequireSpecialCharacter);
+        // The installation may already have an administrator-configured policy; isolate our test settings in the rollback transaction.
+        policy = await Ok<PasswordPolicyResponse>(await admin.PutAsJsonAsync(PolicyRoute, PolicyWrite(policy, true)));
+        var initial = policy;
         admin.DefaultRequestHeaders.Remove("X-CSRF-TOKEN");
         Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync(PolicyRoute, PolicyWrite(policy, false, confirm: true))).StatusCode);
         await Csrf(admin);
@@ -87,8 +89,8 @@ public sealed partial class UserAdministrationSqlTests
         Assert.False((await Login(target, name, "Eeeeeeee")).MustChangePassword);
         var history = (await admin.GetFromJsonAsync<PasswordPolicyHistory[]>(PolicyRoute + "/history"))!;
         Assert.Contains(history, x => !x.After.IsEnabled); Assert.Contains(history, x => x.After.MinimumLength == 80);
-        Assert.All(history, x => Assert.Equal(adminUser.UserName, x.ActorName));
-        var audit = await db.PasswordPolicyChanges.AsNoTracking().FirstAsync();
+        Assert.Contains(history, x => x.ActorName == adminUser.UserName);
+        var audit = await db.PasswordPolicyChanges.AsNoTracking().FirstAsync(x => x.ActorId == adminUser.Id);
         db.Attach(audit); db.Entry(audit).State = EntityState.Deleted;
         await Assert.ThrowsAsync<InvalidOperationException>(() => db.SaveChangesAsync()); db.ChangeTracker.Clear();
         // The immutable trigger also protects raw SQL, not only the EF context.

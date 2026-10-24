@@ -41,7 +41,7 @@ public sealed partial class MainViewModel
         if (!IsPasswordPolicyScreen || passwordPolicyEditor is not { IsDirty: true, IsValid: true } || api == null) return;
         await api.SavePasswordPolicy(passwordPolicyEditor.Request(confirmDisable));
         await ReadPasswordPolicy();
-        await ReadPolicyHistory(0); message = "Zapisano politykę haseł. Nowe operacje użyją jej od razu; dotychczasowe hasła i sesje pozostają ważne.";
+        await ReadPolicyHistory(0); message = "Zapisano politykę haseł. Złożoność, historia i ważność są egzekwowane niezależnie przez serwer.";
     });
     public Task RefreshPasswordPolicy()
     {

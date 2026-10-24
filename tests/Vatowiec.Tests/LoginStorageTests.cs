@@ -30,8 +30,9 @@ public sealed class LoginStorageTests
     public void NativeWindowsStore_RoundTripsOnlyUniqueFixtureAndDeletesIt_WithoutOtherCredentialAccess()
     {
         var store = new WindowsLoginCredentialStore();
-        var target = new LoginTarget("https://credential-fixture.invalid", "fixture-" + Guid.NewGuid().ToString("N"));
-        var other = new LoginTarget("https://other-credential-fixture.invalid", target.UserName);
+        var target = new LoginTarget("https://credential-fixture.invalid", "fixture-" + Guid.NewGuid().ToString("N"), Guid.NewGuid());
+        var other = new LoginTarget("https://other-credential-fixture.invalid", target.UserName, target.UserId);
+        var successor = new LoginTarget(target.ApiAddress, target.UserName, Guid.NewGuid());
         var password = "Fikcyjne-Żółć-😀-" + Guid.NewGuid().ToString("N");
         try
         {
@@ -39,6 +40,7 @@ public sealed class LoginStorageTests
             // Avoid Assert.Equal's display of expected/actual credential values on failure.
             Assert.True(store.Contains(target)); Assert.True(password == store.Read(target));
             Assert.False(store.Contains(other)); Assert.Null(store.Read(other));
+            Assert.False(store.Contains(successor)); Assert.Null(store.Read(successor)); Assert.NotEqual(target.CredentialName, successor.CredentialName);
             var replacement = "Fikcyjne-" + Guid.NewGuid().ToString("N");
             store.Write(target, replacement); Assert.True(replacement == store.Read(target));
             store.Delete(target); Assert.False(store.Contains(target)); Assert.Null(store.Read(target)); store.Delete(target);
@@ -59,7 +61,7 @@ public sealed class LoginStorageTests
             store.Save(value); var json = File.ReadAllText(file);
             using var document = JsonDocument.Parse(json);
             var fields = document.RootElement.GetProperty("profiles")[0].EnumerateObject().Select(x => x.Name).Order().ToArray();
-            Assert.Equal(new[] { "apiAddress", "automaticLogin", "defaultCompanyId", "rememberCredentials", "userName" }, fields);
+            Assert.Equal(new[] { "apiAddress", "automaticLogin", "defaultCompanyId", "rememberCredentials", "userId", "userName" }, fields);
             Assert.Equal(value.Find(target), store.Load().Find(target));
             foreach (var bad in new[] { "broken", "{\"version\":999}", "{\"profiles\":[null]}", "{\"profiles\":[{\"apiAddress\":null,\"userName\":\"fixture\"}]}" })
             {

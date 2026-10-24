@@ -8,11 +8,13 @@ namespace Vatowiec.Desktop.Services;
 public interface IVatowiecApiClient : IDisposable
 {
     Task<SessionResponse> Login(string userName, string password);
-    Task<UserSummary[]> Users(string search, int offset) => throw new NotSupportedException();
+    Task<UserSummary[]> Users(string search, int offset, bool includeArchived = false) => throw new NotSupportedException();
     Task<UserAdministrationLookups> UserLookups() => throw new NotSupportedException();
     Task<UserAdministrationDetail> UserDetail(Guid id) => throw new NotSupportedException();
     Task<TemporaryPasswordResponse> CreateUser(UserCreateRequest value) => throw new NotSupportedException();
     Task<TemporaryPasswordResponse> ResetUserPassword(Guid id, UserVersionRequest value) => throw new NotSupportedException();
+    Task<UserAdministrationDetail> ArchiveUser(Guid id, UserVersionRequest value) => throw new NotSupportedException();
+    Task<TemporaryPasswordResponse> RestoreUser(Guid id, UserVersionRequest value, bool newPerson) => throw new NotSupportedException();
     Task<UserAdministrationDetail> BlockUser(Guid id, UserBlockRequest value) => throw new NotSupportedException();
     Task<UserAdministrationDetail> SaveUserAccess(Guid id, UserAccessRequest value) => throw new NotSupportedException();
     Task<UserAdministrationDetail> SaveAdministratorRole(Guid id, AdministratorRoleRequest value) => throw new NotSupportedException();
@@ -122,11 +124,13 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
     }
 
     public Task<CompanyResponse[]> Companies() => Get<CompanyResponse[]>("api/v1/companies");
-    public Task<UserSummary[]> Users(string search, int offset) => Get<UserSummary[]>($"api/v1/installation/users?search={Uri.EscapeDataString(search)}&offset={offset}");
+    public Task<UserSummary[]> Users(string search, int offset, bool includeArchived = false) => Get<UserSummary[]>($"api/v1/installation/users?search={Uri.EscapeDataString(search)}&offset={offset}&includeArchived={includeArchived.ToString().ToLowerInvariant()}");
     public Task<UserAdministrationLookups> UserLookups() => Get<UserAdministrationLookups>("api/v1/installation/users/lookups");
     public Task<UserAdministrationDetail> UserDetail(Guid id) => Get<UserAdministrationDetail>($"api/v1/installation/users/{id}");
     public Task<TemporaryPasswordResponse> CreateUser(UserCreateRequest value) => Post<TemporaryPasswordResponse>("api/v1/installation/users", value);
     public Task<TemporaryPasswordResponse> ResetUserPassword(Guid id, UserVersionRequest value) => Post<TemporaryPasswordResponse>($"api/v1/installation/users/{id}/password-reset", value);
+    public Task<UserAdministrationDetail> ArchiveUser(Guid id, UserVersionRequest value) => Post<UserAdministrationDetail>($"api/v1/installation/users/{id}/archive", value);
+    public Task<TemporaryPasswordResponse> RestoreUser(Guid id, UserVersionRequest value, bool newPerson) => Post<TemporaryPasswordResponse>($"api/v1/installation/users/{id}/" + (newPerson ? "reuse-login" : "restore"), value);
     public Task<UserAdministrationDetail> BlockUser(Guid id, UserBlockRequest value) => Write<UserAdministrationDetail>($"api/v1/installation/users/{id}/state", value, true);
     public Task<UserAdministrationDetail> SaveUserAccess(Guid id, UserAccessRequest value) => Write<UserAdministrationDetail>($"api/v1/installation/users/{id}/access", value, true);
     public Task<UserAdministrationDetail> SaveAdministratorRole(Guid id, AdministratorRoleRequest value) => Write<UserAdministrationDetail>($"api/v1/installation/users/{id}/administrator-role", value, true);

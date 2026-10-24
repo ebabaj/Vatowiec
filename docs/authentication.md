@@ -33,6 +33,18 @@ Endpointy konfiguracji i historii zwracają konkretny błąd instalacyjny, a for
 bez udanego odczytu pozostaje niedostępny. Diagnostyka SQL zapisuje tylko numer,
 ścieżkę operacji bez query oraz korelację, bez parametrów i tekstu SQL.
 
+ADR-035: historia i ważność haseł działają niezależnie od złożoności. Rozszerzony
+UserManager zapisuje hash, UTC i maksymalnie 20 wcześniejszych hashy atomowo;
+walidator porównuje kandydat przez PasswordHasher z aktualnym i N poprzednimi.
+Okres ochronny od włączenia zapobiega natychmiastowemu wygaśnięciu starych kont.
+Każde żądanie sesji odrzuca konto archiwalne i sprawdza ważność; po terminie
+działa ograniczony tryb zmiany hasła, także dla zalogowanego administratora.
+Archiwizacja odbiera role, CompanyAccess i sesje, zachowując tożsamość i audyt.
+Tylko świadoma operacja administratora może przekazać login nowemu UserId,
+bez dziedziczenia. Klient/Windows Credential Manager v2 wiążą preferencje z
+UserId; niezgodność odrzuca sesję i dane lokalne przed listą firm. Dawne wpisy
+bez UserId wymagają ręcznego logowania. [Wdrożenie i obsługa](users-and-permissions.md).
+
 ## Opcjonalne zapamiętanie w kliencie Windows — ADR-032
 
 [ADR-032](adr/ADR-032-lokalne-logowanie-i-firma-domyslna.md) dodaje opcjonalne

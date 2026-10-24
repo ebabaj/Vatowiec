@@ -8,25 +8,27 @@ namespace Vatowiec.Desktop.Services;
 // No password, cookie or token belongs in these types or in the preferences file.
 public sealed class LoginTarget
 {
-    public LoginTarget(string apiAddress, string userName)
+    public LoginTarget(string apiAddress, string userName, Guid? userId = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(apiAddress);
         ArgumentException.ThrowIfNullOrEmpty(userName);
         ApiAddress = VatowiecApiClient.ValidateAddress(apiAddress.Trim()).AbsoluteUri;
         UserName = userName.Trim();
+        UserId = userId is { } id && id != Guid.Empty ? id : null;
         if (UserName.Length is 0 or > 256 || UserName.Contains('\0')) throw new ArgumentException("Wpisz poprawny login.");
         Key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new[] { ApiAddress, UserName.ToUpperInvariant() }))));
     }
     public string ApiAddress { get; }
     public string UserName { get; }
+    public Guid? UserId { get; }
     public string Key { get; }
-    public string CredentialName => "Vatowiec:DesktopLogin:v1:" + Key;
+    public string CredentialName => UserId is { } id ? "Vatowiec:DesktopLogin:v2:" + Key + ":" + id.ToString("N") : "Vatowiec:DesktopLogin:v1:" + Key;
 }
 
 public sealed record LoginProfilePreferences(string ApiAddress, string UserName, bool RememberCredentials = false,
-    bool AutomaticLogin = false, Guid? DefaultCompanyId = null)
+    bool AutomaticLogin = false, Guid? DefaultCompanyId = null, Guid? UserId = null)
 {
-    [JsonIgnore] public LoginTarget Target => new(ApiAddress, UserName);
+    [JsonIgnore] public LoginTarget Target => new(ApiAddress, UserName, UserId);
 }
 public sealed record LoginPreferences(int Version = 1, string? LastTargetKey = null, LoginProfilePreferences[]? Profiles = null)
 {

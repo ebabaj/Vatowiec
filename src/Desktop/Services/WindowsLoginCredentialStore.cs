@@ -11,8 +11,8 @@ public sealed class WindowsLoginCredentialStore : ILoginCredentialStore
     private static void CheckWindows() { if (!OperatingSystem.IsWindows()) throw Unavailable(); }
 
     // Presence checks inspect/clear the native buffer without creating a password string.
-    public bool Contains(LoginTarget target) => ReadCredential(target, _ => true, false);
-    public string? Read(LoginTarget target) => ReadCredential(target,
+    public bool Contains(LoginTarget target) => target.UserId != null && ReadCredential(target, _ => true, false);
+    public string? Read(LoginTarget target) => target.UserId == null ? null : ReadCredential(target,
         row => Marshal.PtrToStringUni(row.CredentialBlob, (int)row.CredentialBlobSize / 2), (string?)null);
 
     private static T ReadCredential<T>(LoginTarget target, Func<NativeCredential, T> use, T missing)
@@ -42,6 +42,7 @@ public sealed class WindowsLoginCredentialStore : ILoginCredentialStore
     public void Write(LoginTarget target, string password)
     {
         CheckWindows();
+        if (target.UserId == null) throw new LocalLoginStorageException("Najpierw potwierdź tożsamość użytkownika przez logowanie do aktualnego API.");
         if (string.IsNullOrEmpty(password) || password.Length > MaximumBlob / 2 || password.Contains('\0'))
             throw new LocalLoginStorageException("Nie można zapamiętać hasła o tej długości lub formacie. Nadal można logować się ręcznie.");
         var blob = Marshal.StringToCoTaskMemUni(password);

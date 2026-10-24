@@ -27,6 +27,7 @@ public sealed partial class UserAdministrationSqlTests
         await using var originalDb = snapshot.Context();
         var original = UserAdministrationServicePolicy(await originalDb.PasswordPolicies.AsNoTracking().SingleAsync());
         var auditCount = await originalDb.PasswordPolicyChanges.CountAsync();
+        var originalUsers = await originalDb.Users.CountAsync(); var originalUserAudit = await originalDb.UserAdministrationChanges.CountAsync();
         await using (var tx = await PreservedSystemTransaction.Open())
         {
             await using var app = App(tx);
@@ -38,6 +39,7 @@ public sealed partial class UserAdministrationSqlTests
             using var scope = app.Services.CreateScope();
             var password = ("Fixture!1a-" + Guid.NewGuid().ToString("N")).PadRight(1024, 'a');
             var actor = await Account(scope.ServiceProvider, true, password);
+            var archiveFixture = await Account(scope.ServiceProvider, false, password);
             TracePolicyApi("Fictional administrator created in rollback-only transaction.");
             using var transport = VatowiecApiClient.Connect(url); // Standard certificate validation, cookie and CSRF.
             using var model = new MainViewModel(_ => transport) { ApiAddress = url, UserName = actor.UserName! };
@@ -79,6 +81,36 @@ public sealed partial class UserAdministrationSqlTests
                 Assert.True(model.HasPolicyHistory); Assert.False(model.CanSavePasswordPolicy);
                 Assert.Contains(model.PasswordPolicyHistory, x => x.Actor.Contains(actor.UserName!, StringComparison.Ordinal));
                 TracePolicyApi("Screen reopened; saved values and real audit entry verified.");
+                Click(window, "ClosePasswordPolicy");
+                await model.OpenUsersSettings();
+                await Until(() => window.GetVisualDescendants().OfType<ListBox>().Any(x => AutomationProperties.GetAutomationId(x) == "UsersList" && x.IsEffectivelyVisible));
+                Find<ListBox>(window, "UsersList").SelectedItem = model.AdminUsers.Single(x => x.Id == archiveFixture.Id);
+                await Until(() => !model.IsBusy && model.HasAdminUser);
+                Click(window, "ArchiveUser"); await Dialog(lifetime, "ConfirmAdministration");
+                await Until(() => !model.IsBusy && model.Message.StartsWith("Usunięto użytkownika", StringComparison.Ordinal));
+                Assert.DoesNotContain(model.AdminUsers, x => x.Id == archiveFixture.Id);
+                Find<CheckBox>(window, "ShowArchivedUsers").IsChecked = true;
+                await Until(() => !model.IsBusy && model.AdminUsers.Any(x => x.Id == archiveFixture.Id && x.IsArchived));
+                Find<ListBox>(window, "UsersList").SelectedItem = model.AdminUsers.Single(x => x.Id == archiveFixture.Id);
+                await Until(() => !model.IsBusy && model.IsArchivedAdminUser);
+                Assert.True(Find<Button>(window, "RestoreSameUser").IsEffectivelyEnabled);
+                Assert.True(Find<Button>(window, "ReuseArchivedLogin").IsEffectivelyEnabled);
+                Click(window, "RestoreSameUser");
+                await Until(() => lifetime.Windows.Any(x => x.Title == "To ta sama osoba — przywróć konto"));
+                Click(lifetime.Windows.Single(x => x.Title == "To ta sama osoba — przywróć konto"), "AcceptTemporaryPassword");
+                await CloseGenerated(lifetime);
+                Assert.Equal(archiveFixture.Id, model.SelectedAdminUser!.Id); Assert.False(model.IsArchivedAdminUser);
+                Assert.All(model.AdminCompanyAccess, x => Assert.False(x.HasAccess));
+                Click(window, "ArchiveUser"); await Dialog(lifetime, "ConfirmAdministration");
+                await Until(() => !model.IsBusy && model.IsArchivedAdminUser);
+                Click(window, "ReuseArchivedLogin");
+                await Until(() => lifetime.Windows.Any(x => x.Title == "To nowa osoba — wykorzystaj login"));
+                Click(lifetime.Windows.Single(x => x.Title == "To nowa osoba — wykorzystaj login"), "AcceptTemporaryPassword");
+                await CloseGenerated(lifetime);
+                Assert.NotEqual(archiveFixture.Id, model.SelectedAdminUser!.Id); Assert.Equal(archiveFixture.UserName, model.SelectedAdminUser.UserName);
+                Assert.False(model.SelectedAdminUser.IsInstallationAdministrator); Assert.All(model.AdminCompanyAccess, x => Assert.False(x.HasAccess));
+                var oldAccount = await transport.UserDetail(archiveFixture.Id); Assert.True(oldAccount.User.IsArchived && oldAccount.User.IsLoginReleased);
+                TracePolicyApi("Native archive filter, same-person restore and new-person login reuse verified through real API; identities and permissions remain separate.");
             }
             finally
             {
@@ -89,7 +121,14 @@ public sealed partial class UserAdministrationSqlTests
         // Separate real connection after rollback: neither the policy/version nor audit was changed.
         Assert.Equal(original, UserAdministrationServicePolicy(await originalDb.PasswordPolicies.AsNoTracking().SingleAsync()));
         Assert.Equal(auditCount, await originalDb.PasswordPolicyChanges.CountAsync());
+        Assert.Equal(originalUsers, await originalDb.Users.CountAsync()); Assert.Equal(originalUserAudit, await originalDb.UserAdministrationChanges.CountAsync());
         TracePolicyApi("Transaction rolled back; original policy including RowVersion and audit count unchanged.");
+    }
+    private static async Task CloseGenerated(IClassicDesktopStyleApplicationLifetime lifetime)
+    {
+        await Until(() => lifetime.Windows.Any(x => x.Title == "Jednorazowe hasło tymczasowe"));
+        Click(lifetime.Windows.Single(x => x.Title == "Jednorazowe hasło tymczasowe"), "CloseTemporaryPassword");
+        await Until(() => lifetime.Windows.All(x => x.Title != "Jednorazowe hasło tymczasowe"));
     }
     private static void TracePolicyApi(string value)
     {

@@ -287,8 +287,16 @@
               <CheckBox Content="Wymagaj cyfry" IsChecked="{Binding RequireDigit, Mode=TwoWay}" AutomationProperties.AutomationId="PasswordRequireDigit"/>
               <CheckBox Content="Wymagaj znaku specjalnego" IsChecked="{Binding RequireSpecialCharacter, Mode=TwoWay}" AutomationProperties.AutomationId="PasswordRequireSpecial"/>
             </StackPanel>
-            <TextBlock IsVisible="{Binding !IsEnabled}" Text="Uwaga: po wyłączeniu każde niepuste hasło będzie dozwolone dla wszystkich użytkowników. Zapis wymaga osobnego potwierdzenia." Foreground="#B42318" TextWrapping="Wrap"/>
+            <TextBlock IsVisible="{Binding !IsEnabled}" Text="Uwaga: złożoność wyłączona. Każde niepuste hasło spełnia reguły długości i klas znaków. Historia i ważność nadal obowiązują, jeśli je włączono. Zapis wymaga potwierdzenia." Foreground="#B42318" TextWrapping="Wrap"/>
             <TextBlock Text="{Binding Status}" Foreground="#9A6700" AutomationProperties.AutomationId="PasswordPolicyStatus"/>
+            <Separator/>
+            <CheckBox Content="Nie pozwalaj ponownie używać poprzednich haseł" IsChecked="{Binding PreventPasswordReuse, Mode=TwoWay}" AutomationProperties.AutomationId="PreventPasswordReuse"/>
+            <TextBlock Text="Liczba poprzednich haseł (oprócz aktualnego)"/>
+            <NumericUpDown Minimum="1" Maximum="20" FormatString="0" Value="{Binding PreviousPasswordCount, Mode=TwoWay}" IsEnabled="{Binding PreventPasswordReuse}" Width="160" HorizontalAlignment="Left" AutomationProperties.AutomationId="PreviousPasswordCount"/>
+            <CheckBox Content="Wymuszaj okresową zmianę hasła" IsChecked="{Binding EnforcePasswordExpiration, Mode=TwoWay}" AutomationProperties.AutomationId="EnforcePasswordExpiration"/>
+            <TextBlock Text="Ważność hasła w dniach"/>
+            <NumericUpDown Minimum="1" Maximum="3650" FormatString="0" Value="{Binding PasswordValidityDays, Mode=TwoWay}" IsEnabled="{Binding EnforcePasswordExpiration}" Width="160" HorizontalAlignment="Left" AutomationProperties.AutomationId="PasswordValidityDays"/>
+            <TextBlock Text="Historia i ważność działają niezależnie od złożoności. Po włączeniu ważności bieżące konta otrzymują pełny okres na zmianę hasła." TextWrapping="Wrap"/>
           </StackPanel>
           </Border>
           <WrapPanel><Button Content="Zapisz politykę haseł" Click="SavePasswordPolicyClick" IsEnabled="{Binding CanSavePasswordPolicy}" AutomationProperties.AutomationId="SavePasswordPolicy"/><Button Content="Odśwież" Click="RefreshPasswordPolicyClick" AutomationProperties.AutomationId="RefreshPasswordPolicy"/><Button Content="Wróć" Click="ClosePasswordPolicyClick" AutomationProperties.AutomationId="ClosePasswordPolicy"/></WrapPanel>

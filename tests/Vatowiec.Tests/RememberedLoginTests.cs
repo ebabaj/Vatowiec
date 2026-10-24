@@ -7,7 +7,8 @@ namespace Vatowiec.Tests;
 public sealed partial class DesktopTests
 {
     private const string LoginOrigin = "https://login-fixture.invalid:7243";
-    private static LoginTarget RememberedTarget => new(LoginOrigin, "operator");
+    private static readonly Guid FixtureUserId = Guid.Parse("dddddddd-0000-4000-8000-000000000001");
+    private static LoginTarget RememberedTarget => new(LoginOrigin, "operator", FixtureUserId);
     private sealed class FakeLoginPreferences : ILoginPreferencesStore
     {
         public LoginPreferences Value { get; set; } = new();
@@ -25,18 +26,18 @@ public sealed partial class DesktopTests
         public int Writes { get; private set; }
         public int Deletes { get; private set; }
         public bool Unavailable { get; set; }
-        public bool Contains(LoginTarget target) => passwords.ContainsKey(target.Key);
+        public bool Contains(LoginTarget target) => passwords.ContainsKey(target.CredentialName);
         bool ILoginCredentialStore.Contains(LoginTarget target) { Probes++; Check(); return Contains(target); }
-        public void Seed(LoginTarget target, string password) => passwords[target.Key] = password;
+        public void Seed(LoginTarget target, string password) => passwords[target.CredentialName] = password;
         private void Check() { if (Unavailable) throw new LocalLoginStorageException("Test: Credential Manager niedostępny."); }
-        public string? Read(LoginTarget target) { Reads++; Check(); return passwords.GetValueOrDefault(target.Key); }
-        public void Write(LoginTarget target, string password) { Writes++; Check(); passwords[target.Key] = password; }
-        public void Delete(LoginTarget target) { Deletes++; Check(); passwords.Remove(target.Key); }
+        public string? Read(LoginTarget target) { Reads++; Check(); return passwords.GetValueOrDefault(target.CredentialName); }
+        public void Write(LoginTarget target, string password) { Writes++; Check(); passwords[target.CredentialName] = password; }
+        public void Delete(LoginTarget target) { Deletes++; Check(); passwords.Remove(target.CredentialName); }
     }
     private static FakeLoginPreferences SavedLogin(bool automatic = true, Guid? company = null)
     {
         var target = RememberedTarget;
-        return new() { Value = new(LastTargetKey: target.Key, Profiles: [new(target.ApiAddress, target.UserName, true, automatic, company)]) };
+        return new() { Value = new(LastTargetKey: target.Key, Profiles: [new(target.ApiAddress, target.UserName, true, automatic, company, FixtureUserId)]) };
     }
     private static MainViewModel RememberingModel(FakeApi api, FakeLoginPreferences preferences, FakeLoginCredentials credentials, TimeProvider? clock = null) =>
         new(_ => api, clock, preferences, credentials) { ApiAddress = LoginOrigin, UserName = "operator" };
@@ -295,7 +296,7 @@ public sealed partial class DesktopTests
         using var model = RememberingModel(api, preferences, secrets);
         var startup = model.InitializeLogin(); await model.InitializeLogin(); await model.Login("another-fixture-password");
         Assert.Equal(1, api.LoginCalls); Assert.True(model.IsBusy);
-        login.SetResult(new("operator", DateTimeOffset.UtcNow.AddMinutes(30)));
+        login.SetResult(new("operator", DateTimeOffset.UtcNow.AddMinutes(30), UserId: FixtureUserId));
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         while (api.ProfileCalls.Count == 0) await Task.Delay(5, timeout.Token);
         await model.OpenCompany(); await model.ChangeCompany();

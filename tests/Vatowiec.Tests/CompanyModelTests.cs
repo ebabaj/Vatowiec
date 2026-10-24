@@ -114,8 +114,8 @@ public sealed class CompanyModelTests
     {
         using var system = new SystemDbContextFactory().CreateDbContext([]);
         using var company = new CompanyDbContextFactory().CreateDbContext([]);
-        Assert.Equal(13, system.Database.GetMigrations().Count());
-        Assert.EndsWith("_InstallationPasswordPolicy", system.Database.GetMigrations().Last());
+        Assert.Equal(14, system.Database.GetMigrations().Count());
+        Assert.EndsWith("_PasswordLifecycleAndArchivedUsers", system.Database.GetMigrations().Last());
         Assert.Equal(9, company.Database.GetMigrations().Count());
         Assert.EndsWith("_ContractorFinance", company.Database.GetMigrations().Last());
         Assert.False(system.Database.HasPendingModelChanges());

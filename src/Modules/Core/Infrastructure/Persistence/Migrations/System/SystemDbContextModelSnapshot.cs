@@ -319,10 +319,25 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                     b.Property<int>("SingletonKey")
                         .HasColumnType("int");
 
+                    b.Property<bool>("EnforcePasswordExpiration")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("bit");
 
                     b.Property<int>("MinimumLength")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("PasswordExpirationEnabledAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("PasswordValidityDays")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("PreventPasswordReuse")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("PreviousPasswordCount")
                         .HasColumnType("int");
 
                     b.Property<bool>("RequireDigit")
@@ -347,6 +362,8 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
 
                     b.ToTable("PasswordPolicy", "security", t =>
                         {
+                            t.HasCheckConstraint("CK_PasswordPolicy_Lifetime", "[PreviousPasswordCount] BETWEEN 1 AND 20 AND [PasswordValidityDays] BETWEEN 1 AND 3650");
+
                             t.HasCheckConstraint("CK_PasswordPolicy_Values", "[SingletonKey]=1 AND [MinimumLength] BETWEEN 1 AND 1024");
                         });
 
@@ -354,8 +371,12 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                         new
                         {
                             SingletonKey = 1,
+                            EnforcePasswordExpiration = false,
                             IsEnabled = true,
                             MinimumLength = 12,
+                            PasswordValidityDays = 90,
+                            PreventPasswordReuse = false,
+                            PreviousPasswordCount = 5,
                             RequireDigit = true,
                             RequireLowercase = true,
                             RequireSpecialCharacter = true,
@@ -1047,6 +1068,9 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                     b.Property<int?>("PermissionsBefore")
                         .HasColumnType("int");
 
+                    b.Property<Guid?>("RelatedUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("TargetId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1076,6 +1100,16 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("int");
 
+                    b.Property<DateTimeOffset?>("ArchivedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ArchivedByName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid?>("ArchivedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("nvarchar(max)");
@@ -1087,7 +1121,21 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<string>("HistoricalNormalizedUserName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("HistoricalUserName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsBlocked")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsLoginReleased")
                         .HasColumnType("bit");
 
                     b.Property<bool>("LockoutEnabled")
@@ -1106,6 +1154,9 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                     b.Property<string>("NormalizedUserName")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset?>("PasswordChangedAtUtc")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<string>("PasswordHash")
                         .HasColumnType("nvarchar(max)");
@@ -1137,6 +1188,32 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                         .HasFilter("[NormalizedUserName] IS NOT NULL");
 
                     b.ToTable("Users", "security");
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Infrastructure.Identity.UserPasswordHistory", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)");
+
+                    b.Property<DateTimeOffset>("ReplacedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Id");
+
+                    b.ToTable("UserPasswordHistory", "security");
                 });
 
             modelBuilder.Entity("Vatowiec.Core.Infrastructure.Identity.UserSession", b =>
@@ -1244,6 +1321,15 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                         .WithOne()
                         .HasForeignKey("Vatowiec.Core.Domain.CompanyDatabaseRegistration", "CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Infrastructure.Identity.UserPasswordHistory", b =>
+                {
+                    b.HasOne("Vatowiec.Core.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

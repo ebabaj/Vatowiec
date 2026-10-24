@@ -15,13 +15,14 @@ public sealed class UserAdministrationException(int status, string code, string 
 }
 
 // All Identity writes use this scoped context/transaction, including UserManager saves.
-public sealed class UserAdministrationService(SystemDbContext db, UserManager<ApplicationUser> users, TimeProvider clock,
+public sealed partial class UserAdministrationService(SystemDbContext db, UserManager<ApplicationUser> users, TimeProvider clock,
     IPasswordPolicyProvider policies, RoleManager<IdentityRole<Guid>> roles)
 {
     public static Task<bool> IsAdministrator(SystemDbContext db, Guid id, CancellationToken ct = default) =>
         (from membership in db.UserRoles.AsNoTracking()
          join role in db.Roles.AsNoTracking() on membership.RoleId equals role.Id
-         where membership.UserId == id && role.NormalizedName == "INSTALLATIONADMINISTRATOR"
+         join user in db.Users.AsNoTracking() on membership.UserId equals user.Id
+         where membership.UserId == id && !user.IsArchived && role.NormalizedName == "INSTALLATIONADMINISTRATOR"
          select membership.UserId).AnyAsync(ct);
 
     public static string[] Codes(CompanyPermission permissions) => Enum.GetValues<CompanyPermission>()
@@ -51,9 +52,12 @@ public sealed class UserAdministrationService(SystemDbContext db, UserManager<Ap
     {
         var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Missing();
         var access = await db.CompanyAccesses.AsNoTracking().Where(x => x.UserId == id).OrderBy(x => x.CompanyId).ToArrayAsync(ct);
-        return new(new(id, user.UserName!, user.IsBlocked, user.MustChangePassword, await IsAdministrator(db, id, ct)),
+        return new(Summary(user, await IsAdministrator(db, id, ct)),
             user.ConcurrencyStamp!, access.Select(x => new UserCompanyAccess(x.CompanyId, Codes(x.Permissions), Convert.ToBase64String(x.RowVersion))).ToArray());
     }
+    public static UserSummary Summary(ApplicationUser user, bool administrator) => new(user.Id, user.UserName!, user.IsBlocked,
+        user.MustChangePassword, administrator && !user.IsArchived, user.IsArchived, user.HistoricalUserName,
+        user.ArchivedAtUtc, user.ArchivedByName, user.IsLoginReleased);
     private static UserAdministrationException Invalid(string message) => new(400, "user_validation", message);
     private static UserAdministrationException Missing() => new(404, "user_missing", "Nie znaleziono użytkownika. Odśwież listę.");
     private static UserAdministrationException Stale() => new(409, "user_stale", "Inny administrator zmienił konto lub jego prawa. Odśwież szczegóły; niezapisany szkic zachowano.");
@@ -62,14 +66,15 @@ public sealed class UserAdministrationService(SystemDbContext db, UserManager<Ap
         if (result.Succeeded) return;
         if (result.Errors.Any(x => x.Code == "ConcurrencyFailure")) throw Stale();
         // Identity error descriptions can include input. Return only known, nonsecret messages.
-        var passwordErrors = result.Errors.Where(x => x.Code is "PasswordEmpty" or "PasswordTooShort" or "PasswordRequiresUpper" or "PasswordRequiresLower" or "PasswordRequiresDigit" or "PasswordRequiresNonAlphanumeric").ToArray();
+        var passwordErrors = result.Errors.Where(x => x.Code is "PasswordEmpty" or "PasswordTooShort" or "PasswordRequiresUpper" or "PasswordRequiresLower" or "PasswordRequiresDigit" or "PasswordRequiresNonAlphanumeric" or "PasswordReused").ToArray();
         throw Invalid(passwordErrors.Length > 0 ? string.Join(" ", passwordErrors.Select(x => x.Description)) :
             result.Errors.Any(x => x.Code == "DuplicateUserName") ? "Login jest już zajęty." : "Sprawdź dane konta i aktualne wymagania hasła.");
     }
-    private async Task<ApplicationUser> Target(Guid id, string stamp, CancellationToken ct)
+    private async Task<ApplicationUser> Target(Guid id, string stamp, CancellationToken ct, bool allowArchived = false)
     {
         var row = await db.Users.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Missing();
         if (string.IsNullOrEmpty(stamp) || stamp.Length > 128 || row.ConcurrencyStamp != stamp) throw Stale();
+        if (row.IsArchived && !allowArchived) throw Invalid("Konto jest usunięte. Wybierz odrębną operację przywrócenia lub wykorzystania loginu.");
         return row;
     }
     public static async Task Lock(SystemDbContext db, CancellationToken ct)
@@ -80,19 +85,21 @@ public sealed class UserAdministrationService(SystemDbContext db, UserManager<Ap
     {
         var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == actor, ct);
         var now = clock.GetUtcNow();
-        if (user == null || user.IsBlocked || (user.LockoutEnabled && user.LockoutEnd > now) ||
+        if (user == null || user.IsArchived || user.IsBlocked || (user.LockoutEnabled && user.LockoutEnd > now) ||
             !await db.UserSessions.AsNoTracking().AnyAsync(x => x.Id == session && x.UserId == actor && x.RevokedAtUtc == null && x.ExpiresAtUtc > now, ct))
             throw new UserAdministrationException(401, "user_session_revoked", "Sesja została unieważniona. Zaloguj się ponownie.");
-        if (admin && (user.MustChangePassword || !await IsAdministrator(db, actor, ct)))
+        if (admin && (user.MustChangePassword || (await policies.Read(ct)).IsExpired(user.PasswordChangedAtUtc, now)))
+            throw new UserAdministrationException(403, "user_password_change_required", "Przed dalszą pracą ustaw własne hasło.");
+        if (admin && !await IsAdministrator(db, actor, ct))
             throw new UserAdministrationException(403, "user_admin_required", "Wymagana aktualna rola administratora instalacji.");
         return user;
     }
     private async Task Audit(ApplicationUser actor, ApplicationUser target, string operation, CancellationToken ct,
-        Guid? company = null, CompanyPermission? before = null, CompanyPermission? after = null, bool? blockedBefore = null, bool? blockedAfter = null)
+        Guid? company = null, CompanyPermission? before = null, CompanyPermission? after = null, bool? blockedBefore = null, bool? blockedAfter = null, Guid? relatedUser = null)
     {
         var issuer = await db.InstallationIdentities.Select(x => x.Id).SingleOrDefaultAsync(ct);
         if (issuer == Guid.Empty) throw new UserAdministrationException(503, "user_audit_identity", "Brak identyfikacji instalacji. Nie zapisano zmian.");
-        db.UserAdministrationChanges.Add(new(actor.Id, issuer, actor.UserName!, target.Id, target.UserName!, clock.GetUtcNow(), operation, company, before, after, blockedBefore, blockedAfter));
+        db.UserAdministrationChanges.Add(new(actor.Id, issuer, actor.UserName!, target.Id, target.IsArchived ? target.HistoricalUserName ?? target.UserName! : target.UserName!, clock.GetUtcNow(), operation, company, before, after, blockedBefore, blockedAfter, relatedUser));
     }
     private async Task Revoke(ApplicationUser target, CancellationToken ct)
     {
@@ -156,7 +163,7 @@ public sealed class UserAdministrationService(SystemDbContext db, UserManager<Ap
                 var now = clock.GetUtcNow();
                 active = await (from u in db.Users join m in db.UserRoles on u.Id equals m.UserId
                     join r in db.Roles on m.RoleId equals r.Id
-                    where r.NormalizedName == "INSTALLATIONADMINISTRATOR" && !u.IsBlocked && (!u.LockoutEnabled || u.LockoutEnd == null || u.LockoutEnd <= now)
+                    where r.NormalizedName == "INSTALLATIONADMINISTRATOR" && !u.IsArchived && !u.IsBlocked && (!u.LockoutEnabled || u.LockoutEnd == null || u.LockoutEnd <= now)
                     select u.Id).Distinct().CountAsync(ct);
             }
             try { UserAdministrationSafety.ValidateBlock(actorId, id, targetIsAdministrator, active); }
@@ -221,7 +228,7 @@ public sealed class UserAdministrationService(SystemDbContext db, UserManager<Ap
             var now = clock.GetUtcNow();
             var count = await (from u in db.Users join m in db.UserRoles on u.Id equals m.UserId
                 join r in db.Roles on m.RoleId equals r.Id
-                where r.NormalizedName == "INSTALLATIONADMINISTRATOR" && !u.IsBlocked && (!u.LockoutEnabled || u.LockoutEnd == null || u.LockoutEnd <= now)
+                where r.NormalizedName == "INSTALLATIONADMINISTRATOR" && !u.IsArchived && !u.IsBlocked && (!u.LockoutEnabled || u.LockoutEnd == null || u.LockoutEnd <= now)
                 select u.Id).Distinct().CountAsync(ct);
             try { UserAdministrationSafety.ValidateRoleRemoval(actorId, id, active && current, count); }
             catch (ArgumentException e) { throw Invalid(e.Message); }
@@ -242,11 +249,12 @@ public sealed class UserAdministrationService(SystemDbContext db, UserManager<Ap
     }
 
     public static PasswordPolicyResponse PolicyResponse(PasswordPolicy p, bool version = true) => new(p.IsEnabled, p.MinimumLength,
-        p.RequireUppercase, p.RequireLowercase, p.RequireDigit, p.RequireSpecialCharacter, version ? Convert.ToBase64String(p.RowVersion) : "");
+        p.RequireUppercase, p.RequireLowercase, p.RequireDigit, p.RequireSpecialCharacter, version ? Convert.ToBase64String(p.RowVersion) : "",
+        p.PreventPasswordReuse, p.PreviousPasswordCount, p.EnforcePasswordExpiration, p.PasswordValidityDays, p.PasswordExpirationEnabledAtUtc);
     public async Task<PasswordPolicyResponse> ReadPasswordPolicy(CancellationToken ct) => PolicyResponse(await policies.Read(ct));
     public async Task<PasswordPolicyResponse> SavePasswordPolicy(Guid actorId, Guid sessionId, PasswordPolicyRequest value, CancellationToken ct)
     {
-        if (!value.IsEnabled && !value.ConfirmDisable) throw Invalid("Potwierdź wyłączenie złożoności: każde niepuste hasło będzie dozwolone dla wszystkich użytkowników.");
+        if (!value.IsEnabled && !value.ConfirmDisable) throw Invalid("Potwierdź wyłączenie złożoności. Historia i ważność hasła pozostają niezależne.");
         await using var tx = await db.Database.BeginTransactionAsync(ct); await Lock(db, ct);
         var actor = await Actor(actorId, sessionId, true, ct);
         var row = await db.PasswordPolicies.SingleOrDefaultAsync(ct)
@@ -254,7 +262,11 @@ public sealed class UserAdministrationService(SystemDbContext db, UserManager<Ap
         if (Convert.ToBase64String(row.RowVersion) != value.RowVersion)
             throw new UserAdministrationException(409, "password_policy_stale", "Inny administrator zmienił politykę haseł. Odśwież ustawienia i porównaj niezapisany szkic.");
         var before = JsonSerializer.Serialize(PolicyResponse(row, false));
-        try { row.Update(value.IsEnabled, value.MinimumLength, value.RequireUppercase, value.RequireLowercase, value.RequireDigit, value.RequireSpecialCharacter); }
+        try
+        {
+            row.Update(value.IsEnabled, value.MinimumLength, value.RequireUppercase, value.RequireLowercase, value.RequireDigit, value.RequireSpecialCharacter);
+            row.UpdateLifetime(value.PreventPasswordReuse, value.PreviousPasswordCount, value.EnforcePasswordExpiration, value.PasswordValidityDays, clock.GetUtcNow());
+        }
         catch (ArgumentException e) { throw Invalid(e.Message); }
         var after = JsonSerializer.Serialize(PolicyResponse(row, false));
         if (before != after)

@@ -2,6 +2,11 @@ namespace Vatowiec.Core.Application;
 
 public static class UserAdministrationSafety
 {
+    public static void ValidateArchive(Guid actor, Guid target, bool targetIsActiveAdministrator, int activeAdministrators)
+    {
+        if (actor == target) throw new ArgumentException("Nie można usunąć własnego konta.");
+        if (targetIsActiveAdministrator && activeAdministrators <= 1) throw new ArgumentException("Nie można usunąć ostatniego aktywnego administratora instalacji.");
+    }
     public static void ValidateRoleRemoval(Guid actor, Guid target, bool targetIsActiveAdministrator, int activeAdministrators)
     {
         if (actor == target) throw new ArgumentException("Nie można odebrać sobie roli administratora przez ten ekran.");
