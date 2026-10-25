@@ -10,9 +10,10 @@
       <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="8">
         <TextBox Text="{Binding AdminSearch, Mode=TwoWay}" MaxLength="256" PlaceholderText="Szukaj loginu" KeyDown="SearchKeyDown" AutomationProperties.AutomationId="UserSearch"/>
         <WrapPanel Grid.Row="1"><Button Content="Szukaj" Click="SearchClick" AutomationProperties.AutomationId="SearchUsers"/><CheckBox Content="Pokaż usuniętych" IsChecked="{Binding ShowArchivedUsers, Mode=TwoWay}" Margin="8,0" AutomationProperties.AutomationId="ShowArchivedUsers"/></WrapPanel>
-        <ListBox Grid.Row="2" ItemsSource="{Binding AdminUsers}" SelectedItem="{Binding SelectedAdminUser, Mode=OneWay}" SelectionChanged="UserSelectionChanged" AutomationProperties.AutomationId="UsersList">
-          <ListBox.ItemTemplate><DataTemplate x:DataType="contracts:UserSummary"><StackPanel Spacing="3"><TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"/><TextBlock Text="Usunięte — archiwum" IsVisible="{Binding IsArchived}" Foreground="#B42318"/><TextBlock Text="Zablokowane" IsVisible="{Binding IsBlocked}" Foreground="#B42318"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
-        </ListBox>
+        <HeaderedContentControl Grid.Row="2" Classes="tableSection" Header="Użytkownicy">
+        <ListBox ItemsSource="{Binding AdminUsers}" SelectedItem="{Binding SelectedAdminUser, Mode=OneWay}" SelectionChanged="UserSelectionChanged" AutomationProperties.AutomationId="UsersList">
+          <ListBox.ItemTemplate><DataTemplate x:DataType="contracts:UserSummary"><StackPanel Spacing="3"><TextBlock Text="{Binding DisplayName}"/><TextBlock Text="Usunięte — archiwum" IsVisible="{Binding IsArchived}" Foreground="#B42318"/><TextBlock Text="Zablokowane" IsVisible="{Binding IsBlocked}" Foreground="#B42318"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
+        </ListBox></HeaderedContentControl>
         <WrapPanel Grid.Row="3"><Button Content="‹" Click="PreviousClick" IsEnabled="{Binding AdminHasPrevious}"/><TextBlock Text="{Binding AdminPage}" Margin="8"/><Button Content="›" Click="NextClick" IsEnabled="{Binding AdminHasNext}"/></WrapPanel>
       </Grid>
       <ScrollViewer Grid.Column="2" HorizontalContentAlignment="Stretch">
@@ -58,13 +59,14 @@
           </StackPanel>
           <Separator/>
           <WrapPanel><TextBlock Text="Historia administracyjna" FontSize="18" VerticalAlignment="Center"/><Button Content="Odśwież historię" Click="HistoryClick"/></WrapPanel>
-          <ItemsControl ItemsSource="{Binding AdminHistory}">
+          <HeaderedContentControl Classes="tableSection" Header="Zmiany administracyjne">
+          <ItemsControl Classes="tableRecords" ItemsSource="{Binding AdminHistory}">
             <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:UserAdministrationHistoryRow">
-              <StackPanel Margin="0,0,0,12"><TextBlock Text="{Binding Time}" FontWeight="SemiBold"/><TextBlock Text="{Binding Operation}"/><TextBlock Text="{Binding Actor}"/><TextBlock Text="{Binding Target}"/><TextBlock Text="{Binding Company}"/>
+              <StackPanel Classes="tableRecord"><TextBlock Text="{Binding Time}"/><TextBlock Text="{Binding Operation}"/><TextBlock Text="{Binding Actor}"/><TextBlock Text="{Binding Target}"/><TextBlock Text="{Binding Company}"/>
                 <TextBlock Text="{Binding Before}" TextWrapping="Wrap"/><TextBlock Text="{Binding After}" TextWrapping="Wrap"/><TextBlock Text="{Binding State}"/>
               </StackPanel>
             </DataTemplate></ItemsControl.ItemTemplate>
-          </ItemsControl>
+          </ItemsControl></HeaderedContentControl>
           <WrapPanel><Button Content="Nowsze" Click="HistoryPreviousClick" IsEnabled="{Binding AdminHistoryHasPrevious}"/><Button Content="Starsze" Click="HistoryNextClick" IsEnabled="{Binding AdminHistoryHasNext}"/></WrapPanel>
         </StackPanel>
       </ScrollViewer>

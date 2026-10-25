@@ -66,7 +66,7 @@ public sealed partial class MainViewModel
     private string? columnSettingsTable;
     public bool IsColumnSettingsOpen => columnSettingsTable != null;
     public ColumnChoice[] ColumnChoices { get; private set; } = [];
-    public string ColumnSettingsTitle => "Kolumny tabeli: " + columnSettingsTable;
+    public string ColumnSettingsTitle => "Kolumny tabeli: " + TableDisplayNames.For(columnSettingsTable);
     public string ColumnSettingsSource => columnSettingsTable == null ? "" : View(columnSettingsTable).Source switch
     { "User" => "Obowiązuje mój widok", "Installation" => "Obowiązuje domyślny widok instalacji", _ => "Obowiązuje widok fabryczny" };
     public Task OpenColumnSettings(string tableId) => Run(async () =>

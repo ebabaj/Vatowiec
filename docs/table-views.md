@@ -19,6 +19,10 @@ Po zalogowaniu menu ma cztery grupy:
 | FIRMA | Ustawienia firmy, Zmień firmę |
 | KONTO | Własne hasło, zapomnienie logowania, ustawienia instalacji (administrator), wylogowanie |
 
+KARTOTEKI, SŁOWNIKI i FIRMA pozostają po lewej, KONTO przy prawej krawędzi
+obszaru menu. Lista KONTO rozwija się w lewo od prawego końca przycisku,
+w obrębie okna. Wspólny pasek zachowuje nawigację strzałkami i klawisze dostępu.
+
 Podsekcje ustawień firmy (DataPort, waluty/NBP) i instalacji (rejestry, GUS,
 użytkownicy, bezpieczeństwo) pozostają dostępne. Zmiana modułu, firmy i zamknięcie
 chronią niezapisane szkice. Dolny pasek pokazuje aktualny login, firmę i lokalną
@@ -41,9 +45,18 @@ tworzy nowy rekord. Zapisy i konflikty RowVersion działają jak dotychczas.
 
 ## Kolumny i hierarchia
 
-Koło zębate przy nagłówku kontrahentów, walut i kursów otwiera wspólny konfigurator.
+Koło zębate w wierszu nagłówków kontrahentów, walut i kursów otwiera wspólny
+konfigurator. Wspólny `ConfigurableTable` rezerwuje dla niego nieruchome pole
+przy prawej krawędzi tabeli, niezależnie od szerokości i liczby kolumn. Tło
+nagłówka wypełnia całą dostępną szerokość, także przy krótkim zestawie kolumn.
+Nagłówki przewijają się razem z danymi w pozostałym obszarze, bez nachodzenia
+na przycisk. Zębatka nie jest kolumną danych i nie występuje w wierszach rekordów.
 Zaznacz kolumny i wybierz Zapisz mój widok. Co najmniej jedna jest wymagana.
 Konfigurator pokazuje źródło bieżącego widoku.
+
+Tytuły używają polskich nazw: „Kolumny tabeli: Kontrahenci”, „Waluty” lub
+„Kursy walut”. Techniczne Contractors/Currencies/CurrencyRates pozostają
+identyfikatorami API i zapisanych konfiguracji.
 
 1. Własny widok ma pierwszeństwo; jest prywatny i wspólny dla stanowisk i firm
    tej instalacji, przypisany do UserId, a nie loginu/komputera.
@@ -216,3 +229,57 @@ network-before-deployment.json, network-deployment-build.log,
 network-deployment-migration.log, network-deployment-http.json oraz
 network-after-deployment.json. Brak prób Linux i osobnej zmiany DPI pozostaje
 ograniczeniem wcześniejszej weryfikacji. Bez Commit i Push.
+
+## Korekta układu ADR-042 — 2026-10-25
+
+Pierwsza natywna próba `WorkspaceLayoutUiTests` korzystała wyłącznie z atrapy API Network,
+bez SQL, połączeń do rejestrów i uruchamiania Personal. Dla szerokości okna
+900, 1050 i 1200 sprawdza wspólny nagłówek kontrahentów, walut i kursów:
+szeroki zestaw kolumn, oba końce przewijania, synchronizację nagłówków/danych,
+brak nakładania zębatki, kliknięcie rzeczywistym wskaźnikiem i zapis konfiguracji
+z jedną kolumną. Sprawdza też prawostronne KONTO, otwieranie myszą i klawiaturą,
+strzałkę FIRMA → KONTO, Escape oraz położenie rozwiniętej listy wewnątrz okna.
+TRX i obrazy: `%LOCALAPPDATA%/Vatowiec/Verification/ADR-042/layout`.
+
+### Stałe pole zębatki — ponowna korekta
+
+Usunięto pozycjonowanie zębatki zależne od sumy szerokości kolumn. Nagłówek
+korzysta ze zwykłego Grid z przewijaną częścią `*` i stałym polem przycisku 36 px.
+Obszar danych ma tę samą pozostałą szerokość co przewijany nagłówek. Pełne tło
+obejmuje również puste miejsce pomiędzy krótkim zestawem kolumn a zębatką.
+
+Aktualna próba natywna sprawdza 900 i 1200 px, maksymalizację oraz powrót do
+900 px. Dla kontrahentów zapisuje przez konfigurator zestawy 3 i 15 kolumn;
+dla walut i kursów — 3 oraz wszystkie dostępne kolumny (6/8). Sprawdza początek,
+środek i koniec przewijania, pozycję każdej pary nagłówek–komórka, równą szerokość
+obu obszarów przewijania, poziomy pasek oraz klikanie zębatki. Próba używa atrapy
+API bez SQL i nie uruchamia Personal. TRX, pomiary JSON i obrazy:
+`%LOCALAPPDATA%/Vatowiec/Verification/ADR-042/fixed-header`.
+
+### Polskie nazwy i wspólny wygląd
+
+Wspólny styl Desktop obejmuje nagłówki i komórki Kontrahentów, Walut oraz Kursów
+walut. Jasnoniebieskie nagłówki mają wysokość 48, Segoe UI 14 i półgruby tekst;
+komórki mają odstępy 8/6 i minimalną wysokość wiersza 32. Dłuższy tekst nadal
+może się zawijać. Zaznaczenie i podświetlenie wiersza są wspólne.
+
+Ten sam wygląd otrzymały listy firm, użytkowników, wyników szukania nadrzędnego,
+podmiotów grupy, szczegółów kontrahenta (adresy/kontakty/rachunki), limitów,
+sposobów płatności, weryfikacji, konfliktów kursów i operacji walutowych oraz
+historie administracji i polityki haseł. Pomocnicze listy zachowują istniejącą
+treść i obsługę; otrzymały nagłówek sekcji. Formularze nadawania uprawnień
+pozostają formularzami. Checkboxy walut i operacje zbiorcze zachowują dotychczasowe
+wiązania, kontrolę uprawnień i potwierdzenie zapisu.
+
+Wspólny katalog polskich etykiet `TableDisplayNames` działa wyłącznie w Desktop.
+Nie zmieniono identyfikatorów tabel, API, baz, zapisu preferencji ani układu zębatki.
+Nie dodano sortowania, przeciągania, kolejności ani ustawień szerokości kolumn.
+
+Weryfikacja: nowy natywny `TableAppearanceUiTests` na atrapie API Network przy
+900/1200 px, wszystkie trzy tytuły, style nagłówków/wierszy/zaznaczenia, zapis
+i odświeżenie widoku, kliknięcie zębatki oraz checkboxy i operacje zbiorcze walut
+(zaznacz widoczne/wszystkie, wyczyść, filtr, anulowanie, dezaktywacja i aktywacja).
+Osobno: 7 testów nazw i operacji zbiorczych oraz natywny test administracji.
+Nie powtarzano wcześniejszych 72 pomiarów pozycjonowania zębatki. Nie uruchamiano
+Personal ani testów SQL. TRX i obrazy:
+`%LOCALAPPDATA%/Vatowiec/Verification/ADR-042/table-appearance`.

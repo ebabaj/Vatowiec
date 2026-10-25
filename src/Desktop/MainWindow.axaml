@@ -12,8 +12,15 @@
         KeyDown="WindowKeyDown"
         WindowStartupLocation="CenterScreen">
   <Window.Resources><converters:FinanceCurrencyLabelConverter x:Key="FinanceCurrencyLabel"/></Window.Resources>
+  <Window.Styles><StyleInclude Source="/TableStyles.axaml"/></Window.Styles>
   <Grid RowDefinitions="Auto,*,Auto,Auto" Margin="16" RowSpacing="8">
     <Menu IsVisible="{Binding IsAuthenticated}" IsEnabled="{Binding CanUseForm}" AutomationProperties.AutomationId="ApplicationMenu">
+      <Menu.ItemsPanel><ItemsPanelTemplate><desktop:ApplicationMenuPanel/></ItemsPanelTemplate></Menu.ItemsPanel>
+      <Menu.Styles>
+        <Style Selector="MenuItem.account /template/ Popup#PART_Popup">
+          <Setter Property="Placement" Value="BottomEdgeAlignedRight"/>
+        </Style>
+      </Menu.Styles>
       <MenuItem Header="_KARTOTEKI" IsEnabled="{Binding CanUseCompanyMenu}">
         <MenuItem Header="Kontrahenci" Click="NavigateContractorsClick" IsEnabled="{Binding CanViewContractors}" AutomationProperties.AutomationId="MenuContractors"/>
       </MenuItem>
@@ -25,7 +32,7 @@
         <MenuItem Header="Ustawienia firmy" Click="DataPortSettingsClick" AutomationProperties.AutomationId="CompanySettings"/>
         <MenuItem Header="Zmień firmę" Click="ChangeCompanyClick" AutomationProperties.AutomationId="ChangeCompany"/>
       </MenuItem>
-      <MenuItem Header="K_ONTO">
+      <MenuItem Header="K_ONTO" Classes="account" AutomationProperties.AutomationId="AccountMenu">
         <MenuItem Header="Zmień własne hasło" Click="OwnPasswordClick" IsEnabled="{Binding CanOpenOwnPasswordChange}" AutomationProperties.AutomationId="OwnPassword"/>
         <MenuItem Header="Zapomnij dane logowania" Click="ForgetLoginClick" AutomationProperties.AutomationId="ForgetLoginSignedIn"/>
         <MenuItem Header="Ustawienia instalacji" Click="GusSettingsClick" IsVisible="{Binding IsInstallationAdministrator}" IsEnabled="{Binding CanOpenGusSettings}" AutomationProperties.AutomationId="InstallationSettings"/>
@@ -74,8 +81,10 @@
         <TextBlock Grid.Row="1" Text="Lista zawiera wyłącznie firmy udostępnione Twojemu kontu. Jeśli jest pusta, odśwież ją lub skontaktuj się z administratorem."
                    TextWrapping="Wrap" />
         <TextBlock Grid.Row="2" Text="{Binding DefaultCompanyLabel}" FontWeight="SemiBold" TextWrapping="Wrap" AutomationProperties.AutomationId="DefaultCompanyLabel"/>
-        <ListBox Grid.Row="3" ItemsSource="{Binding Companies}" SelectedItem="{Binding SelectedCompany, Mode=TwoWay}" DoubleTapped="CompaniesDoubleTapped"
-                 AutomationProperties.AutomationId="Companies" MinHeight="120" />
+        <HeaderedContentControl Grid.Row="3" Classes="tableSection" Header="Firmy">
+          <ListBox ItemsSource="{Binding Companies}" SelectedItem="{Binding SelectedCompany, Mode=TwoWay}" DoubleTapped="CompaniesDoubleTapped"
+                   AutomationProperties.AutomationId="Companies" MinHeight="120" />
+        </HeaderedContentControl>
         <WrapPanel Grid.Row="4">
           <Button Content="Otwórz firmę" Click="OpenCompanyClick" AutomationProperties.AutomationId="OpenCompany" />
           <Button Content="Ustaw jako domyślną" Click="SetDefaultCompanyClick" IsEnabled="{Binding CanSetDefaultCompany}" AutomationProperties.AutomationId="SetDefaultCompany"/>
@@ -85,10 +94,7 @@
       </Grid>
 
       <Grid IsVisible="{Binding IsBrowsingWorkspace}" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="10">
-        <Grid ColumnDefinitions="*,Auto">
-          <TextBlock Text="Kontrahenci" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
-          <Button Grid.Column="1" Content="⚙" Click="ContractorColumnsClick" ToolTip.Tip="Konfiguracja kolumn" IsVisible="{Binding CanViewContractors}" AutomationProperties.Name="Konfiguracja kolumn kontrahentów" AutomationProperties.AutomationId="ContractorColumns"/>
-        </Grid>
+        <TextBlock Text="Kontrahenci" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
         <Grid Grid.Row="1" IsVisible="{Binding CanBrowse}" ColumnDefinitions="*,150,Auto" ColumnSpacing="10">
           <StackPanel Spacing="4">
             <TextBlock Text="Szukaj w widocznych kolumnach (Ctrl+F)" />
@@ -106,10 +112,8 @@
                    IsVisible="{Binding CannotViewContractors}" TextWrapping="Wrap" />
         <TextBlock Grid.Row="2" Text="{Binding ContractorStatus}" IsVisible="{Binding CanViewContractors}" />
         <Grid Grid.Row="3" IsVisible="{Binding CanViewContractors}" RowDefinitions="*,Auto" RowSpacing="8">
-          <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-          <Grid RowDefinitions="Auto,*">
-          <Border Background="#182A7DB1"><desktop:TableCells Columns="{Binding ContractorColumns}"/></Border>
-          <ListBox Grid.Row="1" ItemsSource="{Binding Contractors}" SelectedItem="{Binding SelectedContractor, Mode=TwoWay}" DoubleTapped="ContractorDoubleTapped" AutomationProperties.AutomationId="Contractors" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <desktop:ConfigurableTable Columns="{Binding ContractorColumns}" ConfigureColumns="ContractorColumnsClick" SettingsId="ContractorColumns" SettingsLabel="Konfiguracja kolumn kontrahentów">
+          <ListBox ItemsSource="{Binding Contractors}" SelectedItem="{Binding SelectedContractor, Mode=TwoWay}" DoubleTapped="ContractorDoubleTapped" AutomationProperties.AutomationId="Contractors" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="contracts:ContractorResponse">
                 <desktop:TableCells Value="{Binding}" Columns="{Binding $parent[Window].((vm:MainViewModel)DataContext).ContractorColumns}"/>
@@ -119,7 +123,7 @@
               <Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch" /></Style>
             </ListBox.Styles>
           </ListBox>
-          </Grid></ScrollViewer>
+          </desktop:ConfigurableTable>
           <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
             <Button Content="Poprzednia" Click="PreviousPageClick" IsEnabled="{Binding HasPreviousPage}" />
             <TextBlock Text="{Binding PageLabel}" VerticalAlignment="Center" />
@@ -146,7 +150,7 @@
         <ScrollViewer Grid.Row="2" MaxHeight="125"><StackPanel><TextBlock Text="Daty od/do są używane tylko w trybie „Za okres”; to daty publikacji, nie dokumentów. A/B: średni. C: kupna i sprzedaży. NBP nie wymaga klucza. PLN nie jest pobierany." TextWrapping="Wrap" Opacity="0.75"/><TextBlock Text="{Binding RateImportSummary}" TextWrapping="Wrap" AutomationProperties.AutomationId="NbpSummary"/></StackPanel></ScrollViewer>
         <Grid Grid.Row="3" IsVisible="{Binding IsCurrencySettings}" ColumnDefinitions="*,*" ColumnSpacing="18">
           <Grid RowDefinitions="Auto,Auto,*" RowSpacing="6">
-            <Grid ColumnDefinitions="*,Auto"><TextBox Text="{Binding CurrencySearch, Mode=TwoWay}" PlaceholderText="Szukaj kodu lub nazwy waluty" AutomationProperties.AutomationId="CurrencySearch"/><Button Grid.Column="1" Content="⚙" Click="CurrencyColumnsClick" ToolTip.Tip="Konfiguracja kolumn walut" AutomationProperties.AutomationId="CurrencyColumns"/></Grid>
+            <TextBox Text="{Binding CurrencySearch, Mode=TwoWay}" PlaceholderText="Szukaj kodu lub nazwy waluty" AutomationProperties.AutomationId="CurrencySearch"/>
             <StackPanel Grid.Row="1" Spacing="5">
               <WrapPanel IsEnabled="{Binding CanStartCurrencyActivity}">
                 <Button Content="Zaznacz widoczne" Click="SelectVisibleCurrenciesClick" AutomationProperties.AutomationId="SelectVisibleCurrencies"/>
@@ -155,16 +159,15 @@
               </WrapPanel>
               <TextBlock Text="{Binding CurrencySelectionCount}" AutomationProperties.AutomationId="CurrencySelectionCount"/>
             </StackPanel>
-            <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"><Grid RowDefinitions="Auto,*">
-            <desktop:TableCells Columns="{Binding CurrencyColumns}"/>
-            <ListBox Grid.Row="1" ItemsSource="{Binding VisibleCurrencySelections}" SelectedItem="{Binding SelectedCurrencySelection, Mode=TwoWay}" AutomationProperties.AutomationId="CurrencyList" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <desktop:ConfigurableTable Grid.Row="2" Columns="{Binding CurrencyColumns}" ConfigureColumns="CurrencyColumnsClick" SettingsId="CurrencyColumns" SettingsLabel="Konfiguracja kolumn walut" HeaderInset="28">
+            <ListBox ItemsSource="{Binding VisibleCurrencySelections}" SelectedItem="{Binding SelectedCurrencySelection, Mode=TwoWay}" AutomationProperties.AutomationId="CurrencyList" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
               <ListBox.ItemTemplate><DataTemplate x:DataType="vm:CurrencySelection">
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                  <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" IsEnabled="{Binding $parent[Window].((vm:MainViewModel)DataContext).CanStartCurrencyActivity}" AutomationProperties.AutomationId="CurrencyBulkCheck" AutomationProperties.Name="{Binding Code}"/>
+                  <CheckBox Width="20" IsChecked="{Binding IsChecked, Mode=TwoWay}" IsEnabled="{Binding $parent[Window].((vm:MainViewModel)DataContext).CanStartCurrencyActivity}" AutomationProperties.AutomationId="CurrencyBulkCheck" AutomationProperties.Name="{Binding Code}"/>
                   <desktop:TableCells Value="{Binding Currency}" Columns="{Binding $parent[Window].((vm:MainViewModel)DataContext).CurrencyColumns}"/>
                 </StackPanel>
               </DataTemplate></ListBox.ItemTemplate>
-            </ListBox></Grid></ScrollViewer>
+            </ListBox></desktop:ConfigurableTable>
           </Grid>
           <ScrollViewer Grid.Column="1"><StackPanel Spacing="10">
             <StackPanel Spacing="6" IsEnabled="{Binding CanStartCurrencyActivity}">
@@ -198,7 +201,7 @@
             <TextBlock Text="Zapis dotyczy wybranej waluty i nie pobiera kursów. Wyłączenie waluty zachowuje jej historię i usuwa wybór pobierania. PLN zawsze pozostaje aktywny, bez kursu NBP. Dostępność waluty zależy od tabeli; brak jest raportowany, bez fikcyjnego kursu." TextWrapping="Wrap"/>
           </StackPanel></ScrollViewer>
         </Grid>
-        <Grid Grid.Row="3" IsVisible="{Binding IsRateList}" RowDefinitions="Auto,Auto,*,Auto,Auto" RowSpacing="6">
+        <Grid Grid.Row="3" IsVisible="{Binding IsRateList}" RowDefinitions="Auto,*,Auto,Auto" RowSpacing="6">
           <WrapPanel>
             <ComboBox Width="300" ItemsSource="{Binding RateCurrencyChoices}" SelectedItem="{Binding SelectedRateCurrency, Mode=OneWay}" SelectionChanged="RateCurrencySelectionChanged" ToolTip.Tip="{Binding SelectedRateCurrency}" AutomationProperties.AutomationId="RateCurrencyFilter"/>
             <CheckBox Content="Pokaż nieaktywne (archiwum)" IsChecked="{Binding ShowInactiveRateCurrencies, Mode=OneWay}" Click="ShowInactiveRateCurrenciesClick" AutomationProperties.AutomationId="ShowInactiveRateCurrencies"/>
@@ -207,21 +210,19 @@
             <CheckBox Content="Najnowsze najpierw" IsChecked="{Binding RateDescending, Mode=TwoWay}"/>
             <Button Content="Filtruj" Click="FilterRatesClick" AutomationProperties.AutomationId="FilterRates"/><Button Content="Wyczyść filtry" Click="ClearRateFiltersClick"/>
           </WrapPanel>
-          <Button Grid.Row="1" Content="⚙" Click="RateColumnsClick" HorizontalAlignment="Right" ToolTip.Tip="Konfiguracja kolumn kursów" AutomationProperties.AutomationId="RateColumns"/>
-          <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"><Grid RowDefinitions="Auto,*">
-            <desktop:TableCells Columns="{Binding RateColumns}"/>
-            <ListBox Grid.Row="1" ItemsSource="{Binding RateRows}" AutomationProperties.AutomationId="RateList" ScrollViewer.HorizontalScrollBarVisibility="Disabled"><ListBox.ItemTemplate><DataTemplate x:DataType="contracts:RateResponse"><desktop:TableCells Value="{Binding}" Columns="{Binding $parent[Window].((vm:MainViewModel)DataContext).RateColumns}"/></DataTemplate></ListBox.ItemTemplate></ListBox>
-          </Grid></ScrollViewer>
-          <WrapPanel Grid.Row="3"><Button Content="Poprzednie kursy" Click="PreviousRatesClick" IsEnabled="{Binding HasPreviousRates}"/><Button Content="Następne kursy" Click="NextRatesClick" IsEnabled="{Binding HasNextRates}"/><TextBlock Text="{Binding RatePageLabel}" VerticalAlignment="Center"/></WrapPanel>
-          <TextBlock Grid.Row="4" Text="{Binding StoredRateDates}" TextWrapping="Wrap" Opacity="0.75"/>
+          <desktop:ConfigurableTable Grid.Row="1" Columns="{Binding RateColumns}" ConfigureColumns="RateColumnsClick" SettingsId="RateColumns" SettingsLabel="Konfiguracja kolumn kursów">
+            <ListBox ItemsSource="{Binding RateRows}" AutomationProperties.AutomationId="RateList" ScrollViewer.HorizontalScrollBarVisibility="Disabled"><ListBox.ItemTemplate><DataTemplate x:DataType="contracts:RateResponse"><desktop:TableCells Value="{Binding}" Columns="{Binding $parent[Window].((vm:MainViewModel)DataContext).RateColumns}"/></DataTemplate></ListBox.ItemTemplate></ListBox>
+          </desktop:ConfigurableTable>
+          <WrapPanel Grid.Row="2"><Button Content="Poprzednie kursy" Click="PreviousRatesClick" IsEnabled="{Binding HasPreviousRates}"/><Button Content="Następne kursy" Click="NextRatesClick" IsEnabled="{Binding HasNextRates}"/><TextBlock Text="{Binding RatePageLabel}" VerticalAlignment="Center"/></WrapPanel>
+          <TextBlock Grid.Row="3" Text="{Binding StoredRateDates}" TextWrapping="Wrap" Opacity="0.75"/>
         </Grid>
         <ScrollViewer Grid.Row="4" MaxHeight="230"><StackPanel Spacing="8">
           <Expander Header="Konflikty — wymagają świadomej decyzji" IsVisible="{Binding HasRateConflicts}"><StackPanel Spacing="6">
-            <ListBox ItemsSource="{Binding RateConflicts}" SelectedItem="{Binding SelectedRateConflict, Mode=TwoWay}" MaxHeight="100" AutomationProperties.AutomationId="RateConflicts"/>
+            <HeaderedContentControl Classes="tableSection" Header="Konflikty kursów"><ListBox ItemsSource="{Binding RateConflicts}" SelectedItem="{Binding SelectedRateConflict, Mode=TwoWay}" MaxHeight="100" AutomationProperties.AutomationId="RateConflicts"/></HeaderedContentControl>
             <TextBlock Text="{Binding RateConflictComparison}" TextWrapping="Wrap"/>
             <StackPanel IsEnabled="{Binding CanResolveRates}"><CheckBox Content="Świadomie potwierdzam wybrany sposób rozstrzygnięcia" IsChecked="{Binding ConfirmRateResolution, Mode=TwoWay}" AutomationProperties.AutomationId="ConfirmRateResolution"/><WrapPanel><Button Content="Zachowaj zapisany kurs" Click="KeepRateClick" AutomationProperties.AutomationId="KeepRate"/><Button Content="Przyjmij propozycję NBP" Click="AcceptRateClick" AutomationProperties.AutomationId="AcceptRate"/></WrapPanel></StackPanel>
           </StackPanel></Expander>
-          <Expander Header="Historia operacji walutowych"><StackPanel><WrapPanel><Button Content="Odśwież historię" Click="CurrencyHistoryClick"/><Button Content="Poprzednie" Click="PreviousCurrencyHistoryClick" IsEnabled="{Binding HasPreviousCurrencyHistory}"/><Button Content="Następne" Click="NextCurrencyHistoryClick" IsEnabled="{Binding HasNextCurrencyHistory}"/></WrapPanel><ListBox ItemsSource="{Binding CurrencyHistoryRows}" SelectedItem="{Binding SelectedCurrencyHistory, Mode=TwoWay}" MaxHeight="150" AutomationProperties.AutomationId="CurrencyHistory"/></StackPanel></Expander>
+          <Expander Header="Historia operacji walutowych"><StackPanel><WrapPanel><Button Content="Odśwież historię" Click="CurrencyHistoryClick"/><Button Content="Poprzednie" Click="PreviousCurrencyHistoryClick" IsEnabled="{Binding HasPreviousCurrencyHistory}"/><Button Content="Następne" Click="NextCurrencyHistoryClick" IsEnabled="{Binding HasNextCurrencyHistory}"/></WrapPanel><HeaderedContentControl Classes="tableSection" Header="Operacje walutowe"><ListBox ItemsSource="{Binding CurrencyHistoryRows}" SelectedItem="{Binding SelectedCurrencyHistory, Mode=TwoWay}" MaxHeight="150" AutomationProperties.AutomationId="CurrencyHistory"/></HeaderedContentControl></StackPanel></Expander>
         </StackPanel></ScrollViewer>
       </Grid>
       <ScrollViewer IsVisible="{Binding IsGusSettings}">
@@ -304,9 +305,10 @@
           <TextBlock IsVisible="{Binding !HasPolicyHistory}" Text="Historia zmian nie została wczytana." AutomationProperties.AutomationId="PasswordPolicyHistoryNotLoaded"/>
           <TextBlock IsVisible="{Binding IsPolicyHistoryEmpty}" Text="Nie ma zapisanych zmian polityki haseł."/>
           <Button Content="Odśwież historię" Click="PolicyHistoryRefreshClick" AutomationProperties.AutomationId="RefreshPolicyHistory"/>
-          <ItemsControl ItemsSource="{Binding PasswordPolicyHistory}" AutomationProperties.AutomationId="PasswordPolicyHistory"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:PasswordPolicyHistoryRow">
-            <StackPanel Spacing="4" Margin="0,0,0,14"><TextBlock Text="{Binding Time}" FontWeight="SemiBold"/><TextBlock Text="{Binding Actor}"/><TextBlock Text="{Binding Before}" TextWrapping="Wrap"/><TextBlock Text="{Binding After}" TextWrapping="Wrap"/></StackPanel>
-          </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+          <HeaderedContentControl Classes="tableSection" Header="Zmiany polityki haseł">
+          <ItemsControl Classes="tableRecords" ItemsSource="{Binding PasswordPolicyHistory}" AutomationProperties.AutomationId="PasswordPolicyHistory"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:PasswordPolicyHistoryRow">
+            <StackPanel Classes="tableRecord" Spacing="4"><TextBlock Text="{Binding Time}"/><TextBlock Text="{Binding Actor}"/><TextBlock Text="{Binding Before}" TextWrapping="Wrap"/><TextBlock Text="{Binding After}" TextWrapping="Wrap"/></StackPanel>
+          </DataTemplate></ItemsControl.ItemTemplate></ItemsControl></HeaderedContentControl>
           <WrapPanel><Button Content="Nowsze" Click="PolicyHistoryPreviousClick" IsEnabled="{Binding PolicyHistoryHasPrevious}"/><Button Content="Starsze" Click="PolicyHistoryNextClick" IsEnabled="{Binding PolicyHistoryHasNext}"/></WrapPanel>
         </StackPanel>
       </ScrollViewer>
@@ -381,11 +383,10 @@
               <StackPanel Spacing="8" IsEnabled="{Binding CanModifyContractor}">
                 <TextBox Text="{Binding ParentSearch, Mode=TwoWay}" MaxLength="128" PlaceholderText="Szukaj po kodzie lub nazwie" AutomationProperties.AutomationId="ParentSearch"/>
                 <WrapPanel><Button Content="Szukaj grupy" Click="SearchParentsClick" AutomationProperties.AutomationId="SearchParents"/><Button Content="Usuń powiązanie" Click="ClearParentClick" AutomationProperties.AutomationId="ClearParent"/></WrapPanel>
-                <ListBox ScrollViewer.HorizontalScrollBarVisibility="Disabled" ItemsSource="{Binding ParentCandidates}" SelectedItem="{Binding SelectedParentCandidate, Mode=TwoWay}" Height="120" AutomationProperties.AutomationId="ParentCandidates"><ListBox.ItemTemplate><DataTemplate x:DataType="contracts:ContractorResponse"><TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="4"/></DataTemplate></ListBox.ItemTemplate></ListBox>
+                <HeaderedContentControl Classes="tableSection" Header="Wyniki wyszukiwania"><ListBox ScrollViewer.HorizontalScrollBarVisibility="Disabled" ItemsSource="{Binding ParentCandidates}" SelectedItem="{Binding SelectedParentCandidate, Mode=TwoWay}" Height="120" AutomationProperties.AutomationId="ParentCandidates"><ListBox.ItemTemplate><DataTemplate x:DataType="contracts:ContractorResponse"><TextBlock Text="{Binding}" TextWrapping="Wrap"/></DataTemplate></ListBox.ItemTemplate></ListBox></HeaderedContentControl>
                 <WrapPanel><Button Content="Wybierz nadrzędnego" Click="ChooseParentClick" AutomationProperties.AutomationId="ChooseParent"/><Button Content="Poprzednie wyniki" Click="PreviousParentsClick" IsEnabled="{Binding HasPreviousParents}"/><Button Content="Następne wyniki" Click="NextParentsClick" IsEnabled="{Binding HasNextParents}"/></WrapPanel>
               </StackPanel>
-              <TextBlock Text="Podmioty należące do tej grupy" FontSize="18" FontWeight="SemiBold"/>
-              <ListBox ItemsSource="{Binding ChildContractors}" SelectedItem="{Binding SelectedChild, Mode=TwoWay}" Height="140" DoubleTapped="ChildDoubleTapped" AutomationProperties.AutomationId="ChildContractors"/>
+              <HeaderedContentControl Classes="tableSection" Header="Podmioty należące do tej grupy"><ListBox ItemsSource="{Binding ChildContractors}" SelectedItem="{Binding SelectedChild, Mode=TwoWay}" Height="140" DoubleTapped="ChildDoubleTapped" AutomationProperties.AutomationId="ChildContractors"/></HeaderedContentControl>
               <WrapPanel><Button Content="Otwórz podmiot" Click="OpenChildClick"/><Button Content="Poprzednie" Click="PreviousChildrenClick" IsEnabled="{Binding HasPreviousChildren}"/><Button Content="Następne" Click="NextChildrenClick" IsEnabled="{Binding HasNextChildren}"/></WrapPanel>
             </StackPanel>
           </Grid>
@@ -400,7 +401,7 @@
               <Button Content="Otwórz (F2)" Click="EditDetailClick" AutomationProperties.AutomationId="EditDetail"/>
               <Button Content="Odśwież" Click="RefreshDetailsClick" AutomationProperties.AutomationId="RefreshDetails"/>
             </WrapPanel>
-            <ListBox ScrollViewer.HorizontalScrollBarVisibility="Disabled" ItemsSource="{Binding DetailRows}" SelectedItem="{Binding SelectedDetail, Mode=TwoWay}" Height="220" DoubleTapped="DetailDoubleTapped" AutomationProperties.AutomationId="DetailRows"><ListBox.ItemTemplate><DataTemplate x:DataType="contracts:DetailResponse"><TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="4"/></DataTemplate></ListBox.ItemTemplate></ListBox>
+            <HeaderedContentControl Classes="tableSection" Header="Dane szczegółowe"><ListBox ScrollViewer.HorizontalScrollBarVisibility="Disabled" ItemsSource="{Binding DetailRows}" SelectedItem="{Binding SelectedDetail, Mode=TwoWay}" Height="220" DoubleTapped="DetailDoubleTapped" AutomationProperties.AutomationId="DetailRows"><ListBox.ItemTemplate><DataTemplate x:DataType="contracts:DetailResponse"><TextBlock Text="{Binding}" TextWrapping="Wrap"/></DataTemplate></ListBox.ItemTemplate></ListBox></HeaderedContentControl>
             <WrapPanel IsEnabled="{Binding !IsDetailEditing}"><Button Content="Poprzednia" Click="PreviousDetailsClick" IsEnabled="{Binding HasPreviousDetails}"/><TextBlock Text="{Binding DetailPage}" Margin="8"/><Button Content="Następna" Click="NextDetailsClick" IsEnabled="{Binding HasNextDetails}"/></WrapPanel>
             <StackPanel IsVisible="{Binding IsAddressesTab}" IsEnabled="{Binding CanEditDetails}" Spacing="6">
               <TextBlock Text="Nowy rodzaj adresu"/>
@@ -483,11 +484,12 @@
             <StackPanel Spacing="8">
             <TextBlock Text="Limity kupieckie według waluty" FontSize="19" FontWeight="SemiBold"/>
             <TextBlock Text="Kwoty nie są wykorzystaniem limitu ani saldem. Zapis nie blokuje sprzedaży i nie przelicza walut." TextWrapping="Wrap"/>
-            <Grid ColumnDefinitions="170,*,140" Margin="12,0"><TextBlock Text="Waluta" FontWeight="SemiBold"/><TextBlock Grid.Column="1" Text="Kwota limitu" FontWeight="SemiBold"/><TextBlock Grid.Column="2" Text="Status" FontWeight="SemiBold"/></Grid>
+            <HeaderedContentControl Classes="tableSection">
+              <HeaderedContentControl.Header><Grid ColumnDefinitions="170,*,140"><TextBlock Text="Waluta"/><TextBlock Grid.Column="1" Text="Kwota limitu"/><TextBlock Grid.Column="2" Text="Status"/></Grid></HeaderedContentControl.Header>
             <ListBox ItemsSource="{Binding CreditLimits}" SelectedItem="{Binding SelectedCreditLimit, Mode=TwoWay}" MinHeight="70" MaxHeight="180" TabIndex="70" AutomationProperties.AutomationId="CreditLimits">
               <ListBox.Styles><Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style></ListBox.Styles>
-              <ListBox.ItemTemplate><DataTemplate x:DataType="contracts:CreditLimitResponse"><Grid ColumnDefinitions="170,*,140" Margin="4"><TextBlock><TextBlock.Text><MultiBinding Converter="{StaticResource FinanceCurrencyLabel}"><Binding Path="CurrencyCode"/><Binding Path="$parent[Window].((vm:MainViewModel)DataContext).FinanceCurrencies"/></MultiBinding></TextBlock.Text></TextBlock><TextBlock Grid.Column="1" Text="{Binding Amount, StringFormat='{}{0:0.########}'}"/><TextBlock Grid.Column="2" IsVisible="{Binding IsActive}" Text="Aktywny"/><TextBlock Grid.Column="2" IsVisible="{Binding !IsActive}" Text="Nieaktywny"/></Grid></DataTemplate></ListBox.ItemTemplate>
-            </ListBox>
+              <ListBox.ItemTemplate><DataTemplate x:DataType="contracts:CreditLimitResponse"><Grid ColumnDefinitions="170,*,140"><TextBlock><TextBlock.Text><MultiBinding Converter="{StaticResource FinanceCurrencyLabel}"><Binding Path="CurrencyCode"/><Binding Path="$parent[Window].((vm:MainViewModel)DataContext).FinanceCurrencies"/></MultiBinding></TextBlock.Text></TextBlock><TextBlock Grid.Column="1" Text="{Binding Amount, StringFormat='{}{0:0.########}'}"/><TextBlock Grid.Column="2" IsVisible="{Binding IsActive}" Text="Aktywny"/><TextBlock Grid.Column="2" IsVisible="{Binding !IsActive}" Text="Nieaktywny"/></Grid></DataTemplate></ListBox.ItemTemplate>
+            </ListBox></HeaderedContentControl>
             <WrapPanel><Button Content="Poprzednie" Click="PreviousLimitsClick" IsEnabled="{Binding HasPreviousCreditLimits}"/><TextBlock Text="{Binding CreditLimitPage}" VerticalAlignment="Center"/><Button Content="Następne" Click="NextLimitsClick" IsEnabled="{Binding HasNextCreditLimits}"/></WrapPanel>
             <WrapPanel IsEnabled="{Binding CanEditFinance}"><Button Content="Nowy limit (Ctrl+N)" Click="NewLimitClick" AutomationProperties.AutomationId="NewCreditLimit"/><Button Content="Edytuj limit / dezaktywuj (F2)" Click="EditLimitClick" AutomationProperties.AutomationId="EditCreditLimit"/></WrapPanel>
             <Border IsVisible="{Binding IsCreditLimitEditing}" BorderBrush="#999999" BorderThickness="1" Padding="12">
@@ -499,7 +501,7 @@
             </StackPanel>
             </Border>
             <Expander Header="Słownik sposobów płatności">
-              <StackPanel Spacing="8"><ListBox ItemsSource="{Binding PaymentMethods}" SelectedItem="{Binding SelectedPaymentMethod, Mode=TwoWay}" MaxHeight="180" AutomationProperties.AutomationId="PaymentMethods"/><WrapPanel IsEnabled="{Binding CanEditFinance}"><Button Content="Nowy sposób" Click="NewPaymentMethodClick" AutomationProperties.AutomationId="NewPaymentMethod"/><Button Content="Edytuj nazwę / aktywność" Click="EditPaymentMethodClick" AutomationProperties.AutomationId="EditPaymentMethod"/></WrapPanel>
+              <StackPanel Spacing="8"><HeaderedContentControl Classes="tableSection" Header="Sposoby płatności"><ListBox ItemsSource="{Binding PaymentMethods}" SelectedItem="{Binding SelectedPaymentMethod, Mode=TwoWay}" MaxHeight="180" AutomationProperties.AutomationId="PaymentMethods"/></HeaderedContentControl><WrapPanel IsEnabled="{Binding CanEditFinance}"><Button Content="Nowy sposób" Click="NewPaymentMethodClick" AutomationProperties.AutomationId="NewPaymentMethod"/><Button Content="Edytuj nazwę / aktywność" Click="EditPaymentMethodClick" AutomationProperties.AutomationId="EditPaymentMethod"/></WrapPanel>
                 <StackPanel IsVisible="{Binding IsPaymentMethodEditing}" IsEnabled="{Binding CanEditFinance}" Spacing="6"><TextBlock Text="Stabilny kod techniczny"/><TextBox Text="{Binding PaymentMethodEditor.Code}" IsReadOnly="True" AutomationProperties.AutomationId="PaymentMethodCode"/><TextBlock Text="Nazwa sposobu płatności"/><TextBox Text="{Binding PaymentMethodEditor.Name, Mode=TwoWay}" MaxLength="100" AutomationProperties.AutomationId="PaymentMethodName"/><CheckBox Content="Aktywny sposób płatności" IsChecked="{Binding PaymentMethodEditor.IsActive, Mode=TwoWay}" AutomationProperties.AutomationId="PaymentMethodActive"/><WrapPanel><Button Content="Zapisz sposób" Click="SavePaymentMethodClick" IsEnabled="{Binding CanSaveFinance}" AutomationProperties.AutomationId="SavePaymentMethod"/><Button Content="Anuluj szkic sposobu" Click="CancelPaymentMethodClick" AutomationProperties.AutomationId="CancelPaymentMethod"/></WrapPanel></StackPanel>
               </StackPanel>
             </Expander>
@@ -509,7 +511,7 @@
         <Grid Grid.Row="1" IsVisible="{Binding IsVerificationsTab}" ColumnDefinitions="340,*" ColumnSpacing="16">
           <ScrollViewer HorizontalScrollBarVisibility="Disabled">
           <StackPanel Spacing="8"><Button Content="Pobierz dane z DataPort" Click="DataPortClick" IsEnabled="{Binding CanVerify}" AutomationProperties.AutomationId="VerifyDataPort"/><TextBlock Text="DataPort (dane GUS) — rzeczywista usługa pośrednika, możliwy cache. Wymaga klucza w ustawieniach firmy. Nie jest bezpośrednią odpowiedzią GUS." TextWrapping="Wrap"/><TextBlock Text="Historia weryfikacji" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="TEST/MOCK nie potwierdzają rzeczywistej rejestracji. Historia jest niezmienna; kolejne ręczne sprawdzenie dodaje nowe zdarzenie." TextWrapping="Wrap"/><Button Content="Odśwież historię" Click="VerificationsClick" IsEnabled="{Binding HasSavedContractor}" AutomationProperties.AutomationId="RefreshVerifications"/>
-            <ListBox ItemsSource="{Binding VerificationRows}" SelectedItem="{Binding SelectedVerification, Mode=TwoWay}" Height="240" ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.AutomationId="VerificationRows"><ListBox.ItemTemplate><DataTemplate x:DataType="contracts:VerificationResponse"><TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="4"/></DataTemplate></ListBox.ItemTemplate></ListBox>
+            <HeaderedContentControl Classes="tableSection" Header="Weryfikacje"><ListBox ItemsSource="{Binding VerificationRows}" SelectedItem="{Binding SelectedVerification, Mode=TwoWay}" Height="240" ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.AutomationId="VerificationRows"><ListBox.ItemTemplate><DataTemplate x:DataType="contracts:VerificationResponse"><TextBlock Text="{Binding}" TextWrapping="Wrap"/></DataTemplate></ListBox.ItemTemplate></ListBox></HeaderedContentControl>
             <WrapPanel><Button Content="Poprzednie" Click="PreviousVerificationsClick" IsEnabled="{Binding HasPreviousVerifications}"/><Button Content="Następne" Click="NextVerificationsClick" IsEnabled="{Binding HasNextVerifications}"/></WrapPanel><TextBlock Text="{Binding VerificationPage}"/>
           </StackPanel>
           </ScrollViewer>
@@ -553,7 +555,7 @@
     </Border>
     <Border Grid.RowSpan="4" IsVisible="{Binding IsColumnSettingsOpen}" Background="{DynamicResource SystemControlBackgroundAltHighBrush}" BorderBrush="#2A7DB1" BorderThickness="2" Padding="20" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="700" MaxHeight="600" AutomationProperties.AutomationId="ColumnSettingsDialog">
       <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="10">
-        <TextBlock Text="{Binding ColumnSettingsTitle}" FontSize="22" FontWeight="SemiBold"/>
+        <TextBlock Text="{Binding ColumnSettingsTitle}" FontSize="22" FontWeight="SemiBold" AutomationProperties.AutomationId="ColumnSettingsTitle"/>
         <TextBlock Grid.Row="1" Text="{Binding ColumnSettingsSource}"/>
         <ScrollViewer Grid.Row="2" MaxHeight="330"><ItemsControl ItemsSource="{Binding ColumnChoices}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:ColumnChoice"><CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" IsEnabled="{Binding Column.CanHide}"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
         <StackPanel Grid.Row="3" Spacing="8" IsEnabled="{Binding CanInteract}">

@@ -1,0 +1,78 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:desktop="using:Vatowiec.Desktop">
+  <Styles.Resources>
+    <SolidColorBrush x:Key="TableHeaderBrush">#182A7DB1</SolidColorBrush>
+    <SolidColorBrush x:Key="TableRowBrush">#F2F2F2</SolidColorBrush>
+    <SolidColorBrush x:Key="TableSelectionBrush">#8CC5E8</SolidColorBrush>
+    <SolidColorBrush x:Key="TableHoverBrush">#E2EFF7</SolidColorBrush>
+    <SolidColorBrush x:Key="TableTextBrush">#172B3A</SolidColorBrush>
+    <FontFamily x:Key="TableFontFamily">Segoe UI</FontFamily>
+    <x:Double x:Key="TableFontSize">14</x:Double>
+    <Thickness x:Key="TableCellPadding">8,6</Thickness>
+  </Styles.Resources>
+  <Style Selector="desktop|ConfigurableTable">
+    <Setter Property="HeaderBackground" Value="{StaticResource TableHeaderBrush}"/>
+  </Style>
+  <Style Selector="Grid.tableHeader, Border.tableHeader">
+    <Setter Property="Height" Value="48"/>
+  </Style>
+  <Style Selector="Grid.tableHeader"><Setter Property="Background" Value="{StaticResource TableHeaderBrush}"/></Style>
+  <Style Selector="Border.tableHeader"><Setter Property="Background" Value="{StaticResource TableHeaderBrush}"/></Style>
+  <Style Selector="TextBlock.tableCell">
+    <Setter Property="FontFamily" Value="{StaticResource TableFontFamily}"/>
+    <Setter Property="FontSize" Value="{StaticResource TableFontSize}"/>
+    <Setter Property="FontWeight" Value="Normal"/>
+    <Setter Property="Foreground" Value="{StaticResource TableTextBrush}"/>
+    <Setter Property="Margin" Value="{StaticResource TableCellPadding}"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+  <Style Selector="TextBlock.tableCell.tableColumnTitle">
+    <Setter Property="FontWeight" Value="SemiBold"/>
+  </Style>
+  <Style Selector="ListBox, ItemsControl.tableRecords">
+    <Setter Property="FontFamily" Value="{StaticResource TableFontFamily}"/>
+    <Setter Property="FontSize" Value="{StaticResource TableFontSize}"/>
+    <Setter Property="FontWeight" Value="Normal"/>
+    <Setter Property="Foreground" Value="{StaticResource TableTextBrush}"/>
+    <Setter Property="Background" Value="{StaticResource TableRowBrush}"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="BorderThickness" Value="0"/>
+  </Style>
+  <Style Selector="ListBoxItem">
+    <Setter Property="MinHeight" Value="32"/>
+    <Setter Property="Padding" Value="{StaticResource TableCellPadding}"/>
+    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+  </Style>
+  <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource TableHoverBrush}"/>
+  </Style>
+  <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource TableSelectionBrush}"/>
+    <Setter Property="Foreground" Value="{StaticResource TableTextBrush}"/>
+  </Style>
+  <Style Selector="StackPanel.tableRecord">
+    <Setter Property="Margin" Value="{StaticResource TableCellPadding}"/>
+    <Setter Property="MinHeight" Value="32"/>
+  </Style>
+  <!-- Simple record lists share the table header without gaining column configuration. -->
+  <Style Selector="HeaderedContentControl.tableSection">
+    <Setter Property="FontFamily" Value="{StaticResource TableFontFamily}"/>
+    <Setter Property="FontSize" Value="{StaticResource TableFontSize}"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Grid RowDefinitions="Auto,*">
+          <Border Classes="tableHeader">
+            <ContentControl Content="{TemplateBinding Header}" ContentTemplate="{TemplateBinding HeaderTemplate}"
+                            FontWeight="SemiBold" Foreground="{StaticResource TableTextBrush}"
+                            Padding="8,0" VerticalContentAlignment="Center" HorizontalContentAlignment="Stretch"/>
+          </Border>
+          <ContentPresenter Grid.Row="1" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                            HorizontalContentAlignment="Stretch"/>
+        </Grid>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+</Styles>

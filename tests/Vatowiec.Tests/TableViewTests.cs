@@ -9,6 +9,19 @@ namespace Vatowiec.Tests;
 
 public sealed class TableViewTests
 {
+    [Theory]
+    [InlineData("Contractors", "Kontrahenci")]
+    [InlineData("Currencies", "Waluty")]
+    [InlineData("CurrencyRates", "Kursy walut")]
+    public async Task ColumnSettings_UsesPolishTitleAndSavesOriginalId(string tableId, string label)
+    {
+        var api = new WorkspaceTestApi(); using var model = await Open(api);
+        await model.OpenColumnSettings(tableId);
+        Assert.Equal("Kolumny tabeli: " + label, model.ColumnSettingsTitle);
+        await model.SaveColumns();
+        Assert.Equal(tableId, api.LastSavedTable);
+    }
+
     [Fact]
     public void Catalog_HierarchyPermissionLossAndFutureColumnsAreSafe()
     {
@@ -127,6 +140,9 @@ internal sealed class WorkspaceTestApi : IVatowiecApiClient
     public static readonly Guid A = Guid.Parse("cccccccc-0000-4000-8000-000000000001");
     public static readonly Guid B = Guid.Parse("cccccccc-0000-4000-8000-000000000002");
     public bool Editable = true;
+    public string[] AdditionalPermissions = [];
+    public CurrencyResponse[] CurrencyData = [new(A, "EUR", "Waluta testowa", true, true, false, false, "AAAAAAAAAAE=")];
+    public Func<CurrencyActivityRequest, CurrencyActivityResponse>? CurrencyActivity;
     public int Writes, SearchCalls;
     public ContractorSearchRequest? LastSearch;
     public TableViewRequest? SavedView;
@@ -136,7 +152,7 @@ internal sealed class WorkspaceTestApi : IVatowiecApiClient
     private readonly Dictionary<string, TableViewResponse> views = [];
     public Task<SessionResponse> Login(string u, string p) => Task.FromResult(new SessionResponse(u, DateTimeOffset.UtcNow.AddHours(1), true, UserId: Guid.NewGuid()));
     public Task<CompanyResponse[]> Companies() => Task.FromResult(new[] { A, B }.Select((id, i) =>
-        new CompanyResponse(id, "Firma " + (i == 0 ? "A" : "B"), Editable ? ["ViewProfile", "ViewContractors", "EditContractors", "ViewExchangeRates"] : ["ViewProfile", "ViewContractors"])).ToArray());
+        new CompanyResponse(id, "Firma " + (i == 0 ? "A" : "B"), Editable ? ["ViewProfile", "ViewContractors", "EditContractors", "ViewExchangeRates", .. AdditionalPermissions] : ["ViewProfile", "ViewContractors"])).ToArray());
     public Task<CompanyProfileResponse> Profile(Guid id) => Task.FromResult(new CompanyProfileResponse(id, id == A ? "Firma A" : "Firma B", null, null));
     public Task<ContractorResponse[]> Contractors(Guid id, string? search = null, string? country = null, bool? active = null, int offset = 0, int limit = 50) =>
         Task.FromResult<ContractorResponse[]>([new(1, id, "FIXTURE", "Dane fikcyjne", "PL", RowVersion: "AAAAAAAAAAE=")]);
@@ -152,5 +168,12 @@ internal sealed class WorkspaceTestApi : IVatowiecApiClient
         return views[table] = current with { PageSize = value.PageSize ?? current.PageSize, VisibleColumns = value.Columns ?? current.VisibleColumns, UserVersion = Guid.NewGuid().ToString() };
     }
     public Task Logout() => Task.CompletedTask;
+    public Task<CurrencyResponse[]> Currencies(Guid companyId) => Task.FromResult(CurrencyData.Select(c => c with { CompanyId = companyId }).ToArray());
+    public Task<CurrencyActivityResponse> ChangeCurrencyActivity(Guid companyId, CurrencyActivityRequest value) =>
+        Task.FromResult(CurrencyActivity?.Invoke(value) ?? throw new InvalidOperationException("Unexpected currency activity write"));
+    public Task<CurrencyHistoryResponse[]> CurrencyHistory(Guid companyId, int offset) => Task.FromResult<CurrencyHistoryResponse[]>([]);
+    public Task<RatePage> Rates(Guid companyId, string? code, string? table, DateOnly? from, DateOnly? to, int offset, bool descending) =>
+        Task.FromResult(new RatePage(companyId,
+            [new(1, companyId, "EUR", "Mock", "A", "fixture", new DateOnly(2026, 10, 23), null, 4m, null, null, DateTimeOffset.UtcNow, "AAAAAAAAAAE=")], null, null, null));
     public void Dispose() { }
 }

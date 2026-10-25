@@ -34,6 +34,20 @@ definiują operacje kontekstowe, ich dostępność i stabilny identyfikator auto
 Nowy moduł dodaje definicję tabeli, jawne mapowania projekcji/wyszukiwania oraz
 operacje, wykorzystując ten sam konfigurator i magazyn. Nie dodajemy frameworka.
 
+Warstwa Desktop rozdziela identyfikatory tabel od polskich nazw przez
+`TableDisplayNames`: Contractors → Kontrahenci, Currencies → Waluty,
+CurrencyRates → Kursy walut. Są to wyłącznie etykiety konfiguratora, bez zmiany
+kontraktu API i zapisanych preferencji.
+
+Wspólny [TableStyles.axaml](../../src/Desktop/TableStyles.axaml) ustanawia wygląd
+kartoteki kontrahentów dla tabel i pozostałych list rekordów: pełne jasnoniebieskie
+tło nagłówka, wysokość 48, Segoe UI 14, półgrube nagłówki, marginesy komórek 8/6,
+minimalny wiersz 32 oraz wspólne zaznaczenie. Dłuższe dane nadal mogą się zawijać
+i powiększać wiersz. Listy pomocnicze zachowują dotychczasową projekcję rekordów,
+z nagłówkiem sekcji; limity kupieckie zachowują trzy wyrównane pola.
+Formularz uprawnień nie staje się tabelą. Obecny układ stałego pola zębatki
+w ConfigurableTable i synchronizacja przewijania pozostają bez zmian.
+
 ## Przechowywanie i bezpieczeństwo
 
 System zawiera `security.TableViews`: klucz bigint, InstallationId, OwnerId,

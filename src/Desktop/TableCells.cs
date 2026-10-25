@@ -1,9 +1,7 @@
-using System.Collections;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
-using Avalonia.Media;
 using Vatowiec.Desktop.ViewModels;
 using Vatowiec.SharedContracts;
 
@@ -30,11 +28,10 @@ public sealed class TableCells : StackPanel
             var label = new TextBlock
             {
                 Text = text,
-                Width = column.Id is "Name" or "ParentName" ? 250 : 150,
-                Margin = new Thickness(8, 6),
-                TextWrapping = TextWrapping.Wrap,
-                FontWeight = Value == null ? FontWeight.SemiBold : FontWeight.Normal
+                Width = column.Id is "Name" or "ParentName" ? 250 : 150
             };
+            label.Classes.Add("tableCell");
+            if (Value == null) label.Classes.Add("tableColumnTitle");
             if (Value is CurrencySelection check && column == Columns[0])
             {
                 var panel = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal };
