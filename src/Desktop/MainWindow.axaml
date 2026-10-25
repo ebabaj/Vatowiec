@@ -12,29 +12,38 @@
         KeyDown="WindowKeyDown"
         WindowStartupLocation="CenterScreen">
   <Window.Resources><converters:FinanceCurrencyLabelConverter x:Key="FinanceCurrencyLabel"/></Window.Resources>
-  <Grid RowDefinitions="Auto,*,Auto,Auto" Margin="32" RowSpacing="18">
-    <Grid ColumnDefinitions="*,Auto">
-      <StackPanel>
-        <TextBlock Text="VATowiec" FontSize="30" FontWeight="SemiBold" />
-        <TextBlock Text="Firmy i kontrahenci · M0" Opacity="0.7" />
-      </StackPanel>
-      <StackPanel Grid.Column="1" IsVisible="{Binding !IsLogin}" HorizontalAlignment="Right">
-        <TextBlock Text="{Binding CurrentUser}" FontWeight="SemiBold" AutomationProperties.AutomationId="CurrentUser" />
-        <TextBlock Text="{Binding SessionExpiry}" Opacity="0.7" />
-        <Button Content="Zmień własne hasło" Click="OwnPasswordClick" IsVisible="{Binding CanOpenOwnPasswordChange}" AutomationProperties.AutomationId="OwnPassword"/>
-        <Button Content="Zapomnij dane logowania" Click="ForgetLoginClick" AutomationProperties.AutomationId="ForgetLoginSignedIn"/>
-      </StackPanel>
-    </Grid>
+  <Grid RowDefinitions="Auto,*,Auto,Auto" Margin="16" RowSpacing="8">
+    <Menu IsVisible="{Binding IsAuthenticated}" IsEnabled="{Binding CanUseForm}" AutomationProperties.AutomationId="ApplicationMenu">
+      <MenuItem Header="_KARTOTEKI" IsEnabled="{Binding CanUseCompanyMenu}">
+        <MenuItem Header="Kontrahenci" Click="NavigateContractorsClick" IsEnabled="{Binding CanViewContractors}" AutomationProperties.AutomationId="MenuContractors"/>
+      </MenuItem>
+      <MenuItem Header="_SŁOWNIKI" IsEnabled="{Binding CanUseCompanyMenu}">
+        <MenuItem Header="Waluty" Click="CurrencySettingsClick" IsEnabled="{Binding CanViewRates}" AutomationProperties.AutomationId="MenuCurrencies"/>
+        <MenuItem Header="Kursy walut" Click="CurrenciesClick" IsEnabled="{Binding CanViewRates}" AutomationProperties.AutomationId="MenuRates"/>
+      </MenuItem>
+      <MenuItem Header="_FIRMA" IsEnabled="{Binding CanUseCompanyMenu}">
+        <MenuItem Header="Ustawienia firmy" Click="DataPortSettingsClick" AutomationProperties.AutomationId="CompanySettings"/>
+        <MenuItem Header="Zmień firmę" Click="ChangeCompanyClick" AutomationProperties.AutomationId="ChangeCompany"/>
+      </MenuItem>
+      <MenuItem Header="K_ONTO">
+        <MenuItem Header="Zmień własne hasło" Click="OwnPasswordClick" IsEnabled="{Binding CanOpenOwnPasswordChange}" AutomationProperties.AutomationId="OwnPassword"/>
+        <MenuItem Header="Zapomnij dane logowania" Click="ForgetLoginClick" AutomationProperties.AutomationId="ForgetLoginSignedIn"/>
+        <MenuItem Header="Ustawienia instalacji" Click="GusSettingsClick" IsVisible="{Binding IsInstallationAdministrator}" IsEnabled="{Binding CanOpenGusSettings}" AutomationProperties.AutomationId="InstallationSettings"/>
+        <Separator/>
+        <MenuItem Header="Wyloguj" Click="LogoutClick" AutomationProperties.AutomationId="LogoutWorkspace"/>
+      </MenuItem>
+    </Menu>
 
-    <Grid Grid.Row="1" IsEnabled="{Binding CanUseForm}">
+    <Grid Grid.Row="1" IsEnabled="{Binding CanUseForm}" ColumnDefinitions="*,Auto">
+      <ItemsControl Grid.Column="1" ItemsSource="{Binding WorkspaceOperations}" Margin="12,0,0,0" MaxWidth="155" IsVisible="{Binding IsWorkspace}" AutomationProperties.AutomationId="WorkspaceOperations">
+        <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:WorkspaceOperation">
+          <Button Content="{Binding Label}" Command="{Binding Command}" AutomationProperties.AutomationId="{Binding AutomationId}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,0,8" Padding="12,10"/>
+        </DataTemplate></ItemsControl.ItemTemplate>
+      </ItemsControl>
       <ScrollViewer IsVisible="{Binding IsLogin}">
         <StackPanel MaxWidth="460" HorizontalAlignment="Stretch" Spacing="10" Margin="0,24">
           <TextBlock Text="Zaloguj się" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,12" />
-          <TextBlock Text="Adres serwera API (HTTPS)" IsVisible="{Binding !IsPersonal}" />
-          <TextBox Text="{Binding ApiAddress, Mode=TwoWay}" IsVisible="{Binding !IsPersonal}" AutomationProperties.AutomationId="ApiAddress" />
           <TextBlock Text="Połączenie lokalne — zabezpieczony kanał Windows" IsVisible="{Binding IsPersonal}" TextWrapping="Wrap" />
-          <TextBlock Text="Na innym komputerze podaj adres HTTPS serwera otrzymany od administratora. localhost oznacza ten komputer."
-                     TextWrapping="Wrap" Opacity="0.7" IsVisible="{Binding !IsPersonal}" />
           <TextBlock Text="Login" />
           <TextBox x:Name="LoginInput" Text="{Binding UserName, Mode=TwoWay}" MaxLength="256"
                    AutomationProperties.AutomationId="Login" />
@@ -47,6 +56,13 @@
           <Button Content="Zaloguj się" Click="LoginClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                   Margin="0,12,0,0" AutomationProperties.AutomationId="LoginButton" />
           <Button Content="Zapomnij dane logowania" Click="ForgetLoginClick" AutomationProperties.AutomationId="ForgetLogin"/>
+          <Expander Header="Ustawienia połączenia" IsVisible="{Binding !IsPersonal}" IsExpanded="{Binding IsConnectionSettingsExpanded, Mode=TwoWay}" AutomationProperties.AutomationId="ConnectionSettings">
+            <StackPanel Spacing="6">
+              <TextBlock Text="Adres serwera API (HTTPS)"/>
+              <TextBox Text="{Binding ApiAddress, Mode=TwoWay}" IsVisible="{Binding IsConnectionSettingsExpanded}" AutomationProperties.AutomationId="ApiAddress"/>
+              <TextBlock Text="Podaj adres HTTPS serwera otrzymany od administratora. localhost oznacza ten komputer. Certyfikat musi być zaufany i zgodny z nazwą serwera." TextWrapping="Wrap" Opacity="0.7"/>
+            </StackPanel>
+          </Expander>
           <TextBlock Text="Zapamiętywanie hasła i autologowanie są przeznaczone wyłącznie dla zaufanego konta Windows. Hasło trafia tylko do Windows Credential Manager, sesja pozostaje w pamięci. Puste pole hasła pozwala użyć zapamiętanego poświadczenia dla tego adresu API i loginu. Wymagany jest zaufany certyfikat HTTPS serwera."
                      TextWrapping="Wrap" Opacity="0.7" Margin="0,8,0,0" IsVisible="{Binding !IsPersonal}" />
           <TextBlock Text="Hasło można zapamiętać wyłącznie w Windows Credential Manager tego konta Windows. Sesja pozostaje w pamięci i dotyczy tej instalacji Personal." TextWrapping="Wrap" Opacity="0.7" IsVisible="{Binding IsPersonal}" />
@@ -61,80 +77,55 @@
         <ListBox Grid.Row="3" ItemsSource="{Binding Companies}" SelectedItem="{Binding SelectedCompany, Mode=TwoWay}" DoubleTapped="CompaniesDoubleTapped"
                  AutomationProperties.AutomationId="Companies" MinHeight="120" />
         <WrapPanel Grid.Row="4">
-          <Button Content="Ustawienia instalacji" Click="GusSettingsClick" IsVisible="{Binding IsInstallationAdministrator}" IsEnabled="{Binding CanOpenGusSettings}" AutomationProperties.AutomationId="InstallationSettingsSelection"/>
           <Button Content="Otwórz firmę" Click="OpenCompanyClick" AutomationProperties.AutomationId="OpenCompany" />
           <Button Content="Ustaw jako domyślną" Click="SetDefaultCompanyClick" IsEnabled="{Binding CanSetDefaultCompany}" AutomationProperties.AutomationId="SetDefaultCompany"/>
           <Button Content="Usuń firmę domyślną" Click="ClearDefaultCompanyClick" AutomationProperties.AutomationId="ClearDefaultCompany"/>
           <Button Content="Odśwież listę" Click="RefreshCompaniesClick" />
-          <Button Content="Wyloguj" Click="LogoutClick" AutomationProperties.AutomationId="LogoutSelection" />
         </WrapPanel>
       </Grid>
 
-      <Grid IsVisible="{Binding IsBrowsingWorkspace}" RowDefinitions="Auto,Auto,Auto,Auto,Auto,*" RowSpacing="14">
-        <TextBlock Text="{Binding CurrentCompany}" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap"
-                   AutomationProperties.AutomationId="CurrentCompany" />
-        <WrapPanel Grid.Row="1">
-          <Button Content="Słowniki → Waluty i kursy NBP" Click="CurrenciesClick" IsVisible="{Binding CanViewRates}" AutomationProperties.AutomationId="OpenCurrencies"/><Button Content="Ustawienia firmy" Click="DataPortSettingsClick" AutomationProperties.AutomationId="CompanySettings"/><Button Content="Zmień firmę" Click="ChangeCompanyClick" AutomationProperties.AutomationId="ChangeCompany" />
-          <Button Content="Ustawienia instalacji" Click="GusSettingsClick" IsVisible="{Binding IsInstallationAdministrator}" IsEnabled="{Binding CanOpenGusSettings}" AutomationProperties.AutomationId="InstallationSettings"/>
-          <Button Content="Wyloguj" Click="LogoutClick" AutomationProperties.AutomationId="LogoutWorkspace" />
-          <Button Content="Nowy (Ctrl+N)" Click="NewContractorClick" IsVisible="{Binding CanEditContractors}" AutomationProperties.AutomationId="NewContractor" />
-          <Button Content="Otwórz (F2)" Click="EditContractorClick" IsVisible="{Binding CanViewContractors}" AutomationProperties.AutomationId="EditContractor" />
-        </WrapPanel>
-        <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
+      <Grid IsVisible="{Binding IsBrowsingWorkspace}" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="10">
+        <Grid ColumnDefinitions="*,Auto">
           <TextBlock Text="Kontrahenci" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
-          <Button Grid.Column="1" Content="Pokaż kontrahentów / odśwież" Click="ContractorsClick"
-                  IsVisible="{Binding CanViewContractors}" AutomationProperties.AutomationId="ShowContractors" />
+          <Button Grid.Column="1" Content="⚙" Click="ContractorColumnsClick" ToolTip.Tip="Konfiguracja kolumn" IsVisible="{Binding CanViewContractors}" AutomationProperties.Name="Konfiguracja kolumn kontrahentów" AutomationProperties.AutomationId="ContractorColumns"/>
         </Grid>
-        <Grid Grid.Row="3" IsVisible="{Binding CanBrowse}" ColumnDefinitions="*,100,150,Auto" ColumnSpacing="10">
+        <Grid Grid.Row="1" IsVisible="{Binding CanBrowse}" ColumnDefinitions="*,150,Auto" ColumnSpacing="10">
           <StackPanel Spacing="4">
-            <TextBlock Text="Szukaj: kod, nazwa lub identyfikator (Ctrl+F)" />
+            <TextBlock Text="Szukaj w widocznych kolumnach (Ctrl+F)" />
             <TextBox x:Name="SearchInput" Text="{Binding SearchText, Mode=TwoWay}" MaxLength="128" KeyDown="SearchKeyDown" AutomationProperties.AutomationId="ContractorSearch" />
           </StackPanel>
           <StackPanel Grid.Column="1" Spacing="4">
-            <TextBlock Text="Kraj (opcjonalnie)" />
-            <TextBox Text="{Binding FilterCountry, Mode=TwoWay}" MaxLength="2" KeyDown="SearchKeyDown" AutomationProperties.AutomationId="FilterCountry" />
-          </StackPanel>
-          <StackPanel Grid.Column="2" Spacing="4">
             <TextBlock Text="Status" />
             <ComboBox SelectedIndex="{Binding FilterActivity, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.AutomationId="FilterActivity">
               <ComboBoxItem Content="Wszyscy" /><ComboBoxItem Content="Aktywni" /><ComboBoxItem Content="Nieaktywni" />
             </ComboBox>
           </StackPanel>
-          <Button Grid.Column="3" Content="Szukaj" Click="ContractorsClick" VerticalAlignment="Bottom" AutomationProperties.AutomationId="SearchContractors" />
+          <Button Grid.Column="2" Content="Szukaj" Click="ContractorsClick" VerticalAlignment="Bottom" AutomationProperties.AutomationId="SearchContractors" />
         </Grid>
-        <TextBlock Grid.Row="4" Text="Brak uprawnień do kartoteki kontrahentów."
+        <TextBlock Grid.Row="2" Text="Brak uprawnień do kartoteki kontrahentów."
                    IsVisible="{Binding CannotViewContractors}" TextWrapping="Wrap" />
-        <TextBlock Grid.Row="4" Text="{Binding ContractorStatus}" IsVisible="{Binding CanViewContractors}" />
-        <Grid Grid.Row="5" IsVisible="{Binding CanViewContractors}" RowDefinitions="Auto,*,Auto" RowSpacing="8">
-          <Border Background="#182A7DB1" Padding="12,8">
-            <Grid ColumnDefinitions="110,*,160,60,100">
-              <TextBlock Text="Kod" FontWeight="SemiBold" />
-              <TextBlock Grid.Column="1" Text="Nazwa kontrahenta" FontWeight="SemiBold" />
-              <TextBlock Grid.Column="2" Text="Identyfikator podatkowy" FontWeight="SemiBold" />
-              <TextBlock Grid.Column="3" Text="Kraj" FontWeight="SemiBold" />
-              <TextBlock Grid.Column="4" Text="Status" FontWeight="SemiBold" />
-            </Grid>
-          </Border>
-          <ListBox Grid.Row="1" ItemsSource="{Binding Contractors}" SelectedItem="{Binding SelectedContractor, Mode=TwoWay}" DoubleTapped="ContractorDoubleTapped" AutomationProperties.AutomationId="Contractors">
+        <TextBlock Grid.Row="2" Text="{Binding ContractorStatus}" IsVisible="{Binding CanViewContractors}" />
+        <Grid Grid.Row="3" IsVisible="{Binding CanViewContractors}" RowDefinitions="*,Auto" RowSpacing="8">
+          <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+          <Grid RowDefinitions="Auto,*">
+          <Border Background="#182A7DB1"><desktop:TableCells Columns="{Binding ContractorColumns}"/></Border>
+          <ListBox Grid.Row="1" ItemsSource="{Binding Contractors}" SelectedItem="{Binding SelectedContractor, Mode=TwoWay}" DoubleTapped="ContractorDoubleTapped" AutomationProperties.AutomationId="Contractors" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="contracts:ContractorResponse">
-                <Grid ColumnDefinitions="110,*,160,60,100" Margin="8" HorizontalAlignment="Stretch">
-                  <TextBlock Text="{Binding Code}" TextWrapping="Wrap" />
-                  <TextBlock Grid.Column="1" Text="{Binding Name}" TextWrapping="Wrap" Margin="0,0,12,0" />
-                  <TextBlock Grid.Column="2" Text="{Binding TaxId}" TextWrapping="Wrap" />
-                  <TextBlock Grid.Column="3" Text="{Binding CountryCode}" />
-                  <TextBlock Grid.Column="4" Text="{Binding ActivityLabel}" />
-                </Grid>
+                <desktop:TableCells Value="{Binding}" Columns="{Binding $parent[Window].((vm:MainViewModel)DataContext).ContractorColumns}"/>
               </DataTemplate>
             </ListBox.ItemTemplate>
             <ListBox.Styles>
               <Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch" /></Style>
             </ListBox.Styles>
           </ListBox>
-          <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+          </Grid></ScrollViewer>
+          <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
             <Button Content="Poprzednia" Click="PreviousPageClick" IsEnabled="{Binding HasPreviousPage}" />
             <TextBlock Text="{Binding PageLabel}" VerticalAlignment="Center" />
             <Button Content="Następna" Click="NextPageClick" IsEnabled="{Binding HasNextPage}" />
+            <TextBlock Text="Na stronie:" VerticalAlignment="Center"/>
+            <ComboBox ItemsSource="{Binding PageSizes}" SelectedItem="{Binding PageSize, Mode=TwoWay}" AutomationProperties.AutomationId="ContractorPageSize"/>
           </StackPanel>
         </Grid>
       </Grid>
@@ -155,7 +146,7 @@
         <ScrollViewer Grid.Row="2" MaxHeight="125"><StackPanel><TextBlock Text="Daty od/do są używane tylko w trybie „Za okres”; to daty publikacji, nie dokumentów. A/B: średni. C: kupna i sprzedaży. NBP nie wymaga klucza. PLN nie jest pobierany." TextWrapping="Wrap" Opacity="0.75"/><TextBlock Text="{Binding RateImportSummary}" TextWrapping="Wrap" AutomationProperties.AutomationId="NbpSummary"/></StackPanel></ScrollViewer>
         <Grid Grid.Row="3" IsVisible="{Binding IsCurrencySettings}" ColumnDefinitions="*,*" ColumnSpacing="18">
           <Grid RowDefinitions="Auto,Auto,*" RowSpacing="6">
-            <TextBox Text="{Binding CurrencySearch, Mode=TwoWay}" PlaceholderText="Szukaj kodu lub nazwy waluty" AutomationProperties.AutomationId="CurrencySearch"/>
+            <Grid ColumnDefinitions="*,Auto"><TextBox Text="{Binding CurrencySearch, Mode=TwoWay}" PlaceholderText="Szukaj kodu lub nazwy waluty" AutomationProperties.AutomationId="CurrencySearch"/><Button Grid.Column="1" Content="⚙" Click="CurrencyColumnsClick" ToolTip.Tip="Konfiguracja kolumn walut" AutomationProperties.AutomationId="CurrencyColumns"/></Grid>
             <StackPanel Grid.Row="1" Spacing="5">
               <WrapPanel IsEnabled="{Binding CanStartCurrencyActivity}">
                 <Button Content="Zaznacz widoczne" Click="SelectVisibleCurrenciesClick" AutomationProperties.AutomationId="SelectVisibleCurrencies"/>
@@ -164,14 +155,16 @@
               </WrapPanel>
               <TextBlock Text="{Binding CurrencySelectionCount}" AutomationProperties.AutomationId="CurrencySelectionCount"/>
             </StackPanel>
-            <ListBox Grid.Row="2" ItemsSource="{Binding VisibleCurrencySelections}" SelectedItem="{Binding SelectedCurrencySelection, Mode=TwoWay}" AutomationProperties.AutomationId="CurrencyList">
+            <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"><Grid RowDefinitions="Auto,*">
+            <desktop:TableCells Columns="{Binding CurrencyColumns}"/>
+            <ListBox Grid.Row="1" ItemsSource="{Binding VisibleCurrencySelections}" SelectedItem="{Binding SelectedCurrencySelection, Mode=TwoWay}" AutomationProperties.AutomationId="CurrencyList" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
               <ListBox.ItemTemplate><DataTemplate x:DataType="vm:CurrencySelection">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" IsEnabled="{Binding $parent[Window].((vm:MainViewModel)DataContext).CanStartCurrencyActivity}" AutomationProperties.AutomationId="CurrencyBulkCheck" AutomationProperties.Name="{Binding Code}"/>
-                  <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
+                  <desktop:TableCells Value="{Binding Currency}" Columns="{Binding $parent[Window].((vm:MainViewModel)DataContext).CurrencyColumns}"/>
                 </StackPanel>
               </DataTemplate></ListBox.ItemTemplate>
-            </ListBox>
+            </ListBox></Grid></ScrollViewer>
           </Grid>
           <ScrollViewer Grid.Column="1"><StackPanel Spacing="10">
             <StackPanel Spacing="6" IsEnabled="{Binding CanStartCurrencyActivity}">
@@ -214,8 +207,11 @@
             <CheckBox Content="Najnowsze najpierw" IsChecked="{Binding RateDescending, Mode=TwoWay}"/>
             <Button Content="Filtruj" Click="FilterRatesClick" AutomationProperties.AutomationId="FilterRates"/><Button Content="Wyczyść filtry" Click="ClearRateFiltersClick"/>
           </WrapPanel>
-          <Grid Grid.Row="1" ColumnDefinitions="100,65,50,170,115,*" Margin="6,0,16,0"><TextBlock Text="Publikacja"/><TextBlock Grid.Column="1" Text="Waluta"/><TextBlock Grid.Column="2" Text="Tabela"/><TextBlock Grid.Column="3" Text="Numer NBP"/><TextBlock Grid.Column="4" Text="Notowanie"/><TextBlock Grid.Column="5" Text="Kurs PLN za jednostkę waluty"/></Grid>
-          <ListBox Grid.Row="2" ItemsSource="{Binding RateRows}" AutomationProperties.AutomationId="RateList"><ListBox.ItemTemplate><DataTemplate x:DataType="contracts:RateResponse"><Grid ColumnDefinitions="100,65,50,170,115,*"><TextBlock Text="{Binding DateLabel}"/><TextBlock Grid.Column="1" Text="{Binding CurrencyCode}"/><TextBlock Grid.Column="2" Text="{Binding TableType}"/><TextBlock Grid.Column="3" Text="{Binding TableNumber}"/><TextBlock Grid.Column="4" Text="{Binding TradingDateLabel}"/><TextBlock Grid.Column="5" Text="{Binding Values}" TextWrapping="Wrap"/></Grid></DataTemplate></ListBox.ItemTemplate></ListBox>
+          <Button Grid.Row="1" Content="⚙" Click="RateColumnsClick" HorizontalAlignment="Right" ToolTip.Tip="Konfiguracja kolumn kursów" AutomationProperties.AutomationId="RateColumns"/>
+          <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"><Grid RowDefinitions="Auto,*">
+            <desktop:TableCells Columns="{Binding RateColumns}"/>
+            <ListBox Grid.Row="1" ItemsSource="{Binding RateRows}" AutomationProperties.AutomationId="RateList" ScrollViewer.HorizontalScrollBarVisibility="Disabled"><ListBox.ItemTemplate><DataTemplate x:DataType="contracts:RateResponse"><desktop:TableCells Value="{Binding}" Columns="{Binding $parent[Window].((vm:MainViewModel)DataContext).RateColumns}"/></DataTemplate></ListBox.ItemTemplate></ListBox>
+          </Grid></ScrollViewer>
           <WrapPanel Grid.Row="3"><Button Content="Poprzednie kursy" Click="PreviousRatesClick" IsEnabled="{Binding HasPreviousRates}"/><Button Content="Następne kursy" Click="NextRatesClick" IsEnabled="{Binding HasNextRates}"/><TextBlock Text="{Binding RatePageLabel}" VerticalAlignment="Center"/></WrapPanel>
           <TextBlock Grid.Row="4" Text="{Binding StoredRateDates}" TextWrapping="Wrap" Opacity="0.75"/>
         </Grid>
@@ -351,7 +347,7 @@
         <StackPanel Spacing="6">
           <TextBlock Text="{Binding CurrentCompany}" TextWrapping="Wrap" FontWeight="SemiBold"/>
           <TextBlock Text="{Binding RegistryEnvironmentLabel}" TextWrapping="Wrap" Foreground="#8A5A00" FontWeight="SemiBold" AutomationProperties.AutomationId="RegistryEnvironment"/>
-          <TextBlock IsVisible="{Binding !CanEditContractors}" Text="Tryb tylko do odczytu — brak uprawnienia edycji w tej firmie." Foreground="#8A5A00" TextWrapping="Wrap"/>
+          <TextBlock IsVisible="{Binding IsContractorReadOnly}" Text="Podgląd — dane tylko do odczytu." Foreground="#8A5A00" TextWrapping="Wrap" AutomationProperties.AutomationId="ContractorReadOnly"/>
           <TextBlock Text="{Binding CurrentContractor}" FontSize="21" FontWeight="SemiBold" TextWrapping="Wrap" AutomationProperties.AutomationId="CurrentContractor"/>
           <TabControl SelectedIndex="{Binding SelectedTab, Mode=TwoWay}" Height="48" AutomationProperties.AutomationId="ContractorTabs">
             <TabItem Header="Dane główne"/><TabItem Header="Adresy"/><TabItem Header="Kontakty"/><TabItem Header="Rachunki bankowe"/><TabItem Header="Weryfikacje"/><TabItem Header="Finansowe"/>
@@ -360,29 +356,29 @@
         <ScrollViewer Grid.Row="1" IsVisible="{Binding IsMainTab}" HorizontalScrollBarVisibility="Disabled">
           <Grid ColumnDefinitions="*,*" ColumnSpacing="24" Margin="0,0,16,8">
             <StackPanel Spacing="10" IsEnabled="{Binding !HasConflict}">
-<StackPanel Spacing="4"><TextBlock Text="Kod *"/><TextBox Text="{Binding Editor.Code, Mode=TwoWay}" MaxLength="64" IsReadOnly="{Binding !CanEditContractors}" x:Name="ContractorCodeInput" AutomationProperties.AutomationId="ContractorCode"/><TextBlock Text="{Binding Editor.CodeError}" Foreground="#B42318" TextWrapping="Wrap"/></StackPanel>
-<StackPanel Spacing="4"><TextBlock Text="Pełna nazwa *"/><TextBox Text="{Binding Editor.Name, Mode=TwoWay}" MaxLength="256" IsReadOnly="{Binding !CanEditContractors}" AutomationProperties.AutomationId="ContractorName"/><TextBlock Text="{Binding Editor.NameError}" Foreground="#B42318" TextWrapping="Wrap"/></StackPanel>
-<StackPanel Spacing="4"><TextBlock Text="Kraj *"/><TextBox Text="{Binding Editor.CountryCode, Mode=TwoWay}" MaxLength="2" IsReadOnly="{Binding !CanEditContractors}" AutomationProperties.AutomationId="ContractorCountryCode"/><TextBlock Text="{Binding Editor.CountryError}" Foreground="#B42318" TextWrapping="Wrap"/></StackPanel>
-<StackPanel Spacing="4"><TextBlock Text="TaxId — krajowy identyfikator podatkowy (opcjonalny)"/><TextBox Text="{Binding Editor.TaxId, Mode=TwoWay}" MaxLength="100" IsReadOnly="{Binding !CanEditContractors}" AutomationProperties.AutomationId="ContractorTaxId"/><TextBlock Text="{Binding Editor.TaxIdError}" Foreground="#B42318"/><TextBlock Text="{Binding TaxIdAssessment}" TextWrapping="Wrap"/></StackPanel>
-<StackPanel Spacing="4"><TextBlock Text="VatEuId — pełny numer VAT UE z prefiksem (opcjonalny)"/><TextBox Text="{Binding Editor.VatEuId, Mode=TwoWay}" MaxLength="100" IsReadOnly="{Binding !CanEditContractors}" AutomationProperties.AutomationId="ContractorVatEuId"/><TextBlock Text="{Binding Editor.VatEuIdError}" Foreground="#B42318"/><TextBlock Text="{Binding VatEuIdAssessment}" TextWrapping="Wrap"/></StackPanel>
-<StackPanel Spacing="4"><TextBlock Text="KsefIdWew — pełny IDWew nadany w KSeF (opcjonalny)"/><TextBox Text="{Binding Editor.KsefIdWew, Mode=TwoWay}" MaxLength="100" IsReadOnly="{Binding !CanEditContractors}" AutomationProperties.AutomationId="ContractorKsefIdWew"/><TextBlock Text="{Binding Editor.KsefIdWewError}" Foreground="#B42318"/><TextBlock Text="{Binding KsefIdWewAssessment}" TextWrapping="Wrap"/></StackPanel>
-              <StackPanel Spacing="4"><TextBlock Text="REGON (9 lub 14 cyfr, opcjonalny)"/><TextBox Text="{Binding Editor.Regon, Mode=TwoWay}" MaxLength="100" IsReadOnly="{Binding !CanEditContractors}" AutomationProperties.AutomationId="ContractorRegon"/><TextBlock Text="{Binding RegonAssessment}" TextWrapping="Wrap"/></StackPanel>
-              <StackPanel Spacing="4"><TextBlock Text="KRS (10 cyfr, opcjonalny)"/><TextBox Text="{Binding Editor.Krs, Mode=TwoWay}" MaxLength="100" IsReadOnly="{Binding !CanEditContractors}" AutomationProperties.AutomationId="ContractorKrs"/><TextBlock Text="{Binding KrsAssessment}" TextWrapping="Wrap"/></StackPanel>
-              <StackPanel Spacing="4"><TextBlock Text="BDO (9 cyfr, opcjonalny)"/><TextBox Text="{Binding Editor.Bdo, Mode=TwoWay}" MaxLength="100" IsReadOnly="{Binding !CanEditContractors}" AutomationProperties.AutomationId="ContractorBdo"/><TextBlock Text="{Binding BdoAssessment}" TextWrapping="Wrap"/></StackPanel>
-              <StackPanel Spacing="4" IsVisible="{Binding CanManagePesel}"><TextBlock Text="PESEL (dane chronione, opcjonalny)"/><TextBox Text="{Binding Editor.Pesel, Mode=TwoWay}" MaxLength="100" IsReadOnly="{Binding !CanEditContractors}" AutomationProperties.AutomationId="ContractorPesel"/><TextBlock Text="{Binding PeselAssessment}" TextWrapping="Wrap"/></StackPanel>
+<StackPanel Spacing="4"><TextBlock Text="Kod *"/><TextBox Text="{Binding Editor.Code, Mode=TwoWay}" MaxLength="64" IsReadOnly="{Binding !CanModifyContractor}" x:Name="ContractorCodeInput" AutomationProperties.AutomationId="ContractorCode"/><TextBlock Text="{Binding Editor.CodeError}" Foreground="#B42318" TextWrapping="Wrap"/></StackPanel>
+<StackPanel Spacing="4"><TextBlock Text="Pełna nazwa *"/><TextBox Text="{Binding Editor.Name, Mode=TwoWay}" MaxLength="256" IsReadOnly="{Binding !CanModifyContractor}" AutomationProperties.AutomationId="ContractorName"/><TextBlock Text="{Binding Editor.NameError}" Foreground="#B42318" TextWrapping="Wrap"/></StackPanel>
+<StackPanel Spacing="4"><TextBlock Text="Kraj *"/><TextBox Text="{Binding Editor.CountryCode, Mode=TwoWay}" MaxLength="2" IsReadOnly="{Binding !CanModifyContractor}" AutomationProperties.AutomationId="ContractorCountryCode"/><TextBlock Text="{Binding Editor.CountryError}" Foreground="#B42318" TextWrapping="Wrap"/></StackPanel>
+<StackPanel Spacing="4"><TextBlock Text="TaxId — krajowy identyfikator podatkowy (opcjonalny)"/><TextBox Text="{Binding Editor.TaxId, Mode=TwoWay}" MaxLength="100" IsReadOnly="{Binding !CanModifyContractor}" AutomationProperties.AutomationId="ContractorTaxId"/><TextBlock Text="{Binding Editor.TaxIdError}" Foreground="#B42318"/><TextBlock Text="{Binding TaxIdAssessment}" TextWrapping="Wrap"/></StackPanel>
+<StackPanel Spacing="4"><TextBlock Text="VatEuId — pełny numer VAT UE z prefiksem (opcjonalny)"/><TextBox Text="{Binding Editor.VatEuId, Mode=TwoWay}" MaxLength="100" IsReadOnly="{Binding !CanModifyContractor}" AutomationProperties.AutomationId="ContractorVatEuId"/><TextBlock Text="{Binding Editor.VatEuIdError}" Foreground="#B42318"/><TextBlock Text="{Binding VatEuIdAssessment}" TextWrapping="Wrap"/></StackPanel>
+<StackPanel Spacing="4"><TextBlock Text="KsefIdWew — pełny IDWew nadany w KSeF (opcjonalny)"/><TextBox Text="{Binding Editor.KsefIdWew, Mode=TwoWay}" MaxLength="100" IsReadOnly="{Binding !CanModifyContractor}" AutomationProperties.AutomationId="ContractorKsefIdWew"/><TextBlock Text="{Binding Editor.KsefIdWewError}" Foreground="#B42318"/><TextBlock Text="{Binding KsefIdWewAssessment}" TextWrapping="Wrap"/></StackPanel>
+              <StackPanel Spacing="4"><TextBlock Text="REGON (9 lub 14 cyfr, opcjonalny)"/><TextBox Text="{Binding Editor.Regon, Mode=TwoWay}" MaxLength="100" IsReadOnly="{Binding !CanModifyContractor}" AutomationProperties.AutomationId="ContractorRegon"/><TextBlock Text="{Binding RegonAssessment}" TextWrapping="Wrap"/></StackPanel>
+              <StackPanel Spacing="4"><TextBlock Text="KRS (10 cyfr, opcjonalny)"/><TextBox Text="{Binding Editor.Krs, Mode=TwoWay}" MaxLength="100" IsReadOnly="{Binding !CanModifyContractor}" AutomationProperties.AutomationId="ContractorKrs"/><TextBlock Text="{Binding KrsAssessment}" TextWrapping="Wrap"/></StackPanel>
+              <StackPanel Spacing="4"><TextBlock Text="BDO (9 cyfr, opcjonalny)"/><TextBox Text="{Binding Editor.Bdo, Mode=TwoWay}" MaxLength="100" IsReadOnly="{Binding !CanModifyContractor}" AutomationProperties.AutomationId="ContractorBdo"/><TextBlock Text="{Binding BdoAssessment}" TextWrapping="Wrap"/></StackPanel>
+              <StackPanel Spacing="4" IsVisible="{Binding CanManagePesel}"><TextBlock Text="PESEL (dane chronione, opcjonalny)"/><TextBox Text="{Binding Editor.Pesel, Mode=TwoWay}" MaxLength="100" IsReadOnly="{Binding !CanModifyContractor}" AutomationProperties.AutomationId="ContractorPesel"/><TextBlock Text="{Binding PeselAssessment}" TextWrapping="Wrap"/></StackPanel>
               <TextBlock Text="{Binding Editor.StandardIdentifierErrors}" Foreground="#B42318" TextWrapping="Wrap"/>
-              <Button Content="Normalizuj i sprawdź identyfikatory" Click="ValidateIdentifiersClick" IsEnabled="{Binding CanEditContractors}" AutomationProperties.AutomationId="ValidateIdentifiers"/>
+              <Button Content="Normalizuj i sprawdź identyfikatory" Click="ValidateIdentifiersClick" IsEnabled="{Binding CanModifyContractor}" AutomationProperties.AutomationId="ValidateIdentifiers"/>
               <TextBlock Text="Kontrola lokalna nie potwierdza rejestracji podatnika. Wyniki dotyczą pokazanego sprawdzenia; po zmianie pól sprawdź ponownie." TextWrapping="Wrap" Opacity="0.75"/>
               <WrapPanel IsEnabled="{Binding CanVerify}"><Button Content="Pobierz dane z GUS" Click="GusClick" AutomationProperties.AutomationId="VerifyGus"/><Button Content="Sprawdź VAT UE" Click="ViesClick" AutomationProperties.AutomationId="VerifyVies"/><Button Content="Sprawdź podatnika VAT" Click="MfTaxpayerClick" AutomationProperties.AutomationId="VerifyMfTaxpayer"/><Button Content="Status VAT (WL2)" Click="MfStatusClick" AutomationProperties.AutomationId="VerifyMfStatus"/></WrapPanel>
               <TextBlock Text="Data stanu wykazu MF (także rachunku)"/><DatePicker SelectedDate="{Binding VerificationDate, Mode=TwoWay}" AutomationProperties.AutomationId="VerificationDate"/>
-              <CheckBox Content="Aktywny" IsChecked="{Binding Editor.IsActive, Mode=TwoWay}" IsEnabled="{Binding CanEditContractors}" AutomationProperties.AutomationId="ContractorActive"/>
+              <CheckBox Content="Aktywny" IsChecked="{Binding Editor.IsActive, Mode=TwoWay}" IsEnabled="{Binding CanModifyContractor}" AutomationProperties.AutomationId="ContractorActive"/>
             </StackPanel>
             <StackPanel Grid.Column="1" Spacing="10">
               <TextBlock Text="Kontrahent nadrzędny / grupa" FontSize="18" FontWeight="SemiBold"/>
               <TextBlock Text="{Binding ParentLabel}" TextWrapping="Wrap" AutomationProperties.AutomationId="ParentLabel"/>
               <TextBlock Text="{Binding Editor.ParentError}" Foreground="#B42318" TextWrapping="Wrap"/>
               <TextBlock Text="Grupowanie nie dziedziczy danych i nie określa podmiotu podatkowego." TextWrapping="Wrap" Opacity="0.75"/>
-              <StackPanel Spacing="8" IsEnabled="{Binding CanEditContractors}">
+              <StackPanel Spacing="8" IsEnabled="{Binding CanModifyContractor}">
                 <TextBox Text="{Binding ParentSearch, Mode=TwoWay}" MaxLength="128" PlaceholderText="Szukaj po kodzie lub nazwie" AutomationProperties.AutomationId="ParentSearch"/>
                 <WrapPanel><Button Content="Szukaj grupy" Click="SearchParentsClick" AutomationProperties.AutomationId="SearchParents"/><Button Content="Usuń powiązanie" Click="ClearParentClick" AutomationProperties.AutomationId="ClearParent"/></WrapPanel>
                 <ListBox ScrollViewer.HorizontalScrollBarVisibility="Disabled" ItemsSource="{Binding ParentCandidates}" SelectedItem="{Binding SelectedParentCandidate, Mode=TwoWay}" Height="120" AutomationProperties.AutomationId="ParentCandidates"><ListBox.ItemTemplate><DataTemplate x:DataType="contracts:ContractorResponse"><TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="4"/></DataTemplate></ListBox.ItemTemplate></ListBox>
@@ -546,7 +542,28 @@
       <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}"
                  AutomationProperties.AutomationId="StatusMessage" />
     </StackPanel>
-    <TextBlock Grid.Row="3" Text="Kartoteka kontrahentów · brak funkcji księgowych" FontSize="12" Opacity="0.65" />
+    <Border Grid.Row="3" IsVisible="{Binding IsAuthenticated}" Background="#182A7DB1" Padding="10,6" AutomationProperties.AutomationId="SessionStatusBar">
+      <WrapPanel>
+        <TextBlock Text="{Binding CurrentUser, StringFormat='Użytkownik: {0}'}" AutomationProperties.AutomationId="CurrentUser"/>
+        <TextBlock Text=" | "/>
+        <TextBlock Text="{Binding CurrentCompany, StringFormat='Firma: {0}'}" IsVisible="{Binding IsWorkspace}" AutomationProperties.AutomationId="CurrentCompany"/>
+        <TextBlock Text=" | "/>
+        <TextBlock Text="{Binding SessionExpiry}" AutomationProperties.AutomationId="SessionExpiry"/>
+      </WrapPanel>
+    </Border>
+    <Border Grid.RowSpan="4" IsVisible="{Binding IsColumnSettingsOpen}" Background="{DynamicResource SystemControlBackgroundAltHighBrush}" BorderBrush="#2A7DB1" BorderThickness="2" Padding="20" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="700" MaxHeight="600" AutomationProperties.AutomationId="ColumnSettingsDialog">
+      <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="10">
+        <TextBlock Text="{Binding ColumnSettingsTitle}" FontSize="22" FontWeight="SemiBold"/>
+        <TextBlock Grid.Row="1" Text="{Binding ColumnSettingsSource}"/>
+        <ScrollViewer Grid.Row="2" MaxHeight="330"><ItemsControl ItemsSource="{Binding ColumnChoices}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:ColumnChoice"><CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" IsEnabled="{Binding Column.CanHide}"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
+        <StackPanel Grid.Row="3" Spacing="8" IsEnabled="{Binding CanInteract}">
+          <WrapPanel><Button Content="Zapisz mój widok" Click="SaveMyColumnsClick" AutomationProperties.AutomationId="SaveMyColumns"/><Button Content="Resetuj mój widok" Click="ResetMyColumnsClick" AutomationProperties.AutomationId="ResetMyColumns"/></WrapPanel>
+          <WrapPanel IsVisible="{Binding IsInstallationAdministrator}"><Button Content="Zapisz jako domyślny dla wszystkich" Click="SaveInstallationColumnsClick" AutomationProperties.AutomationId="SaveInstallationColumns"/><Button Content="Resetuj domyślny widok instalacji" Click="ResetInstallationColumnsClick" AutomationProperties.AutomationId="ResetInstallationColumns"/></WrapPanel>
+          <TextBlock Text="{Binding Message}" TextWrapping="Wrap"/>
+          <Button Content="Zamknij" Click="CloseColumnSettingsClick" AutomationProperties.AutomationId="CloseColumnSettings"/>
+        </StackPanel>
+      </Grid>
+    </Border>
     <Border Grid.RowSpan="4" IsVisible="{Binding DiscardPrompt}" Background="#EEFFFFFF" BorderBrush="#B77816" BorderThickness="2" Padding="30" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="620">
       <StackPanel Spacing="16"><TextBlock Text="Porzucić niezapisane zmiany?" FontSize="24" FontWeight="SemiBold"/><TextBlock Text="Zmiany w formularzu zostaną utracone. Zapisane wcześniej pozycje pozostaną w bazie." TextWrapping="Wrap"/><WrapPanel><Button Content="Wróć do edycji" Click="KeepEditingClick" AutomationProperties.AutomationId="KeepEditing"/><Button Content="Porzuć niezapisane zmiany" Click="DiscardClick" AutomationProperties.AutomationId="DiscardChanges"/></WrapPanel></StackPanel>
     </Border>  </Grid>

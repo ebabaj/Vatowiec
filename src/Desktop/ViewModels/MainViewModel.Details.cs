@@ -56,7 +56,7 @@ public sealed partial class MainViewModel
     public DetailResponse? SelectedDetail { get; set; }
     public DetailEditor? DetailEditor => detailEditor;
     public bool IsDetailEditing => detailEditor is not null;
-    public bool CanEditDetails => CanEditContractors && HasSavedContractor;
+    public bool CanEditDetails => CanModifyContractor && HasSavedContractor;
     public bool CanSaveDetail => CanEditDetails && IsDetailEditing && !HasDetailConflict && !HasBankWarning;
     public bool HasDetailConflict => detailConflict is not null;
     public string DetailServerSummary => detailConflict is null ? "" : new DetailEditor(detailConflict).Summary();
@@ -65,7 +65,7 @@ public sealed partial class MainViewModel
     public string BankWarning => warningMessage;
     public bool CanAcceptWarnings => selectedCompany?.Permissions.Contains("AcceptWarnings", StringComparer.Ordinal) == true;
     public bool DiscardPrompt => discardAction is not null;
-    public bool CanUseForm => !busy && !DiscardPrompt && !IsPersonalUnavailable;
+    public bool CanUseForm => !busy && !DiscardPrompt && !IsColumnSettingsOpen && !IsPersonalUnavailable;
     public bool HasUnsavedChanges => PasswordPolicyEditor?.IsDirty == true || HasAdminChanges || HasFinanceChanges || CurrencyEditor?.IsDirty == true || editor?.IsDirty == true || detailEditor?.IsDirty == true || !string.IsNullOrEmpty(NewAddressTypeName);
     public bool HasNextDetails { get; private set; }
     public bool HasPreviousDetails => detailOffset > 0;
@@ -133,7 +133,7 @@ public sealed partial class MainViewModel
     }
     public void ChooseParent()
     {
-        if (busy || !CanEditContractors || editor is null || SelectedParentCandidate is null) return;
+        if (busy || !CanModifyContractor || editor is null || SelectedParentCandidate is null) return;
         editor.ParentId = SelectedParentCandidate.Id;
         ParentLabel = SelectedParentCandidate.ToString();
         ParentCandidates = [];
@@ -142,7 +142,7 @@ public sealed partial class MainViewModel
     }
     public void ClearParent()
     {
-        if (busy || !CanEditContractors || editor is null) return;
+        if (busy || !CanModifyContractor || editor is null) return;
         editor.ParentId = null;
         ParentLabel = "Brak powiązania nadrzędnego";
         ChangedAll();
@@ -162,7 +162,7 @@ public sealed partial class MainViewModel
     {
         if (SelectedChild is null || busy) return;
         var child = SelectedChild;
-        void Open() { selectedContractor = child; _ = EditContractor(); }
+        void Open() { selectedContractor = child; _ = ShowContractor(); }
         if (HasUnsavedChanges) RequestDiscard(Open); else Open();
     }
     public void NewDetail()

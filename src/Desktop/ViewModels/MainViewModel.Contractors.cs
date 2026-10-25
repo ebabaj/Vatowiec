@@ -13,35 +13,45 @@ public sealed partial class MainViewModel
     private bool hasNextPage;
     private (string, string, int) loadedFilter;
 
-    public string SearchText { get; set; } = "";
+    private string searchText = "";
+    public string SearchText { get => searchText; set { if (searchText == value) return; searchText = value; Changed(); if (CanBrowse && !busy) _ = LoadContractors(); } }
     public string FilterCountry { get; set; } = "";
-    public int FilterActivity { get; set; }
+    private int filterActivity = 1;
+    public int FilterActivity { get => filterActivity; set { if (filterActivity == value || value is < 0 or > 2) return; filterActivity = value; Changed(); if (CanBrowse && !busy) _ = LoadContractors(); } }
+    private bool contractorReadOnly;
+    public bool IsContractorReadOnly => IsEditing && contractorReadOnly;
+    public bool CanModifyContractor => CanEditContractors && !contractorReadOnly;
+    public bool CanShowSelectedContractor => CanBrowse && selectedContractor != null;
+    public bool CanEditSelectedContractor => CanShowSelectedContractor && CanEditContractors;
+    public bool CanStartContractorEdit => IsContractorReadOnly && CanEditContractors;
     public bool CanEditContractors => CanViewContractors && selectedCompany?.CanEditContractors == true;
     public bool CanManagePesel => selectedCompany?.Permissions.Contains("ManageContractorPesel", StringComparer.Ordinal) == true;
     public bool CanBrowse => CanViewContractors && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !IsGusSettings && !IsUsersSettings && !IsOwnPasswordChange && !IsPasswordPolicyScreen;
     public bool IsBrowsingWorkspace => IsWorkspace && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !IsGusSettings && !IsUsersSettings && !IsOwnPasswordChange && !IsPasswordPolicyScreen;
     public bool IsEditing => editor is not null;
-    public bool CanSaveContractor => IsMainTab && IsEditing && !HasConflict && CanEditContractors && DetailEditor is null;
+    public bool CanSaveContractor => IsMainTab && IsEditing && !HasConflict && CanModifyContractor && DetailEditor is null;
     public bool HasConflict => conflictCurrent is not null;
     public ContractorEditor? Editor => editor;
-    public string EditorTitle => editor?.IsNew == true ? "Nowy kontrahent" : "Edycja kontrahenta";
+    public string EditorTitle => editor?.IsNew == true ? "Nowy kontrahent" : IsContractorReadOnly ? "Podgląd kontrahenta" : "Edycja kontrahenta";
     public string ServerVersionSummary => conflictCurrent is null ? "" : Summary(conflictCurrent, conflictParentLabel);
     public string LocalVersionSummary => editor is null ? "" : $"Kod: {editor.Code}\nNazwa: {editor.Name}\nTaxId: {editor.TaxId}\nVatEuId: {editor.VatEuId}\nKsefIdWew: {editor.KsefIdWew}\nREGON: {editor.Regon}\nKRS: {editor.Krs}\nBDO: {editor.Bdo}\nPESEL: dane chronione — porównaj w formularzu po wczytaniu wersji\nNadrzędny: {ParentLabel}\nKraj: {editor.CountryCode}\nStatus: {(editor.IsActive ? "Aktywny" : "Nieaktywny")}";
     public bool HasPreviousPage => pageOffset > 0;
     public bool HasNextPage => hasNextPage;
-    public string PageLabel => $"Strona {pageOffset / 50 + 1} · do 50 pozycji";
+    public string PageLabel => $"Strona {pageOffset / PageSize + 1} · do {PageSize} pozycji";
     public ContractorResponse? SelectedContractor
     {
         get => selectedContractor;
-        set { selectedContractor = value; Changed(); }
+        set { selectedContractor = value; ChangedAll(); }
     }
 
-    public Task NextPage() => Run(() => LoadPage(pageOffset + 50));
-    public Task PreviousPage() => Run(() => LoadPage(Math.Max(0, pageOffset - 50)));
+    public Task NextPage() => LoadPage(pageOffset + PageSize);
+    public Task PreviousPage() => LoadPage(Math.Max(0, pageOffset - PageSize));
 
     public void NewContractor()
     {
         if (busy || !CanEditContractors || IsEditing || IsDataPortSettings || IsCurrencyScreen || IsGusSettings || IsUsersSettings || IsOwnPasswordChange || IsPasswordPolicyScreen) return;
+        CancelContractorLoading();
+        contractorReadOnly = false;
         editor = new ContractorEditor();
         ObserveIdentifierEdits();
         conflictCurrent = null;
@@ -49,12 +59,18 @@ public sealed partial class MainViewModel
         ChangedAll();
     }
 
-    public Task EditContractor() => Run(async () =>
+    public Task ShowContractor() => OpenContractor(true);
+    public Task EditContractor() => OpenContractor(false);
+    public Task StartContractorEdit() => CanStartContractorEdit ? OpenContractor(false) : Task.CompletedTask;
+    private Task OpenContractor(bool readOnly) => Run(async () =>
     {
         if (!CanViewContractors || api is null || profile is null || selectedContractor is null)
             throw new ArgumentException("Zaznacz kontrahenta do otwarcia.");
+        if (!readOnly && !CanEditContractors) return;
+        CancelContractorLoading();
         var row = await api.Contractor(profile.CompanyId, selectedContractor.Id);
         CheckContractorCompany(row);
+        contractorReadOnly = readOnly;
         editor = new ContractorEditor(row);
         ObserveIdentifierEdits();
         conflictCurrent = null;
@@ -91,7 +107,8 @@ public sealed partial class MainViewModel
             selectedContractor = null;
             ResetDetails();
             ChangedAll();
-            message = "Zapisano kontrahenta i historię zmiany. Odśwież lub wyszukaj pozycję w kartotece.";
+            await LoadPage(pageOffset);
+            message = "Zapisano kontrahenta i historię zmiany.";
         }
         catch (ApiException ex) when (ex.Code == "contractor_conflict" && ex.Current is not null)
         {
@@ -147,7 +164,9 @@ public sealed partial class MainViewModel
         editor = null;
         conflictCurrent = null;
         ResetDetails();
-        message = "Anulowano edycję. Nie zapisano zmian.";
+        contractorReadOnly = false;
+        message = "Zamknięto kartotekę.";
+        _ = LoadContractors();
         ChangedAll();
     }
 
@@ -165,9 +184,10 @@ public sealed partial class MainViewModel
         selectedContractor = null;
         pageOffset = 0;
         hasNextPage = false;
-        SearchText = "";
+        contractorReadOnly = false;
+        searchText = "";
         FilterCountry = "";
-        FilterActivity = 0;
+        filterActivity = 1;
         loadedFilter = default;
     }
 }

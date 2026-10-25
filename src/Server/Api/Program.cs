@@ -117,6 +117,7 @@ app.MapUserAdministration();
 app.MapGusConfiguration();
 app.MapRegistryConfiguration();
 app.MapCompanies();
+app.MapTableViews();
 
 if (personalWorker != null && OperatingSystem.IsWindows()) personalWorker.Attach(app);
 await app.RunAsync();

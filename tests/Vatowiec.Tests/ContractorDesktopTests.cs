@@ -135,12 +135,13 @@ public sealed partial class DesktopTests
         await model.LoadContractors();
         Assert.Equal(50, model.Contractors.Length);
         Assert.True(model.HasNextPage);
-        Assert.Equal(("demo & test", "PL", false, 0, 51), api.LastQuery);
+        Assert.Equal(("demo & test", null, false, 0, 51), api.LastQuery);
         await model.NextPage();
         Assert.Equal(50, api.LastQuery.Offset);
         model.SearchText = "nowe";
+        Assert.Equal(0, api.LastQuery.Offset); // Filter change now loads the first page automatically.
         await model.NextPage();
-        Assert.Equal(0, api.LastQuery.Offset);
+        Assert.Equal(50, api.LastQuery.Offset);
     }
 
     [Fact]

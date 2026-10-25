@@ -55,7 +55,7 @@ public sealed partial class MainViewModel
     }
     public bool IsInstallationAdministrator => session?.IsInstallationAdministrator == true;
     public bool IsGusSettings => session != null && gusSettings && !IsOwnPasswordChange;
-    public bool CanOpenGusSettings => IsInstallationAdministrator && !busy && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !gusSettings && !IsUsersSettings && !IsOwnPasswordChange && !IsPasswordPolicyScreen;
+    public bool CanOpenGusSettings => IsInstallationAdministrator && !busy && !IsOwnPasswordChange;
     public bool CanManageGus => IsGusSettings && IsInstallationAdministrator && !busy && gusConfiguration != null;
     public bool CanDeleteGusKey => CanManageGus && gusConfiguration?.IsConfigured == true;
     public bool ConfirmGusDelete => confirmGusDelete;
@@ -65,6 +65,8 @@ public sealed partial class MainViewModel
     public Task OpenGusSettings()
     {
         if (!CanOpenGusSettings) return Task.CompletedTask;
+        if (HasUnsavedChanges) { RequestDiscard(() => { ClearNavigationDrafts(); _ = OpenGusSettings(); }); return Task.CompletedTask; }
+        CancelContractorLoading(); ClearNavigationDrafts();
         return Run(async () => { gusSettings = true; await ReadRegistryConfigurations(); await ReadGusStatus(); });
     }
     public Task RefreshGusStatus() => Run(ReadGusStatus);
@@ -96,6 +98,6 @@ public sealed partial class MainViewModel
             message = "Usunięto wspólny klucz GUS. Produkcyjne zapytania wszystkich firm wymagają ponownej konfiguracji.";
         });
     }
-    public void CloseGusSettings() { if (!busy) { ResetGusSettings(); ChangedAll(); } }
+    public void CloseGusSettings() { if (!busy) { ResetGusSettings(); ChangedAll(); _ = LoadContractors(); } }
     private void ResetGusSettings() { gusSettings = false; gusConfiguration = null; confirmGusDelete = false; registryConfigurations = []; registrySettingsEditor = null; registryServiceIndex = 0; }
 }

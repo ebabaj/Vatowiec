@@ -17,7 +17,9 @@ public sealed partial class MainViewModel
         ? "Możesz zapisać, zastąpić lub usunąć klucz tej firmy." : "Zmiana klucza wymaga uprawnienia administratora firmy. Dostęp tylko do stanu konfiguracji.";
     public Task OpenDataPortSettings() => Run(async () =>
     {
-        if (api == null || profile == null || IsEditing) return;
+        if (api == null || profile == null) return;
+        if (HasUnsavedChanges) { RequestDiscard(() => { ClearNavigationDrafts(); _ = OpenDataPortSettings(); }); return; }
+        CancelContractorLoading(); ClearNavigationDrafts();
         dataPortSettings = true;
         await ReadDataPortStatus();
     });
@@ -62,7 +64,7 @@ public sealed partial class MainViewModel
     public void CloseDataPortSettings()
     {
         if (busy) return;
-        ResetDataPortSettings(); ChangedAll();
+        ResetDataPortSettings(); ChangedAll(); _ = LoadContractors();
     }
     private void ResetDataPortSettings() { dataPortSettings = false; dataPortConfiguration = null; confirmDataPortDelete = false; }
 }

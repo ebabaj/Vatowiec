@@ -10,7 +10,7 @@ public sealed partial class DesktopTests
     [Fact]
     public async Task NewVerification_SelectionCannotBeRevertedByItemsSourceBindingDuringRefresh()
     {
-        var api = new FakeApi { Permissions = ["ViewProfile", "ViewContractors", "VerifyRegistries"], VerificationResult = VerificationFixture("VIES", "Vies") };
+        var api = new FakeApi { Permissions = ["ViewProfile", "ViewContractors", "EditContractors", "VerifyRegistries"], VerificationResult = VerificationFixture("VIES", "Vies") };
         using var model = await Open(api); model.SelectedContractor = new(1, A, "TEST", "Fikcyjny", "PL"); await model.EditContractor();
         await model.VerifyRegistry("Vies"); var previous = model.SelectedVerification;
         Assert.NotNull(previous);

@@ -190,20 +190,22 @@ public sealed partial class DesktopTests
     }
 
     [Fact]
-    public async Task SlowRequest_BlocksSwitch_AndDiscardsResultIfSessionExpired()
+    public async Task SlowRequest_CanSwitchCompany_AndDiscardsObsoleteResult()
     {
         var clock = new Clock();
         var pending = new TaskCompletionSource<ContractorResponse[]>();
-        var api = new FakeApi { Expires = clock.Now.AddMinutes(1), Pending = pending.Task };
+        var api = new FakeApi { Expires = clock.Now.AddMinutes(1) };
         using var model = new MainViewModel(_ => api, clock) { UserName = "operator" };
         await model.Login("temporary");
         model.SelectedCompany = model.Companies[0];
         await model.OpenCompany();
+        api.Pending = pending.Task;
         var load = model.LoadContractors();
-        Assert.True(model.IsBusy);
+        Assert.True(model.IsContractorLoading);
         await model.ChangeCompany();
-        Assert.True(model.IsWorkspace);
+        Assert.True(model.IsCompanySelection);
         clock.Now += TimeSpan.FromMinutes(2);
+        model.CheckExpiry();
         pending.SetResult([new(1, A, "x", "old", "PL")]);
         await load;
         Assert.True(model.IsLogin);

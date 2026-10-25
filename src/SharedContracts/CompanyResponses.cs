@@ -18,8 +18,14 @@ public sealed record ContractorResponse(int Id, Guid CompanyId, string Code, str
     string? Bdo = null, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Pesel = null)
 {
     public override string ToString() => $"{Code} — {Name} ({CountryCode})";
+    public RegisteredAddressResponse? RegisteredAddress { get; init; }
+    public string? ParentName { get; init; }
+    public DateTimeOffset? CreatedAtUtc { get; init; }
+    public DateTimeOffset? UpdatedAtUtc { get; init; }
     [JsonIgnore]
     public string ActivityLabel => IsActive ? "Aktywny" : "Nieaktywny";
 }
+public sealed record RegisteredAddressResponse(string? Name, string? Street, string? BuildingNo, string? ApartmentNo,
+    string? PostalCode, string? City, string? Region, string? CountryCode, bool IsActive, bool IsDefault);
 public sealed record SessionResponse(string UserName, DateTimeOffset ExpiresAtUtc, bool IsInstallationAdministrator = false, bool MustChangePassword = false, Guid UserId = default);
 public sealed record CsrfResponse(string Token, string HeaderName);

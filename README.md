@@ -1,5 +1,12 @@
 # Otwarty następca VATowca
 
+[Nowy interfejs i wspólne widoki tabel (ADR-042)](docs/table-views.md): menu,
+podgląd kontrahentów, automatyczne stronicowanie i kolumny użytkownika/instalacji.
+Standardowy Debug; migracja widoków tabel jest wdrożona na istniejącym
+developerskim Network. Aktualizacja baz jest jawna, poza startem API.
+Wszystkie bazy projektu są developerskie i mogą być resetowane/odtwarzane bez
+osobnej zgody; zakres i zasady bezpieczeństwa opisuje [AGENTS.md](AGENTS.md).
+
 [VATowiec Personal — sprawdzony prototyp LocalDB 2025](docs/personal-localdb.md):
 wspólny kod z Network. [Instalator Personal 0.1.1-preview (ADR-040/041)](docs/personal-windows-installation.md)
 zawiera klienta i lokalne API; LocalDB jest osobną zależnością (wariant online przy jego braku).

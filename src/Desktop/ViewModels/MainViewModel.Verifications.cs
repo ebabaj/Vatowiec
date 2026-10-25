@@ -44,7 +44,7 @@ public sealed partial class MainViewModel
         ? "ŚRODOWISKO PRODUKCYJNE. " : "ŚRODOWISKO TESTOWE / MOCK — bez potwierdzenia produkcyjnego. ") + registryEnvironment.Label;
     public bool IsVerificationsTab => tab == 4;
     public bool IsDetailTab => tab is >= 1 and <= 3;
-    public bool CanVerify => HasSavedContractor && selectedCompany?.Permissions.Contains("VerifyRegistries", StringComparer.Ordinal) == true;
+    public bool CanVerify => !IsContractorReadOnly && HasSavedContractor && selectedCompany?.Permissions.Contains("VerifyRegistries", StringComparer.Ordinal) == true;
     public DateTimeOffset? VerificationDate { get; set; } = DateTimeOffset.Now.Date;
     public VerificationResponse[] VerificationRows { get; private set; } = [];
     public bool HasPreviousVerifications => verificationOffset > 0;
@@ -67,7 +67,7 @@ public sealed partial class MainViewModel
         $"NIP: {x.TaxId} · VAT UE: {x.VatEuId}\nRachunek: {x.AccountNumber}\nStan na: {x.StateDate:yyyy-MM-dd}\n" +
         $"Zapytanie UTC: {x.StartedAtUtc:u} — {x.CompletedAtUtc:u}\nWynik: {x.Outcome} · Usługa: {x.ServiceStatus}\n{x.Message}\nBłąd: {x.ErrorCode}\nReferencja urzędu: {x.OfficeReference ?? "nie zwrócono"}\n" +
         $"Nazwa: {x.Data.Name}\nAdres: {x.Data.Address} {x.Data.Street} {x.Data.BuildingNo} {x.Data.ApartmentNo} {x.Data.PostalCode} {x.Data.City}\nREGON (podgląd): {x.Data.Regon}\nData zakończenia działalności (podgląd): {x.Data.ActivityEndDate:yyyy-MM-dd}\nWersja adaptera: {x.AdapterVersion}\nReguły wejścia: {x.RuleVersion}";
-    public bool CanImportGus => CanEditContractors && selectedVerification is { Source: "GUS" or "DataPort", ServiceStatus: "Completed", Outcome: "Information" };
+    public bool CanImportGus => CanModifyContractor && selectedVerification is { Source: "GUS" or "DataPort", ServiceStatus: "Completed", Outcome: "Information" };
     public bool UseGusName { get; set; }
     public bool UseGusStreet { get; set; }
     public bool UseGusBuilding { get; set; }
@@ -79,7 +79,7 @@ public sealed partial class MainViewModel
         "Adresy istniejące pozostaną bez zmian. Wybrane pola pobranego adresu trafią do nowego, niezapisanego szkicu adresu.";
     public Task CheckIdentifiers() => Run(async () =>
     {
-        if (api is null || profile is null || editor is null || !CanEditContractors) return;
+        if (api is null || profile is null || editor is null || !CanModifyContractor) return;
         var errors = ContractorValidation.Validate(editor.Request()); editor.SetErrors(errors);
         if (errors.Count != 0) throw new ArgumentException("Uzupełnij wymagane pola formularza.");
         identifierPreview = await api.ValidateIdentifiers(profile.CompanyId, editor.Request());

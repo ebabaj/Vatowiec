@@ -1,10 +1,17 @@
 # Logowanie i kartoteka kontrahentów w Avalonia
 
+## Aktualny interfejs (ADR-042)
+
+Menu, podgląd i konfigurację kolumn opisuje [interfejs i widoki tabel](table-views.md).
+Poniższe wcześniejsze opisy i wyniki zachowujemy jako historię; aktualne skróty
+F2/Enter/dwuklik otwierają podgląd, Edytuj jest jawną operacją.
+
 Klienta można zainstalować bez SDK: [Windows 0.1.0-preview](windows-release.md).
 Na drugim stanowisku wymagany jest rzeczywisty adres HTTPS serwera;
 `localhost` oznacza bieżący komputer. [Konfiguracja LAN/VPN](server-lan-vpn.md).
 
-Klient korzysta wyłącznie z API HTTPS. Katalog firm i uprawnienia są w
+Klient Network korzysta z API HTTPS, Personal z prywatnego Named Pipe (ADR-039).
+Katalog firm i uprawnienia są w
 Vatowiec_System, a kontrahenci w osobnych Vatowiec_Company_A_Dev/B_Dev.
 Pierwszy etap odczytu opisuje [ADR-016](adr/ADR-016-desktop-logowanie-i-kontekst-firmy.md).
 **Aktualizacja 2026-10-22:** dodawanie, edycję, wyszukiwanie, stronicowanie,

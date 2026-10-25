@@ -9,7 +9,7 @@ public sealed record ContractorWriteRequest(int Id, string Code, string Name,
 }
 
 public sealed record ContractorSearchRequest(string? Query = null, string? Country = null, bool? Active = null,
-    int? ParentId = null, int? ExcludeId = null, int Offset = 0, int Limit = 50)
+    int? ParentId = null, int? ExcludeId = null, int Offset = 0, int Limit = 50, string[]? VisibleColumns = null)
 {
     public override string ToString() => "ContractorSearchRequest (filtry chronione)";
 }

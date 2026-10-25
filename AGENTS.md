@@ -3,14 +3,74 @@
 Projekt: **Otwarty następca VATowca** (nazwa robocza).  
 Główne źródło wymagań: [`SPECYFIKACJA.md`](./SPECYFIKACJA.md).  
 
+## Nadrzędne zasady środowiska developerskiego — 2026-10-25
+
+**Priorytetem jest VATowiec Network. Prace nad Personal są wstrzymane.**
+Kod źródłowy obu edycji, dokumentacja/ADR, raporty prowadzonych prac, skrypty
+budowania, opublikowane GitHub Release i archiwalne instalatory w
+`artifacts/personal-releases` pozostają zachowane. Nie uruchamiaj testów Personal
+bez osobnego zadania wymagającego takiej pracy.
+
+Do czasu jawnego rozpoczęcia eksploatacji produkcyjnej **wszystkie bazy projektu
+VATowiec są developerskie**, w tym `Vatowiec_System`, wszystkie bazy firmowe
+Network i należące do projektu bazy Personal/prototypów/fixture, zarówno na
+SQLEXPRESS, jak i LocalDB. Decyzją właściciela można je usuwać, resetować,
+odtwarzać, przebudowywać ich schematy, jawnie wykonywać migracje EF Core oraz
+ponownie inicjalizować dane testowe **bez każdorazowego pytania o zgodę**.
+Nie istnieją produkcyjne bazy VATowca ani dane biznesowe wymagające zachowania.
+Backup developerskiej bazy nie jest warunkiem zgody na te operacje; wykonuj go,
+gdy wymaga tego cel konkretnego testu lub sprawdzana procedura odtwarzania.
+Korzystaj z istniejącego środowiska developerskiego. Nie twórz nowej izolowanej
+instancji SQL dla każdej próby ani kopii tylko dla ochrony danych demonstracyjnych;
+izolację stosuj, gdy wymaga jej konkretny test. Wykonuj tylko operacje potrzebne
+w bieżącym zadaniu: samo sprzątanie Personal nie uzasadnia resetowania Network.
+
+W razie potrzeby samodzielnie zatrzymuj i uruchamiaj ponownie developerskie API
+VATowca, także gdy blokuje standardowy build. Nie pytaj ponownie o zgodę na jego
+zatrzymanie. Po zakończeniu przywróć prawidłowo działające API i zweryfikuj HTTPS.
+Po testach automatycznie sprzątaj zbędne instancje, bazy i artefakty utworzone
+przez dany przebieg, po potwierdzeniu ich własności i dokładnych ścieżek/nazw.
+Zachowaj raporty wyników i dowody potrzebne do oceny prowadzonych prac.
+Nie sprzątaj cudzych ani niepowiązanych zasobów. Nie powtarzaj zaliczonych testów
+bez potrzeby; wracaj do nich po istotnej zmianie, błędzie lub nowej wątpliwości.
+
+Zgoda dotyczy **wyłącznie zweryfikowanych zasobów tego projektu VATowiec**.
+Przed operacją sprawdź dokładną instancję, nazwę i przynależność zasobu; sam
+podobny prefiks nazwy nie upoważnia do usunięcia cudzej bazy. Nie ingeruj w bazy
+innych aplikacji, systemowe bazy SQL, niezwiązane usługi ani instalacje innych
+programów. Zachowaj silnik SQLEXPRESS, konfigurację HTTPS Network i certyfikaty.
+
+Poniższe opisy etapów nie ograniczają tej zgody do trzech demonstracyjnych baz.
+Jawne allowlisty konkretnych narzędzi nadal chronią przed pomyleniem zasobów;
+nie rozszerzaj ich bez sprawdzenia własności celu. Zgoda administracyjna nie
+zmienia bezpieczeństwa aplikacji: Identity, autoryzacji i uprawnień, audytu,
+ochrony sekretów, optymistycznej współbieżności, izolacji firm ani zakazu
+fizycznego usuwania użytkowników przez API.
+Migracje pozostają jawne; zwykły start aplikacji nie resetuje ani nie migruje baz.
+Budowanie wyłącznie w standardowym Debug. **Bez Commit i Push.**
+
+W sprzątaniu Personal silnik LocalDB należy pozostawić, jeżeli korzysta z niego
+inna aplikacja. Na tym komputerze potwierdzono zależność Visual Studio Community
+2026: `Microsoft.VisualStudio.Component.SQL.LocalDB.Runtime` i rejestrację
+`SQLLocalDB,v17.0/Dependents/VS.{AEF703B8-D2CC-4343-915C-F54A30B90937}`.
+Nie odinstalowuj go ani składników Visual Studio w ramach usuwania Personal.
+
+## Historyczne etapy i zasady architektury
+
+Aktualne prace Network: interfejs i widoki tabel, zlecone jako „ADR-041”, zapisane
+w [ADR-042](docs/adr/ADR-042-interfejs-i-widoki-tabel.md), ponieważ ADR-041
+opisuje wcześniejsze ustawienia Personal. Stosuj powyższe zasady developerskie.
+
 Eksperyment Personal (ADR-037): [docs/personal-localdb.md](docs/personal-localdb.md).
 Nowa prywatna instancja `VatowiecPersonal_Prototype` i trzy bazy
 `Vatowiec_Personal_Prototype_System/Company_A/Company_B` są odrębne od Network.
-Komenda `personal-prototype` nie korzysta z resetującego runnera. Zajęte nazwy
-lub katalog kończą tworzenie; nie usuwaj danych, aby wymusić powtórkę.
+Komenda `personal-prototype` nie korzysta z resetującego runnera. Sam provisioning
+odmawia nadpisania zastanego celu; uprawnione sprzątanie developerskich zasobów
+jest odrębną operacją administracyjną zgodną z zasadami powyżej.
 Profil jest jawny, nie zmienia konfiguracji Network, nie instaluje LocalDB
-automatycznie. Przy zadaniach Personal nie migruj ani nie resetuj istniejącego
-SQLEXPRESS i domyślnego MSSQLLocalDB. Build wyłącznie standardowy Debug.
+automatycznie. Przy zadaniach Personal sprawdzaj dokładną instancję i własność
+baz; nie traktuj domyślnego MSSQLLocalDB ani całego SQLEXPRESS jako zasobu projektu.
+Build wyłącznie standardowy Debug.
 
 Personal ADR-038/039: normalny klient `--personal` uruchamia własne API.exe przez
 prywatne potoki sterowania; biznesowe API działa wyłącznie przez Named Pipe
@@ -19,11 +79,12 @@ Nie dodawaj portu TCP, dev-certs ani wyjątków walidacji TLS do Personal. Netwo
 zachowuje HTTPS 7243/7443. Bootstrap ma checkpointy i trwałe zamknięcie w SQL.
 Zwykły start nie wykonuje migracji/resetu. Fixture `Personal.WizardTest.<GUID>`
 tworzą wyłącznie nowe prywatne instancje/bazy z identyfikatorem instalacji;
-zachowuj je do inspekcji. Wyniki/logi poza repozytorium w LocalAppData.
+po testach sprzątaj zbędne zasoby utworzone przez przebieg, zachowując raport
+wyników. Wyniki/logi poza repozytorium w LocalAppData.
 Aktualne zasady: docs/adr/ADR-039-personal-cykl-zycia-api.md i docs/personal-running.md.
 Status: historia/ważność haseł i archiwizacja tożsamości, 2026-10-24; ADR-035.
 
-**Aktualny etap: użytkownicy i uprawnienia instalacji (ADR-033).**
+**Wdrożony etap: użytkownicy i uprawnienia instalacji (ADR-033).**
 Rozszerzamy istniejące Identity/CompanyAccess, bez nowego logowania. Administrator
 instalacji jest sprawdzany świeżo po stronie serwera, nie ma automatycznych praw
 do danych firm. Hasła tymczasowe tylko raz, obowiązkowa zmiana własna; przed nią
@@ -52,12 +113,13 @@ z RowVersion i niezmiennym audytem; jeden dynamiczny walidator Identity egzekwuj
 ją przy tworzeniu, resetowaniu i każdej zmianie hasła, bez cache procesu.
 Początkowo 12 znaków i cztery klasy; po świadomym wyłączeniu każde niepuste
 hasło. Zmiana polityki nie unieważnia haseł/sesji. Generator domyślnie 16 znaków.
-Buduj wyłącznie standardowy Debug; przy blokadzie plików zgłoś potrzebę zatrzymania
-procesu, bez niestandardowych OutputPath/BaseOutputPath i katalogów weryfikacyjnych.
-Migracje tylko System po zweryfikowanym backupie. Nie zmieniaj baz firm.
+Buduj wyłącznie standardowy Debug; przy blokadzie plików zatrzymaj właściwy
+developerski proces VATowca i po pracy przywróć API, bez niestandardowych
+OutputPath/BaseOutputPath i katalogów weryfikacyjnych. W etapie ADR-033 migracje
+dotyczyły System; obecny zakres migracji wynika z bieżącego zadania.
 seed-users tworzy wyłącznie brakujące konta, nigdy nie resetuje zastanych haseł,
 ról ani CompanyAccess. UserAdministrationSqlTests używają rollback/savepoint,
-bez czyszczenia danych; nie uruchamiaj resetującego runnera. Windows Credential
+co nie ogranicza zgody na administracyjny reset baz developerskich. Windows Credential
 Manager pozostaje jak w ADR-032. Szczegóły: docs/users-and-permissions.md.
 
 **Poprzedni etap: warunki finansowe kontrahenta (ADR-031).**
@@ -75,8 +137,8 @@ Odczyt ViewContractors, zapis także EditContractors/CSRF/rowversion; atomowy
 ContractorChanges i trwała idempotencja tworzenia. Osobne szkice/zapisy finansów
 i danych głównych w Avalonia; przełączanie widoków i zamykanie chronią szkice.
 Nie implementuj sald, wykorzystania limitu, blokad sprzedaży ani dokumentów.
-Nie resetuj baz; nowe ContractorFinanceSqlTests stosują rollback/savepoint,
-bez kasowania danych, obok pozostałych niedestrukcyjnych testów poniżej.
+ContractorFinanceSqlTests stosują rollback/savepoint; ich konstrukcja nie
+ogranicza zgody na reset developerskich baz w zadaniach, które tego wymagają.
 
 Zachowujemy standardowe identyfikatory kontrahenta (ADR-030):
 Dodajemy Regon/Krs/Bdo/Pesel jako opcjonalne teksty nvarchar(100) w bazie firmy,
@@ -93,18 +155,15 @@ dla nowych zmian danych głównych, bez przepisywania dawnych zdarzeń.
 REGON 9/14 i PESEL mają kontrolę sumy; KRS/BDO tylko formatu. Nie potwierdzamy
 nadania numeru. Normalizacja jest jawna, błędne dane wymagają AcceptWarnings
 i aktualnego WarningHash. Integracje nie nadpisują nowych pól automatycznie.
-Nie uruchamiaj destrukcyjnego runnera SQL; nowe StandardIdentifierSqlTests
-używają rzeczywistych transakcji wycofywanych po testach, bez czyszczenia baz.
-W tym zadaniu zachowujemy wszystkie istniejące dane, konta i tabele System:
-nie uruchamiaj resetującego runnera `DatabaseTools test` ani jego fixture.
-Używaj niedestrukcyjnych OfficialVatRulesSqlTests/GusConfigurationSqlTests/RegistrySettingsSqlTests/StandardIdentifierSqlTests po jawnej migracji
-i backupie. Jest to ograniczenie bieżące, nadrzędne wobec historycznych zgód
-na reset demonstratora poniżej. Rozszerzamy istniejącą kartotekę i formularz Avalonia;
+StandardIdentifierSqlTests używają rzeczywistych transakcji wycofywanych po testach.
+Dobieraj potrzebne OfficialVatRulesSqlTests/GusConfigurationSqlTests/RegistrySettingsSqlTests/StandardIdentifierSqlTests
+lub runner `DatabaseTools test` do bieżącego zadania. Reset, migracje i ponowna
+inicjalizacja developerskich baz są dozwolone według zasad na początku pliku.
+Rozszerzamy istniejącą kartotekę i formularz Avalonia;
 nie wykonujemy automatycznych zapytań produkcyjnych ani konfiguracji klucza za użytkownika.
-Użytkownik zakończył etap dokumentacyjny. Można odtwarzać wyłącznie lokalne
-Vatowiec_System, Vatowiec_Company_A_Dev i Vatowiec_Company_B_Dev po kontroli
-instancji, dokładnych nazw, znaczników i fikcyjnego przeznaczenia danych.
-Nie migruj dawnych GUID ani danych demonstracyjnych. Nie modyfikuj innych baz.
+Nie projektuj migracji dawnych GUID ani fikcyjnych danych demonstracyjnych tylko
+po to, by je zachować. Przynależność każdej zmienianej bazy VATowca sprawdzaj
+według instancji, dokładnej nazwy i znaczników; zakaz dotyczy baz innych aplikacji.
 [ADR-019](docs/adr/ADR-019-implementacja-modelu-kontrahentow.md) opisuje rozwiązania
 techniczne; [ADR-018](docs/adr/ADR-018-docelowy-model-kontrahentow.md) pozostaje
 źródłem decyzji biznesowych. ADR-020 obejmuje cztery zakładki i pełne szczegóły.
@@ -136,7 +195,9 @@ Odtwarzamy tylko trzy demonstracyjne tabele modułu walutowego; nie migrujemy
 danych ani CurrencyId. Sama migracja nie dotyka innych kartotek ani DataPort.
 Użytkownik następnie jawnie odwołał ograniczenie czyszczenia danych demonstratora
 i zatwierdził pełny reset fikcyjnych danych na potrzeby wszystkich testów.
-Używamy istniejącego `test` na trzech dozwolonych bazach; nie tworzymy *_Test.
+Istniejący runner `test` ma własną allowlistę trzech baz demonstracyjnych.
+Nie jest ona ograniczeniem zgody właściciela na pozostałe zweryfikowane bazy
+VATowca. Nowe cele izolowane twórz tylko wtedy, gdy wymaga ich konkretny test.
 Runner nadal zachowuje zastany szyfrogram DataPort po zweryfikowanych kopiach.
 Nie rozszerza to zgody na inne aplikacje, bazy SQL systemowe ani zdalne serwery.
 Pozostałe zasady ADR-023 obowiązują.
@@ -277,7 +338,8 @@ Po każdym zadaniu programistycznym:
    Nie uruchamiaj API przed zakończeniem migracji i testów wymagających jego zatrzymania.
 2. Sprawdź port 7243 i upewnij się, że nie działa na nim stara instancja API VATowca.
    Nie uruchamiaj drugiego serwera równolegle. Jeśli proces blokuje kompilację,
-   zgłoś potrzebę jego zatrzymania; nie obchodź blokady innym katalogiem wyjściowym.
+   samodzielnie zatrzymaj właściwe developerskie API VATowca; nie obchodź blokady
+   innym katalogiem wyjściowym. Po wymaganych pracach uruchom je ponownie.
 3. Uruchom aktualne API z katalogu repozytorium w osobnym, widocznym i trwałym
    terminalu PowerShell, pozostającym otwartym po zakończeniu polecenia:
 
@@ -336,15 +398,22 @@ Nie twórz wszystkich katalogów pustymi szablonami bez potrzeby; szkielet jest 
 ## 8. Pierwsze zadanie dla Codexa
 
 Poniżej zapis wcześniejszych etapów i zgody na lokalne operacje testowe.
-Aktualny zakres implementacyjny i lista trzech dozwolonych baz z początku pliku mają pierwszeństwo.
-Po zatwierdzeniu szczegółów nowego modelu przyszła implementacja może odtworzyć
-wyłącznie demonstracyjne bazy VATowca: fikcyjne dane nie wymagają zachowania,
+Aktualny zakres implementacyjny i zasady środowiska developerskiego z początku
+pliku mają pierwszeństwo; zgoda nie ogranicza się do trzech baz demonstratora.
+Fikcyjne dane z wcześniejszych etapów nie wymagają zachowania:
 nie projektujemy ich migracji, map GUID ani zachowania przykładowych kontrahentów.
 Nie rozszerza to zgody na bazy systemowe SQL ani bazy innych aplikacji.
 
 > Przygotuj propozycję i minimalny szkielet repozytorium według M0 w `SPECYFIKACJA.md`: solution .NET 10, ASP.NET Core Web API, Avalonia Desktop, projekt Domain/Application/Infrastructure, integracja z SQL Server, testy xUnit i instrukcja uruchomienia. Zacznij od dokumentu ADR opisującego podział projektów i granice modułów. Nie implementuj podatków, KSeF ani schematów JPK bez osobnych wymagań i testów. Zapewnij możliwość zalogowania dwóch użytkowników oraz podstawowy model dwóch firm z izolacją danych.
 
-Aktualny etap po zaakceptowaniu ADR-014: wdrożenie lokalne i testy SQL. Użytkownik potwierdził, że wszystkie bazy projektu są testowe, i zezwolił na ich tworzenie, modyfikowanie i usuwanie na `localhost\SQLEXPRESS`, w tym usunięcie starej `Vatowiec_Dev`, bez ponawiania pytań. Przed usunięciem należy potwierdzić dokładną nazwę i przeznaczenie bazy; nie wystarcza sam prefiks nazwy. Nie wolno zmieniać baz systemowych SQL ani baz innych aplikacji. Narzędzie administracyjne korzysta z jawnej listy nazw i znacznika własności (dla starej Vatowiec_Dev: schemat i znana migracja). Aktualny runner SQL sprawdza trzy dozwolone bazy demonstracyjne i czyści ich fikcyjne fixture, wykonuje testy i ponownie inicjalizuje konta oraz dane fikcyjne; nie tworzy baz *_Test. Aktualny runner czyści tylko fikcyjne fixture DML w istniejących bazach; nie wykonuje DROP/CREATE. Przed testami zatrzymaj API i desktop. Pominiętych testów nie raportujemy jako zaliczonych. Zgoda nie obejmuje baz produkcyjnych ani zdalnych instancji i nie oznacza migracji przy starcie API.
+Historyczny etap po ADR-014 obejmował lokalne wdrożenie i testy SQL na
+`localhost\SQLEXPRESS`, w tym usunięcie rozpoznanej starej `Vatowiec_Dev`.
+Runner administracyjny zachowuje sprawdzanie dokładnych nazw, znaczników
+własności i zgodności historii. Jego allowlista i sposób czyszczenia fixture
+opisują implementację narzędzia, a nie zakres aktualnej zgody właściciela.
+Przed testami wymagającymi wyłączności zatrzymaj developerskie API i desktop;
+po zakończeniu przywróć API. Pominiętych testów nie raportujemy jako zaliczonych.
+Zwykły start API nadal nie wykonuje migracji ani resetu.
 
 ## 9. Licencje i cudze materiały
 

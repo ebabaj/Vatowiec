@@ -36,12 +36,33 @@ public static class ContractorEndpoints
 
     private static async Task<IResult> List(Guid companyId, HttpContext context, CompanyDatabaseResolver resolver,
         IWebHostEnvironment environment, string? q, string? country, bool? active, int? parentId, int? excludeId, int offset = 0, int limit = 50,
-        bool searchPesel = false)
+        bool searchPesel = false, string[]? visibleColumns = null)
     {
         await using var db = await Resolve(companyId, context, resolver, environment);
-        if (offset < 0 || offset > 1000000 || limit is < 1 or > 100 || q?.Length > 128 ||
+        if (offset < 0 || offset > 1000000 || limit is < 1 or > 201 || q?.Length > 128 ||
             (!string.IsNullOrWhiteSpace(country) && (country.Trim().Length != 2 || country.Trim().Any(c => !char.IsAsciiLetter(c)))))
             return Error(400, "invalid_filter", "Nieprawidłowe filtry lub strona wyników.");
+        if (visibleColumns != null)
+        {
+            var available = TableCatalog.Contractors.Available(Enum.GetValues<CompanyPermission>()
+                .Where(p => p != CompanyPermission.None && (db.Permissions & p) == p).Select(p => p.ToString())).Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
+            if (visibleColumns.Length == 0 || visibleColumns.Length > available.Count ||
+                visibleColumns.Distinct(StringComparer.Ordinal).Count() != visibleColumns.Length || visibleColumns.Any(c => !available.Contains(c)))
+                return Error(400, "table_columns_invalid", "Nieprawidłowy zestaw dostępnych kolumn.");
+            var table = ContractorTableQuery.Search(ContractorTableQuery.Rows(db.Context), visibleColumns, q);
+            if (active.HasValue) table = table.Where(x => x.Contractor.IsActive == active.Value);
+            if (parentId.HasValue) table = table.Where(x => x.Contractor.ParentId == parentId);
+            if (excludeId.HasValue) table = table.Where(x => x.Contractor.Id != excludeId);
+            var result = await table.OrderBy(x => x.Contractor.Code).ThenBy(x => x.Contractor.Id).Skip(offset).Take(limit).ToArrayAsync(context.RequestAborted);
+            return Results.Ok(result.Select(x => Response(x.Contractor, companyId, CanPesel(db)) with
+            {
+                ParentName = x.ParentName,
+                CreatedAtUtc = x.Contractor.CreatedAtUtc,
+                UpdatedAtUtc = x.Contractor.UpdatedAtUtc,
+                RegisteredAddress = x.Address == null ? null : new(x.Address.Name, x.Address.Street, x.Address.BuildingNo,
+                    x.Address.ApartmentNo, x.Address.PostalCode, x.Address.City, x.Address.Region, x.Address.CountryCode, x.Address.IsActive, x.Address.IsDefault)
+            }));
+        }
         var rows = db.Context.Contractors.AsNoTracking();
         if (parentId.HasValue) rows = rows.Where(x => x.ParentId == parentId);
         if (excludeId.HasValue) rows = rows.Where(x => x.Id != excludeId);
@@ -67,7 +88,7 @@ public static class ContractorEndpoints
         try { await csrf.ValidateRequestAsync(http); }
         catch (AntiforgeryValidationException) { return Error(400, "csrf_invalid", "Nie udało się potwierdzić żądania."); }
         return await List(companyId, http, resolver, environment, value.Query, value.Country, value.Active,
-            value.ParentId, value.ExcludeId, value.Offset, value.Limit, searchPesel: true);
+            value.ParentId, value.ExcludeId, value.Offset, value.Limit, searchPesel: true, visibleColumns: value.VisibleColumns);
     }
     private static bool CanPesel(AuthorizedCompanyDatabase db) => (db.Permissions & CompanyPermission.ManageContractorPesel) != 0;
     private static IResult PeselDenied() => Error(403, "pesel_permission_denied", "Brak uprawnienia do odczytu i edycji PESEL w tej firmie.");

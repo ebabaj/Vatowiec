@@ -16,7 +16,7 @@ public sealed partial class DesktopTests
     {
         var model = await Open(api);
         model.SelectedContractor = new(4132, A, "DEMO", "Fikcyjny kontrahent testu wiązań", "PL");
-        await model.EditContractor();
+        if (model.CanEditContractors) await model.EditContractor(); else await model.ShowContractor();
         return model;
     }
     private static void AssertSavedFinance(MainViewModel model, string days, string version)

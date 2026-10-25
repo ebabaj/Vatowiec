@@ -9,7 +9,7 @@ public sealed partial class DesktopTests
     {
         var model = await Open(api);
         model.SelectedContractor = new ContractorResponse(1, A, "TEST", "Fikcyjny kontrahent", "PL");
-        await model.EditContractor();
+        if (model.CanEditContractors) await model.EditContractor(); else await model.ShowContractor();
         model.SelectedTab = 2;
         return model;
     }

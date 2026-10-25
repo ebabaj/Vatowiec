@@ -48,7 +48,7 @@ public sealed partial class MainViewModel
     public bool IsUsersSettings => session != null && usersSettings;
     public bool IsOwnPasswordChange => session != null && (session.MustChangePassword || ownPasswordForm);
     public bool CanCancelPasswordChange => session != null && !session.MustChangePassword;
-    public bool CanOpenOwnPasswordChange => session != null && !busy && !IsOwnPasswordChange && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !IsGusSettings && !IsUsersSettings && !IsPasswordPolicyScreen;
+    public bool CanOpenOwnPasswordChange => session != null && !busy && !IsOwnPasswordChange;
     public bool CanManageUsers => IsUsersSettings && IsInstallationAdministrator && !busy;
     public bool HasAdminUser => IsUsersSettings && adminUser != null;
     public bool HasAdminChanges => HasRoleChanges || adminCompanyAccess.Any(x => x.IsDirty) || !string.IsNullOrWhiteSpace(NewUserName);
@@ -221,10 +221,10 @@ public sealed partial class MainViewModel
     public void OpenOwnPasswordChange()
     {
         if (!CanOpenOwnPasswordChange) return;
-        void Open() { ownPasswordForm = true; ChangedAll(); }
+        void Open() { CancelContractorLoading(); ClearNavigationDrafts(); ownPasswordForm = true; ChangedAll(); }
         if (HasUnsavedChanges) RequestDiscard(Open); else Open();
     }
-    public void CancelOwnPasswordChange() { if (!busy && CanCancelPasswordChange) { ownPasswordForm = false; ChangedAll(); } }
+    public void CancelOwnPasswordChange() { if (!busy && CanCancelPasswordChange) { ownPasswordForm = false; ChangedAll(); _ = LoadContractors(); } }
     public void ReportOwnPasswordMismatch() { message = "Nowe hasła muszą być identyczne. Popraw pola formularza."; Changed(nameof(Message)); }
     public Task ChangeOwnPassword(string current, string replacement) => Run(async () =>
     {

@@ -1,11 +1,37 @@
 # Otwarty następca VATowca — specyfikacja produktu i architektury
 
-**Wersja dokumentu:** 0.19 (warunki finansowe kontrahenta, ADR-031)
-**Data:** 2026-10-23
+**Wersja dokumentu:** 0.20 (interfejs i widoki tabel, ADR-042)
+**Data:** 2026-10-25
 **Status:** projekt założeń; nie jest potwierdzeniem zgodności podatkowej gotowego oprogramowania  
 **Nazwa projektu:** robocza „Otwarty następca VATowca”; docelowa nazwa i użycie nazwy „VATowiec” wymagają odrębnej decyzji i sprawdzenia praw  
 **Główna platforma:** Windows; klient i serwer projektowane także z myślą o Linux  
 **Główny stos:** C# / .NET 10, Avalonia UI, ASP.NET Core, Microsoft SQL Server
+
+ADR-042 (REP-004, ORG-003/008/011): wspólne menu Personal/Network, dolny pasek
+sesji, kontekstowe operacje, jawny podgląd kontrahenta bez zapisów i blokowania.
+Automatyczne strony 25/50/100/200, domyślnie aktywni, wyszukiwanie SQL wyłącznie
+po wskazanych widocznych, dozwolonych kolumnach. Katalog tabel/kolumn i hierarchia
+własny UserId → instalacja → fabryczny, z kontrolą wersji/CSRF i atomowym audytem
+zmian globalnych w System. PESEL pozostaje chroniony także w metadanych.
+Nowe tabele System wdrażamy jawną migracją; start aplikacji nie aktualizuje baz.
+Zlecenie używało numeru ADR-041, zajętego już
+przez ustawienia początkowe Personal. [Decyzja](docs/adr/ADR-042-interfejs-i-widoki-tabel.md),
+[obsługa, wdrożenie i testy](docs/table-views.md).
+
+**Decyzja właściciela środowiska — 2026-10-25:** wszystkie bazy VATowca na
+SQLEXPRESS i LocalDB są developerskie; nie ma baz produkcyjnych ani danych
+biznesowych wymagających zachowania. Do rozpoczęcia produkcji dozwolone są
+administracyjne usuwanie, reset, odtworzenie, przebudowa schematów, jawne migracje
+EF Core i inicjalizacja danych testowych bez odrębnej zgody i bez obowiązkowej
+kopii wyłącznie dla zachowania danych demonstracyjnych. Korzystamy z istniejącego
+środowiska, tworząc izolację tylko dla testów, które jej wymagają. Można zatrzymać
+developerskie API i przywrócić je po pracy. Zbędne zasoby utworzone przez przebieg
+testów sprzątamy automatycznie; zachowujemy raporty prowadzonych prac.
+Zgoda dotyczy wyłącznie zweryfikowanych zasobów VATowca. Bazy/usługi innych
+aplikacji, źródła, wydania i raporty są chronione. Identity, audyt, uprawnienia,
+izolacja firm, współbieżność i kontrola sekretów pozostają wymaganiami aplikacji.
+Ta decyzja zastępuje historyczne ograniczenia ochrony fikcyjnych baz; nie zmienia
+docelowych procedur backupu i wdrożenia systemu produkcyjnego.
 
 ADR-037: dwa warianty jednego projektu — Personal (Windows, lokalne API i
 SQL Server 2025 Express LocalDB) oraz Network (dotychczasowe API/SQL Server).
@@ -853,7 +879,7 @@ ADR-021 wdraża SQL `ref.TaxIdentifierSchemes` w bazie systemowej: wspólne wers
 - Integralność strukturalna SQL (klucze, relacje i właściwe ograniczenia) pozostaje obowiązkowa. Walidację podatkową identyfikatorów wykonuje Application/API z wersjonowanymi regułami i audytowanym świadomym odstępstwem; nie realizujemy jej podatkowymi CHECK CONSTRAINT.
 - Dokument, ewidencje, audyt księgowy i Outbox są zatwierdzane w jednej transakcji bazy firmowej, bez transakcji rozproszonych obejmujących katalog systemowy.
 - Osobne migracje `SystemDbContext` i `CompanyDbContext`; każda fizyczna baza ma własną `dbo.__EFMigrationsHistory`. Wspólny zestaw migracji firmowych wdraża się osobno do każdej firmy, z kontrolą wersji obsługiwanych przez API. Historia w katalogu nie zastępuje historii fizycznej bazy.
-- Migracje schematu wersjonowane, odwracalne tylko gdy bezpieczne; przed aktualizacją istniejącej bazy backup i weryfikacja zgodności. Automatyczny provisioning wykonuje migracje tylko jawnie wskazanej nowej firmy; start API nie migruje baz.
+- Migracje schematu wersjonowane, odwracalne tylko gdy bezpieczne; przed aktualizacją bazy produkcyjnej backup i weryfikacja zgodności. Dla obecnych baz developerskich obowiązuje zgoda właściciela opisana na początku dokumentu. Automatyczny provisioning wykonuje migracje tylko jawnie wskazanej nowej firmy; start API nie migruje baz.
 
 ### 8.2. Załączniki
 

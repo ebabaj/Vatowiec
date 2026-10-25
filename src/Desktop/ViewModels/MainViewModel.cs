@@ -50,7 +50,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
     public bool IsWorkspace => session is not null && profile is not null;
     public string CurrentUser => session?.UserName ?? "";
     public string CurrentCompany => profile?.Name ?? "";
-    public string SessionExpiry => session is null ? "" : $"Sesja do {session.ExpiresAtUtc.ToLocalTime():HH:mm}";
+    public string SessionExpiry => session is null ? "" : $"Sesja do: {session.ExpiresAtUtc.ToLocalTime():HH:mm}";
     public string Message => message;
     public CompanyResponse[] Companies => companies;
     public CompanyResponse? SelectedCompany
@@ -61,7 +61,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
     public ContractorResponse[] Contractors => contractors;
     public bool CanViewContractors => IsWorkspace && selectedCompany?.CanViewContractors == true;
     public bool CannotViewContractors => IsWorkspace && !CanViewContractors;
-    public string ContractorStatus => !contractorsLoaded ? "Wybierz „Pokaż kontrahentów”, aby pobrać aktualne dane."
+    public string ContractorStatus => IsContractorLoading ? "Ładowanie kontrahentów…" : !contractorsLoaded ? "Nie wczytano danych. Wybierz Odśwież, aby ponowić."
         : contractors.Length == 0 ? "Brak kontrahentów spełniających filtry." : $"Pozycje na tej stronie: {contractors.Length}";
 
     public async Task Login(string password)
@@ -134,6 +134,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         var result = await api.Profile(id);
         if (result.CompanyId != id) throw new ApiException(502, "API zwróciło dane innej firmy. Odmowa wyświetlenia danych.");
         profile = result;
+        await ReadTableViews();
+        if (CanViewContractors) _ = LoadPage(0);
     }
 
     public Task OpenClickedCompany(CompanyResponse company)
@@ -143,31 +145,60 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         return OpenCompany();
     }
 
-    public Task LoadContractors() => Run(() => LoadPage(0));
-
+    public Task LoadContractors() => LoadPage(0);
+    private CancellationTokenSource? contractorLoad;
+    private long contractorLoadGeneration;
+    public bool IsContractorLoading { get; private set; }
+    private void CancelContractorLoading()
+    {
+        contractorLoadGeneration++;
+        contractorLoad?.Cancel(); contractorLoad?.Dispose(); contractorLoad = null;
+        IsContractorLoading = false;
+    }
     private async Task LoadPage(int offset)
     {
-        contractors = [];
-        contractorsLoaded = false;
-        ChangedAll();
-        if (api is null || profile is null || !CanViewContractors)
-            throw new ApiException(403, "Brak uprawnień do kartoteki kontrahentów.");
+        CancelContractorLoading();
+        if (disposed || api == null || profile == null) return;
+        if (!CanViewContractors) { message = "Brak uprawnień do kartoteki kontrahentów."; ChangedAll(); return; }
+        if (!CanBrowse) return;
+        CheckExpiry();
+        if (api == null || profile == null) return;
+        var generation = contractorLoadGeneration;
+        var client = api; var companyId = profile.CompanyId; var identity = session?.UserId;
+        contractorLoad = new(); var token = contractorLoad.Token;
         var filter = (SearchText.Trim(), FilterCountry.Trim(), FilterActivity);
         if (filter != loadedFilter) offset = 0;
-        var rows = await api.Contractors(profile.CompanyId, filter.Item1, filter.Item2,
-            FilterActivity == 0 ? null : FilterActivity == 1, offset, 51);
-        if (rows.Any(x => x.CompanyId != profile.CompanyId))
-            throw new ApiException(502, "API zwróciło dane innej firmy. Odmowa wyświetlenia danych.");
-        contractors = rows.Take(50).ToArray();
-        hasNextPage = rows.Length > 50;
-        pageOffset = offset;
-        loadedFilter = filter;
-        selectedContractor = null;
-        contractorsLoaded = true;
+        contractors = []; selectedContractor = null; contractorsLoaded = false; IsContractorLoading = true;
+        ChangedAll();
+        try
+        {
+            var rows = await client.SearchContractors(companyId, new(filter.Item1, Active: FilterActivity == 0 ? null : FilterActivity == 1,
+                Offset: offset, Limit: PageSize + 1, VisibleColumns: ContractorTable.VisibleColumns), token);
+            if (token.IsCancellationRequested || generation != contractorLoadGeneration || profile?.CompanyId != companyId || session?.UserId != identity) return;
+            if (rows.Any(x => x.CompanyId != companyId)) throw new ApiException(502, "API zwróciło dane innej firmy. Odmowa wyświetlenia danych.");
+            contractors = rows.Take(PageSize).ToArray();
+            hasNextPage = rows.Length > PageSize; pageOffset = offset; loadedFilter = filter; contractorsLoaded = true;
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception ex) when (IsExpected(ex))
+        {
+            if (generation != contractorLoadGeneration) return;
+            if (ex is ApiException { StatusCode: 401 }) ResetSession();
+            else if (ex is ApiException { StatusCode: 403, Code: "user_password_change_required" })
+            {
+                ClearCompanyData(); ResetUsersSettings(); ResetGusSettings(); ResetPasswordPolicy();
+                if (session != null) session = session with { MustChangePassword = true };
+            }
+            else if (ex is ApiException { StatusCode: 403 }) ClearCompanyData();
+            message = ex is ApiException error ? error.Message : "Nie można połączyć się z API i wczytać kartoteki. Sprawdź połączenie i wybierz Odśwież.";
+            ChangedAll();
+        }
+        finally { if (generation == contractorLoadGeneration) { IsContractorLoading = false; ChangedAll(); } }
     }
 
     public Task ChangeCompany() => Run(async () =>
     {
+        if (HasUnsavedChanges) { RequestDiscard(() => { ClearNavigationDrafts(); _ = ChangeCompany(); }); return; }
         ClearCompanyData();
         selectedCompany = null;
         companies = [];
@@ -178,6 +209,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
     public Task Logout()
     {
         if (busy || disposed) return Task.CompletedTask;
+        if (HasUnsavedChanges) { RequestDiscard(() => { ClearNavigationDrafts(); _ = Logout(); }); return Task.CompletedTask; }
         // An explicit logout must also disable startup login if CheckExpiry in Run
         // discovers that the server session has just expired.
         var preferenceWarning = DisableAutomaticLogin();
@@ -274,6 +306,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
     private static bool IsExpected(Exception ex) => ex is ApiException or HttpRequestException or TaskCanceledException or JsonException;
     private void ClearCompanyData()
     {
+        CancelContractorLoading();
+        ResetTableViews();
         profile = null;
         contractors = [];
         contractorsLoaded = false;
@@ -299,6 +333,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
     public void Dispose()
     {
         disposed = true;
+        CancelContractorLoading();
         if (!busy) ResetSession();
     }
 }

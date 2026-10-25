@@ -11,6 +11,8 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
     : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options)
 {
     public DbSet<Company> Companies => Set<Company>();
+    public DbSet<TableView> TableViews => Set<TableView>();
+    public DbSet<TableViewChange> TableViewChanges => Set<TableViewChange>();
     public DbSet<CompanyDatabaseRegistration> CompanyDatabases => Set<CompanyDatabaseRegistration>();
     public DbSet<CompanyAccess> CompanyAccesses => Set<CompanyAccess>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
@@ -27,13 +29,41 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<TableView>(b =>
+        {
+            b.ToTable("TableViews", "security", t => t.HasCheckConstraint("CK_TableViews_PageSize", "[PageSize] IS NULL OR [PageSize] IN (25,50,100,200)"));
+            b.HasKey(x => x.Id);
+            b.Property(x => x.TableId).HasMaxLength(64).UseCollation("Latin1_General_100_BIN2");
+            b.Property(x => x.ColumnsJson).HasMaxLength(4096);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasIndex(x => new { x.InstallationId, x.OwnerId, x.TableId }).IsUnique();
+        });
+        modelBuilder.Entity<TableViewChange>(b =>
+        {
+            b.ToTable("TableViewChanges", "audit", t => t.HasTrigger("TR_TableViewChanges_Immutable"));
+            b.HasKey(x => x.Id);
+            b.Property(x => x.TableId).HasMaxLength(64);
+            b.Property(x => x.ActorName).HasMaxLength(256);
+            b.Property(x => x.BeforeJson).HasMaxLength(4096); b.Property(x => x.AfterJson).HasMaxLength(4096);
+        });
         modelBuilder.Entity<PasswordPolicy>(b =>
         {
             b.ToTable("PasswordPolicy", "security", t => t.HasCheckConstraint("CK_PasswordPolicy_Values", "[SingletonKey]=1 AND [MinimumLength] BETWEEN 1 AND 1024"));
             b.HasKey(x => x.SingletonKey); b.Property(x => x.SingletonKey).ValueGeneratedNever(); b.Property(x => x.RowVersion).IsRowVersion();
-            b.HasData(new { SingletonKey = 1, IsEnabled = true, MinimumLength = 12, RequireUppercase = true,
-                RequireLowercase = true, RequireDigit = true, RequireSpecialCharacter = true, PreventPasswordReuse = false,
-                PreviousPasswordCount = 5, EnforcePasswordExpiration = false, PasswordValidityDays = 90 });
+            b.HasData(new
+            {
+                SingletonKey = 1,
+                IsEnabled = true,
+                MinimumLength = 12,
+                RequireUppercase = true,
+                RequireLowercase = true,
+                RequireDigit = true,
+                RequireSpecialCharacter = true,
+                PreventPasswordReuse = false,
+                PreviousPasswordCount = 5,
+                EnforcePasswordExpiration = false,
+                PasswordValidityDays = 90
+            });
             b.ToTable("PasswordPolicy", "security", t => t.HasCheckConstraint("CK_PasswordPolicy_Lifetime", "[PreviousPasswordCount] BETWEEN 1 AND 20 AND [PasswordValidityDays] BETWEEN 1 AND 3650"));
         });
         modelBuilder.Entity<UserPasswordHistory>(b =>
@@ -125,6 +155,8 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
     }
     private void ProtectRegistryAudit()
     {
+        if (ChangeTracker.Entries<TableViewChange>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Historia domyślnych widoków tabel jest niezmienna.");
         if (ChangeTracker.Entries<PasswordPolicyChange>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("Historia polityki haseł jest niezmienna.");
         if (ChangeTracker.Entries<UserAdministrationChange>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))

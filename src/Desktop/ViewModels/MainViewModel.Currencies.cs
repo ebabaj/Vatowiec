@@ -263,7 +263,9 @@ public sealed partial class MainViewModel
     public bool HasNextCurrencyHistory { get; private set; }
     public Task OpenCurrencies(bool settings = false) => Run(async () =>
     {
-        if (api == null || profile == null || IsEditing || !CanViewRates) return;
+        if (api == null || profile == null || !CanViewRates) return;
+        if (HasUnsavedChanges) { RequestDiscard(() => { ClearNavigationDrafts(); _ = OpenCurrencies(settings); }); return; }
+        CancelContractorLoading(); ClearNavigationDrafts();
         ResetDataPortSettings(); currencyScreen = true; currencySettings = settings;
         await RefreshCurrencyData();
     });
@@ -287,7 +289,7 @@ public sealed partial class MainViewModel
     public void CloseCurrencies()
     {
         if (busy || CurrencyActivityPrompt) return;
-        void Close() { ResetCurrencyState(); ChangedAll(); }
+        void Close() { ResetCurrencyState(); ChangedAll(); _ = LoadContractors(); }
         if (CurrencyEditor?.IsDirty == true) RequestDiscard(Close); else Close();
     }
     public void CancelCurrencyChanges() { if (!busy && !CurrencyActivityPrompt) { SetCurrencyEditor(selectedCurrency); ChangedAll(); } }

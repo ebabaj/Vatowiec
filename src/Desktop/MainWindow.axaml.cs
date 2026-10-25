@@ -155,13 +155,26 @@ public partial class MainWindow : Window
     private async void OpenCompanyClick(object? sender, RoutedEventArgs e) => await model.OpenCompany();
     private async void RefreshCompaniesClick(object? sender, RoutedEventArgs e) => await model.RefreshCompanies();
     private async void ContractorsClick(object? sender, RoutedEventArgs e) => await model.LoadContractors();
+    private async void NavigateContractorsClick(object? sender, RoutedEventArgs e) => await model.NavigateContractors();
+    private async void ContractorColumnsClick(object? sender, RoutedEventArgs e) => await model.OpenColumnSettings("Contractors");
+    private async void CurrencyColumnsClick(object? sender, RoutedEventArgs e) => await model.OpenColumnSettings("Currencies");
+    private async void RateColumnsClick(object? sender, RoutedEventArgs e) => await model.OpenColumnSettings("CurrencyRates");
+    private async void SaveMyColumnsClick(object? sender, RoutedEventArgs e) => await model.SaveColumns();
+    private async void ResetMyColumnsClick(object? sender, RoutedEventArgs e) => await model.SaveColumns(reset: true);
+    private async void SaveInstallationColumnsClick(object? sender, RoutedEventArgs e) => await model.SaveColumns(installation: true);
+    private async void ResetInstallationColumnsClick(object? sender, RoutedEventArgs e) => await model.SaveColumns(installation: true, reset: true);
+    private void CloseColumnSettingsClick(object? sender, RoutedEventArgs e) => model.CloseColumnSettings();
     private async void ChangeCompanyClick(object? sender, RoutedEventArgs e) => await model.ChangeCompany();
     private async void LogoutClick(object? sender, RoutedEventArgs e) => await model.Logout();
     private void NewContractorClick(object? sender, RoutedEventArgs e) { model.NewContractor(); ContractorCodeInput.Focus(); }
     private async void EditContractorClick(object? sender, RoutedEventArgs e) { await model.EditContractor(); ContractorCodeInput.Focus(); }
     private async void ContractorDoubleTapped(object? sender, TappedEventArgs e)
     {
-        if (model.CanViewContractors) { await model.EditContractor(); ContractorCodeInput.Focus(); }
+        if (sender is not ListBox list || e.Source is not Avalonia.Visual source) return;
+        var item = source.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault();
+        if (item == null || list.ItemFromContainer(item) is not ContractorResponse row) return;
+        e.Handled = true; model.SelectedContractor = row;
+        await model.ShowContractor();
     }
     private async void SaveContractorClick(object? sender, RoutedEventArgs e) => await model.SaveContractor();
     private async void ValidateIdentifiersClick(object? sender, RoutedEventArgs e) => await model.CheckIdentifiers();
@@ -283,6 +296,7 @@ public partial class MainWindow : Window
     private async void WindowKeyDown(object? sender, KeyEventArgs e)
     {
         if (model.IsBusy) return;
+        if (model.IsColumnSettingsOpen) { if (e.Key == Key.Escape) model.CloseColumnSettings(); e.Handled = true; return; }
         if (model.DiscardPrompt) { if (e.Key == Key.Escape) model.KeepEditing(); e.Handled = true; return; }
         if (model.IsPasswordPolicyScreen)
         {
@@ -332,7 +346,7 @@ public partial class MainWindow : Window
         { e.Handled = true; SearchInput.Focus(); }
         else if (model.CanBrowse && model.CanEditContractors && e.KeyModifiers == KeyModifiers.Control && e.Key == Key.N)
         { e.Handled = true; model.NewContractor(); ContractorCodeInput.Focus(); }
-        else if (model.CanBrowse && model.CanEditContractors && e.Key == Key.F2)
-        { e.Handled = true; await model.EditContractor(); ContractorCodeInput.Focus(); }
+        else if (model.CanShowSelectedContractor && e.Key is Key.F2 or Key.Enter)
+        { e.Handled = true; await model.ShowContractor(); }
     }
 }

@@ -7,6 +7,10 @@ namespace Vatowiec.Desktop.Services;
 
 public interface IVatowiecApiClient : IDisposable
 {
+    Task<TableViewResponse> TableView(Guid companyId, string tableId) => Task.FromResult(TableCatalog.Factory(tableId, []));
+    Task<TableViewResponse> SaveTableView(Guid companyId, string tableId, TableViewRequest value, bool installation) => throw new NotSupportedException();
+    Task<ContractorResponse[]> SearchContractors(Guid companyId, ContractorSearchRequest value, CancellationToken ct) =>
+        Contractors(companyId, value.Query, value.Country, value.Active, value.Offset, value.Limit).WaitAsync(ct);
     Task<SessionResponse> Login(string userName, string password);
     Task<UserSummary[]> Users(string search, int offset, bool includeArchived = false) => throw new NotSupportedException();
     Task<UserAdministrationLookups> UserLookups() => throw new NotSupportedException();
@@ -130,6 +134,16 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
     }
 
     public Task<CompanyResponse[]> Companies() => Get<CompanyResponse[]>("api/v1/companies");
+    public Task<TableViewResponse> TableView(Guid companyId, string tableId) => Get<TableViewResponse>($"api/v1/companies/{companyId}/table-views/{Uri.EscapeDataString(tableId)}");
+    public Task<TableViewResponse> SaveTableView(Guid companyId, string tableId, TableViewRequest value, bool installation) =>
+        Write<TableViewResponse>($"api/v1/companies/{companyId}/table-views/{Uri.EscapeDataString(tableId)}/" + (installation ? "installation" : "mine"), value, true);
+    public async Task<ContractorResponse[]> SearchContractors(Guid companyId, ContractorSearchRequest value, CancellationToken ct)
+    {
+        var csrf = await Get<CsrfResponse>("api/v1/auth/csrf");
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/v1/companies/{companyId}/contractors/search") { Content = JsonContent.Create(value) };
+        request.Headers.Add("X-CSRF-TOKEN", csrf.Token);
+        return await Send<ContractorResponse[]>(request, cancellationToken: ct);
+    }
     public Task<UserSummary[]> Users(string search, int offset, bool includeArchived = false) => Get<UserSummary[]>($"api/v1/installation/users?search={Uri.EscapeDataString(search)}&offset={offset}&includeArchived={includeArchived.ToString().ToLowerInvariant()}");
     public Task<UserAdministrationLookups> UserLookups() => Get<UserAdministrationLookups>("api/v1/installation/users/lookups");
     public Task<UserAdministrationDetail> UserDetail(Guid id) => Get<UserAdministrationDetail>($"api/v1/installation/users/{id}");
@@ -257,9 +271,9 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         return await Send<T>(request);
     }
 
-    private async Task<T> Send<T>(HttpRequestMessage request, bool login = false)
+    private async Task<T> Send<T>(HttpRequestMessage request, bool login = false, CancellationToken cancellationToken = default)
     {
-        using var response = await http.SendAsync(request);
+        using var response = await http.SendAsync(request, cancellationToken);
         await EnsureSuccess(response, login, request.RequestUri);
         try
         {
@@ -280,6 +294,7 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         var userAdministration = uri?.AbsolutePath.StartsWith("/api/v1/installation/users", StringComparison.Ordinal) == true;
         var message = response.StatusCode switch
         {
+            _ when error?.Code?.StartsWith("table_", StringComparison.Ordinal) == true => error.Message ?? "Nie potwierdzono ustawień tabeli. Odśwież widok.",
             HttpStatusCode.NotFound when error?.Code == "user_missing" => error.Message ?? "Nie znaleziono użytkownika. Odśwież listę użytkowników.",
             HttpStatusCode.Conflict when error?.Code == "user_stale" => error.Message ?? "Inny administrator zmienił użytkownika lub jego prawa. Odśwież szczegóły i porównaj aktualny stan.",
             _ when error?.Code?.StartsWith("user_", StringComparison.Ordinal) == true => error.Message ?? "Sprawdź konto, prawa i aktualną wersję danych.",
