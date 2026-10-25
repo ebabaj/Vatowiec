@@ -330,6 +330,17 @@ Po kodowaniu:
 9. Uaktualnij specyfikację, jeśli powstało nowe ustalenie, oraz dopisz ADR dla decyzji architektonicznej.
 10. Nie ogłaszaj gotowości produkcyjnej bez zgodności z definicją wersji z `SPECYFIKACJA.md`.
 
+### Opisy commitów Git
+
+1. Wszystkie proponowane tytuły i treści commitów pisz po polsku.
+2. Tytuł commita zaczynaj od numeru ADR, którego dotyczy zmiana, np. `ADR-042: zapamiętywanie kolejności i szerokości kolumn`.
+3. Jeśli zmiana dotyczy istniejącego ADR, używaj jego rzeczywistego numeru.
+4. Nie wymyślaj numerów ADR. Jeśli zmiana nie jest przypisana do ADR, zaproponuj polski opis bez numeru i zgłoś brak przypisania do ADR.
+5. Opisy mają być konkretne, zwięzłe i informować, co faktycznie zmieniono.
+6. W treści commita można umieścić krótkie polskie podsumowanie najważniejszych zmian.
+7. Nie stosuj ogólnych angielskich tytułów typu „Refactor table layout and view management features”.
+8. Codex proponuje opis commita, ale nie wykonuje samodzielnie commit ani push. Te czynności wykonuje osobiście użytkownik.
+
 ### Stała zasada: uruchomienie API po zakończeniu zadania
 
 Po każdym zadaniu programistycznym:
