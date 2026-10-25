@@ -5,7 +5,9 @@ Data: 2026-10-24. Decyzja: [ADR-037](adr/ADR-037-personal-localdb.md).
 Nie jest to jeszcze instalator Personal 0.1.0-preview. Nie zbudowano nowego
 instalatora, nie publikowano Release i nie instalowano dodatkowego oprogramowania.
 
-Obecny etap ADR-039: [automatyczne uruchamianie Personal](personal-running.md).
+Obecny etap ADR-040: [instalator Personal](personal-windows-installation.md),
+[raport prób 0.1.1](releases/personal-0.1.1-preview.md).
+ADR-039: [automatyczne uruchamianie Personal](personal-running.md).
 Wyniki poniżej są zapisem eksperymentu LocalDB; jego HTTPS/dev-certs nie są
 już wymagane przez normalny profil Personal, który korzysta z Named Pipes.
 

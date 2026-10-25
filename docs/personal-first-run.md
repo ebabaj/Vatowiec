@@ -4,6 +4,11 @@ Stan implementacji: etap 2, zweryfikowany 2026-10-24 na rzeczywistym LocalDB
 17.0.4025.3 i w natywnym oknie Avalonia, standardowy Debug.
 Decyzja: [ADR-038](adr/ADR-038-personal-pierwsze-uruchomienie.md).
 
+Aktualizacja 2026-10-25, 0.1.1-preview: [ADR-041](adr/ADR-041-personal-ustawienia-poczatkowe.md)
+wyłącza domyślną złożoność/historię/ważność haseł tylko w nowym Personal.
+MF/WL2 i VIES rozpoczynają w Production, GUS w Test; nowa firma ma aktywny tylko PLN,
+bez flag pobierania NBP. [Raport](releases/personal-0.1.1-preview.md).
+
 Aktualizacja ADR-039: kreator korzysta obecnie z controllera procesu i lokalnego
 Named Pipe, bez portu i certyfikatu .NET. [Aktualna instrukcja uruchomienia,
 zamykania i odzyskiwania](personal-running.md). Poniższe wyniki etapu 2 opisują
@@ -26,9 +31,12 @@ na pulpicie. Otwiera normalny kreator, bez terminala i bez fikcyjnych kont.
    Nie potwierdzamy nadania numeru ani nie odpytujemy rejestrów.
 3. „Przygotuj instalację” pokazuje kolejne etapy: prywatną instancję LocalDB,
    bazę systemową, fizycznie osobną bazę firmy oraz administratora i uprawnienia.
-   Początkowa polityka wymaga minimum 12 znaków i wszystkich czterech klas;
-   zapis ostatecznie waliduje wspólny serwerowy UserManager. Politykę można
+   Początkowa polityka Personal dopuszcza każde niepuste hasło (minimum 1,
+   klasy znaków, historia i ważność wyłączone). Zapis ostatecznie waliduje wspólny
+   serwerowy UserManager. Puste hasło jest odrzucane. Politykę można
    później zmienić w istniejących ustawieniach instalacji.
+   Po zakończeniu formularz pokazuje informację o rzeczywistych rejestrach MF/VIES,
+   zanim użytkownik przejdzie do logowania. Inicjalizacja nie odpytuje rejestrów.
 4. „Przejdź do logowania” uruchamia normalne API Personal i dotychczasowy ekran
    logowania. Należy zalogować się własnym loginem/hasłem; kreator nie zapisuje
    poświadczenia w Credential Manager ani nie włącza autologowania.

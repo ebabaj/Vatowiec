@@ -1,6 +1,8 @@
 # VATowiec Personal — uruchamianie i odzyskiwanie (ADR-039)
 
-Uruchom ikonę **VATowiec Personal (Debug)** na pulpicie. Nie uruchamiaj ręcznie API.
+Po [instalacji ADR-040](personal-windows-installation.md) uruchom **VATowiec Personal**
+z menu Start lub pulpitu. Dla pracy deweloperskiej pozostaje osobna ikona
+**VATowiec Personal (Debug)**. Nie uruchamiaj ręcznie API.
 Klient sam sprawdzi LocalDB i konfigurację. Przy pierwszym starcie pokaże
 [kreator](personal-first-run.md), a przy istniejącej instalacji — zwykłe logowanie.
 Serwer działa bez widocznego terminala, przez zabezpieczony kanał Windows.

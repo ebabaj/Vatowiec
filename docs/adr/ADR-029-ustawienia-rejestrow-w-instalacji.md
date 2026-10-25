@@ -4,6 +4,11 @@ Data: 2026-10-23. Status: wdrożone i przetestowane na zlecenie użytkownika.
 Wymagania ORG-003/007. Rozszerza ADR-028, zastępując ręczne konfigurowanie
 publicznych adresów i trybów rejestrów przez user-secrets.
 
+Wyjątek dla nowych instalacji Personal od 0.1.1-preview: jawny, audytowany
+bootstrap [ADR-041](ADR-041-personal-ustawienia-poczatkowe.md) ustawia MF/WL2
+i VIES Production, GUS Test. Seedy i zachowanie Network oraz późniejsze
+potwierdzenia administratora pozostają bez zmian.
+
 W System dodajemy security.RegistryConfigurations (trzy rekordy GUS/MF/VIES:
 tryb, URL Test/Production, osobne URL WL2 dla MF, rowversion) oraz niezmienne
 audit.RegistryConfigurationChanges (wartości przed/po, czas i trwały aktor z

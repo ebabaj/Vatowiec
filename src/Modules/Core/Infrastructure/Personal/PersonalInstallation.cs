@@ -92,7 +92,7 @@ public sealed class PersonalInstallation : IDisposable
         => await RunLocalDb(45, args);
     private static async Task<string> RunLocalDb(int timeoutSeconds, params string[] args)
     {
-        var start = new ProcessStartInfo("SqlLocalDB.exe") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        var start = new ProcessStartInfo(LocalDb2025Locator.FindExecutable()) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (var arg in args) start.ArgumentList.Add(arg);
         try
         {
@@ -208,7 +208,7 @@ public sealed class PersonalInstallation : IDisposable
         if (name.Length is < 1 or > 256 || name.Any(char.IsControl)) throw new PersonalSetupException("Podaj nazwę firmy (1–256 znaków).");
         if (string.IsNullOrEmpty(nip)) nip = null;
         else if (!new PolishNipChecksum().IsValid(nip)) throw new PersonalSetupException("NIP powinien zawierać 10 cyfr i prawidłową sumę kontrolną. Możesz pozostawić go pustego.");
-        var policy = InstallationPasswordValidator.Validate(new PasswordPolicy(), input.Password);
+        var policy = InstallationPasswordValidator.Validate(PersonalBootstrapDefaults.PasswordPolicy(), input.Password);
         if (!policy.Succeeded) throw new PersonalSetupException(string.Join(" ", policy.Errors.Select(x => x.Description)));
         return (login, name, nip);
     }
@@ -239,6 +239,7 @@ public sealed class PersonalInstallation : IDisposable
                     if (!State.DatabaseIntents.Contains(names.GetString(0))) throw new PersonalSetupException("Instancja zawiera bazę spoza zapisanych etapów kreatora. Nie zmieniono danych.");
             }
             await EnsureDatabase(Target.System);
+            Guid issuer;
             await Stage("system", "3/5 Przygotowanie bazy systemowej i polityki bezpieczeństwa…");
             await using (var guard = await Open(Target.System))
             await using (var db = SystemDb())
@@ -246,6 +247,7 @@ public sealed class PersonalInstallation : IDisposable
                 await db.Database.MigrateAsync();
                 if (await db.Users.AnyAsync() || await db.UserAdministrationChanges.AnyAsync(x => x.Operation == "PersonalInitialized"))
                     throw new PersonalSetupException("W instalacji istnieją już konta. Kreator nie może ich zastąpić.");
+                issuer = (await db.InstallationIdentities.SingleAsync()).Id;
             }
             await Stage("company", "4/5 Przygotowanie osobnej bazy pierwszej firmy…");
             State.CompanyName = name; State.Nip = nip; Save();
@@ -254,9 +256,7 @@ public sealed class PersonalInstallation : IDisposable
             await using (var db = CompanyDb())
             {
                 await db.Database.MigrateAsync();
-                var profile = await db.CompanyProfiles.IgnoreQueryFilters().SingleOrDefaultAsync();
-                if (profile == null) { db.CompanyProfiles.Add(new(State.CompanyId, name, nip)); await db.SaveChangesAsync(); }
-                else if (profile.CompanyId != State.CompanyId || profile.Name != name || profile.Nip != nip) throw new PersonalSetupException("Profil firmy jest niezgodny. Dane nie zostały zastąpione.");
+                await PersonalBootstrapDefaults.InitializeCompany(db, State.InstallationId, issuer, name, nip);
             }
             await Stage("administrator", "5/5 Zapis administratora, uprawnień i audytu…");
             var services = new ServiceCollection(); services.AddLogging();
@@ -268,6 +268,7 @@ public sealed class PersonalInstallation : IDisposable
             var manager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             var roles = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
             var user = new ApplicationUser { Id = Guid.NewGuid(), UserName = login, LockoutEnabled = true };
+            await PersonalBootstrapDefaults.InitializeSystem(system, State.InstallationId, user.Id, issuer, login);
             static void Require(IdentityResult result)
             { if (!result.Succeeded) throw new PersonalSetupException(string.Join(" ", result.Errors.Select(x => x.Description))); }
             Require(await manager.CreateAsync(user, input.Password!));
@@ -277,7 +278,7 @@ public sealed class PersonalInstallation : IDisposable
             system.CompanyDatabases.Add(new(State.CompanyId, Target.Server, Target.Company, "Personal"));
             var permissions = Enum.GetValues<CompanyPermission>().Aggregate(CompanyPermission.None, (a, p) => a | p);
             system.CompanyAccesses.Add(new(user.Id, State.CompanyId, permissions));
-            var issuer = (await system.InstallationIdentities.SingleAsync()).Id; var now = DateTimeOffset.UtcNow;
+            var now = DateTimeOffset.UtcNow;
             foreach (var operation in new[] { "PersonalInitialized", "Created", "AdministratorGranted", "CompanyAccessGranted" })
                 system.UserAdministrationChanges.Add(new(user.Id, issuer, login, user.Id, login, now, operation,
                     operation == "CompanyAccessGranted" ? State.CompanyId : null, after: operation == "CompanyAccessGranted" ? permissions : null));
@@ -295,10 +296,18 @@ public sealed class PersonalInstallation : IDisposable
         await using var cmd = guard.CreateCommand(); cmd.CommandText = "SELECT COUNT(*) FROM sys.extended_properties WHERE class=0 AND name=N'Vatowiec.Personal.Initialized'";
         if (!Equals(await cmd.ExecuteScalarAsync(), 1)) throw new PersonalSetupException("Nie potwierdzono zakończenia instalacji. Kreator nie zastąpi danych.");
         await using var db = SystemDb();
+        EnsureCompatibleSchema(db.Database.GetMigrations(), await db.Database.GetAppliedMigrationsAsync());
+        await using var companyGuard = await Open(Target.Company);
+        await using var company = CompanyDb();
+        EnsureCompatibleSchema(company.Database.GetMigrations(), await company.Database.GetAppliedMigrationsAsync());
         if (!await db.Users.AnyAsync() || !await db.UserAdministrationChanges.AnyAsync(x => x.Operation == "PersonalInitialized") ||
             !await db.CompanyDatabases.AnyAsync(x => x.CompanyId == State.CompanyId && x.DatabaseName == Target.Company && x.ServerName == Target.Server))
             throw new PersonalSetupException("Niekompletna konfiguracja instalacji. Dane wymagają sprawdzenia przez administratora.");
-        await using var companyGuard = await Open(Target.Company);
+    }
+    public static void EnsureCompatibleSchema(IEnumerable<string> available, IEnumerable<string> applied)
+    {
+        if (!available.Order(StringComparer.Ordinal).SequenceEqual(applied.Order(StringComparer.Ordinal), StringComparer.Ordinal))
+            throw new PersonalSetupException("Wersja baz Personal jest niezgodna z programem. Nie zmieniono schematu. Zamknij program, wykonaj kopię całej instalacji i zastosuj kontrolowaną aktualizację baz według instrukcji wydania. Nie uruchamiaj ponownie kreatora.");
     }
     public Dictionary<string, string?> Configuration() => new()
     {

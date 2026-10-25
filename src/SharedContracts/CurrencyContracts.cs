@@ -37,7 +37,7 @@ public sealed record CurrencyHistoryResponse(long Id, Guid CompanyId, string Kin
 {
     public override string ToString()
     {
-        var kind = Kind switch { "Configuration" => "Ustawienia waluty", "BulkActivity" => "Zbiorowa aktywność walut", "Import" => "Ręczne pobranie NBP", "ResolveConflict" => "Rozstrzygnięcie konfliktu", _ => Kind };
+        var kind = Kind switch { "PersonalInitialized" => "Inicjalizacja walut Personal", "Configuration" => "Ustawienia waluty", "BulkActivity" => "Zbiorowa aktywność walut", "Import" => "Ręczne pobranie NBP", "ResolveConflict" => "Rozstrzygnięcie konfliktu", _ => Kind };
         string info;
         try
         {
@@ -45,6 +45,7 @@ public sealed record CurrencyHistoryResponse(long Id, Guid CompanyId, string Kin
             static string Yes(JsonElement value) => value.GetBoolean() ? "tak" : "nie";
             info = Kind switch
             {
+                "PersonalInitialized" => "Aktywna: PLN · waluty obce nieaktywne · pobieranie NBP wyłączone",
                 "BulkActivity" => $"Aktywacja: {Yes(data.GetProperty("result").GetProperty("isActive"))} · zmienione: {data.GetProperty("result").GetProperty("changed").GetArrayLength()} · pominięte: {data.GetProperty("result").GetProperty("skipped").GetArrayLength()}",
                 "Configuration" => data.GetProperty("after").GetProperty("code").GetString() + " — " +
                     "aktywna: " + Yes(data.GetProperty("after").GetProperty("isActive")) + "; A/B/C: " + Yes(data.GetProperty("after").GetProperty("downloadA")) + "/" + Yes(data.GetProperty("after").GetProperty("downloadB")) + "/" + Yes(data.GetProperty("after").GetProperty("downloadC")),

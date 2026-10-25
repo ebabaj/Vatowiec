@@ -1,7 +1,9 @@
 # Otwarty następca VATowca
 
 [VATowiec Personal — sprawdzony prototyp LocalDB 2025](docs/personal-localdb.md):
-wspólny kod z Network, bez gotowego jeszcze instalatora Personal.
+wspólny kod z Network. [Instalator Personal 0.1.1-preview (ADR-040/041)](docs/personal-windows-installation.md)
+zawiera klienta i lokalne API; LocalDB jest osobną zależnością (wariant online przy jego braku).
+[Wyniki i ograniczenia prób](docs/releases/personal-0.1.1-preview.md).
 [Kreator pierwszego uruchomienia Personal (etap 2)](docs/personal-first-run.md)
 tworzy własną instalację, administratora i pierwszą firmę z Avalonia.
 [Uruchamianie Personal jednym kliknięciem (ADR-039)](docs/personal-running.md):

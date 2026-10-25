@@ -3,6 +3,10 @@
 Data: 2026-10-24. Status: przyjęty w zakresie jawnego zlecenia użytkownika.
 Wymagania ORG-003/004/008, T-012; uzupełnienie ADR-015/033.
 
+Wyjątek początkowy Personal 0.1.1-preview opisuje [ADR-041](ADR-041-personal-ustawienia-poczatkowe.md):
+nowa instalacja ma złożoność wyłączoną, minimum 1 i niezależne klasy false.
+Network zachowuje poniższe domyślne wartości; wspólny walidator i ekran nie zmieniają zasad.
+
 Jedna konfiguracja security.PasswordPolicy w System, początkowo włączona,
 minimum 12 i cztery klasy znaków. Wyłączenie znosi długość i złożoność, ale
 nigdy nie dopuszcza pustego hasła. Nie zmienia hashowania, blokad i sesji.

@@ -59,7 +59,7 @@ public sealed class PersonalLifecycleTests
     }
 
     [PersonalLocalDbFact]
-    public async Task MissingLocalDbUtilityReportsSafeErrorAndRetryKeepsTheSameInstallation()
+    public async Task InstalledLocalDbIsFoundWithoutPathAndRetryKeepsTheSameInstallation()
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException();
         var root = PersonalSetupTests.NewRoot(); var originalPath = Environment.GetEnvironmentVariable("PATH");
@@ -67,8 +67,8 @@ public sealed class PersonalLifecycleTests
         {
             Environment.SetEnvironmentVariable("PATH", Path.Combine(root, "unavailable-localdb-tool"));
             using var backend = new PersonalBackend(root);
-            var failed = await backend.Send(new()); Assert.False(failed.Success); Assert.Contains("Nie znaleziono SQL Server 2025 LocalDB", failed.Message);
-            Assert.DoesNotContain("SqlException", failed.Message); Assert.False(failed.Complete);
+            var status = await backend.Send(new()); Assert.True(status.Success, status.Message); Assert.Contains("17.", status.Message);
+            Assert.False(status.Complete);
         }
         finally { Environment.SetEnvironmentVariable("PATH", originalPath); }
         var before = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, "installation.json")));

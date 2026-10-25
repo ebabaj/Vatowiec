@@ -15,13 +15,14 @@
         <TextBlock Text="Login" /><TextBox x:Name="SetupLogin" AutomationProperties.AutomationId="PersonalSetupLogin" MaxLength="128" />
         <TextBlock Text="Hasło" /><TextBox x:Name="SetupPassword" AutomationProperties.AutomationId="PersonalSetupPassword" PasswordChar="●" />
         <TextBlock Text="Powtórz hasło" /><TextBox x:Name="SetupPasswordConfirmation" AutomationProperties.AutomationId="PersonalSetupPasswordConfirmation" PasswordChar="●" />
-        <TextBlock Text="Co najmniej 12 znaków, wielka i mała litera, cyfra oraz znak specjalny. Hasło nie zostanie zapisane w plikach." TextWrapping="Wrap" FontSize="12" />
+        <TextBlock Text="Hasło nie może być puste. W nowej instalacji złożoność, historia i ważność haseł są wyłączone. Administrator może je później włączyć w Polityce haseł. Hasło nie zostanie zapisane w plikach." TextWrapping="Wrap" FontSize="12" />
         <TextBlock Text="Pierwsza firma" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
         <TextBlock Text="Nazwa firmy" /><TextBox x:Name="SetupCompany" AutomationProperties.AutomationId="PersonalSetupCompany" MaxLength="256" />
         <TextBlock Text="NIP (opcjonalny, 10 cyfr)" /><TextBox x:Name="SetupNip" AutomationProperties.AutomationId="PersonalSetupNip" MaxLength="10" />
         <TextBlock Text="Administrator otrzyma wszystkie uprawnienia do tej firmy, w tym do PESEL. Dostęp można później zmienić w ustawieniach użytkowników." TextWrapping="Wrap" FontSize="12" />
         <Button x:Name="InitializePersonal" AutomationProperties.AutomationId="InitializePersonal" Content="Przygotuj instalację" Click="InitializeClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
       </StackPanel>
+      <TextBlock Text="Nowa instalacja: MF i VIES korzystają z rzeczywistych usług PRODUKCJA (w tym MF WL2). GUS pozostaje w TEST. Zapytania są wykonywane wyłącznie na Twoje żądanie; kreator nie odpytuje rejestrów. W nowej firmie aktywny jest tylko PLN, bez pobierania kursów NBP." TextWrapping="Wrap" FontSize="12" AutomationProperties.AutomationId="PersonalDefaultsNotice" />
       <Button x:Name="OpenPersonalLogin" AutomationProperties.AutomationId="OpenPersonalLogin" Content="Przejdź do logowania" IsVisible="False" Click="LoginClick" />
       <Button x:Name="RetryPersonalCheck" Content="Sprawdź ponownie" IsVisible="False" Click="RetryClick" />
       <TextBlock Text="Przerwaną konfigurację można wznowić po ponownym uruchomieniu. Kreator nie resetuje danych ani nie instaluje dodatkowych programów." TextWrapping="Wrap" FontSize="12" />

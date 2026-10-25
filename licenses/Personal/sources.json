@@ -1,0 +1,112 @@
+﻿{
+    "Microsoft.Identity.Client.Broker/4.84.2":  {
+                                                    "source":  "https://raw.githubusercontent.com/AzureAD/microsoft-authentication-library-for-dotnet/bad7cae331c1d9e699ca2150a5fecb108ea54916/LICENSE",
+                                                    "file":  "AzureAD-microsoft-authentication-library-for-dotnet-bad7cae331c1d9e699ca2150a5fecb108ea54916.txt",
+                                                    "sha256":  "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+                                                },
+    "Microsoft.EntityFrameworkCore/10.0.13":  {
+                                                  "source":  "https://raw.githubusercontent.com/dotnet/dotnet/4099f83977f4d29604a9aeb971fb0a7bc1d5f699/LICENSE.TXT",
+                                                  "file":  "dotnet-dotnet-4099f83977f4d29604a9aeb971fb0a7bc1d5f699.txt",
+                                                  "sha256":  "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+                                              },
+    "Microsoft.IdentityModel.Protocols/7.7.1":  {
+                                                    "source":  "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/e65fcb2b0eb679a6eed0f8731a9d21a8e8d2dd5b/LICENSE.txt",
+                                                    "file":  "AzureAD-azure-activedirectory-identitymodel-extensions-for-dotnet-e65fcb2b0eb679a6eed0f8731a9d21a8e8d2dd5b.txt",
+                                                    "sha256":  "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
+                                                },
+    "Microsoft.Identity.Client/4.84.2":  {
+                                             "source":  "https://raw.githubusercontent.com/AzureAD/microsoft-authentication-library-for-dotnet/bad7cae331c1d9e699ca2150a5fecb108ea54916/LICENSE",
+                                             "file":  "AzureAD-microsoft-authentication-library-for-dotnet-bad7cae331c1d9e699ca2150a5fecb108ea54916.txt",
+                                             "sha256":  "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+                                         },
+    "Microsoft.Identity.Client.Extensions.Msal/4.78.0":  {
+                                                             "source":  "https://raw.githubusercontent.com/AzureAD/microsoft-authentication-library-for-dotnet/d6f9310e2f1073ad2db8ca3bf39827b9bcf26e06/LICENSE",
+                                                             "file":  "AzureAD-microsoft-authentication-library-for-dotnet-d6f9310e2f1073ad2db8ca3bf39827b9bcf26e06.txt",
+                                                             "sha256":  "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+                                                         },
+    "Microsoft.IdentityModel.Tokens/7.7.1":  {
+                                                 "source":  "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/e65fcb2b0eb679a6eed0f8731a9d21a8e8d2dd5b/LICENSE.txt",
+                                                 "file":  "AzureAD-azure-activedirectory-identitymodel-extensions-for-dotnet-e65fcb2b0eb679a6eed0f8731a9d21a8e8d2dd5b.txt",
+                                                 "sha256":  "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
+                                             },
+    "Microsoft.IdentityModel.Abstractions/8.14.0":  {
+                                                        "source":  "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/c8f7d87bcda35557a68f6cb9c55856a2ee733856/LICENSE.txt",
+                                                        "file":  "AzureAD-azure-activedirectory-identitymodel-extensions-for-dotnet-c8f7d87bcda35557a68f6cb9c55856a2ee733856.txt",
+                                                        "sha256":  "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
+                                                    },
+    "IbanNet/6.2.0":  {
+                          "source":  "https://github.com/skwasjer/IbanNet/tree/4c46768a0697aebaefd3afd73677ab3c0b158c3e",
+                          "file":  "../IbanNet/LICENSE.md",
+                          "sha256":  "3d60fefd7b68db4a2517bf551b0944a2770ac92cf12cc087afe7c0bbd7656fee"
+                      },
+    "System.ClientModel/1.8.0":  {
+                                     "source":  "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/033d7cea151a65b3c11037021403787d7e6e01a3/LICENSE.txt",
+                                     "file":  "Azure-azure-sdk-for-net-033d7cea151a65b3c11037021403787d7e6e01a3.txt",
+                                     "sha256":  "9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa"
+                                 },
+    "System.IdentityModel.Tokens.Jwt/7.7.1":  {
+                                                  "source":  "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/e65fcb2b0eb679a6eed0f8731a9d21a8e8d2dd5b/LICENSE.txt",
+                                                  "file":  "AzureAD-azure-activedirectory-identitymodel-extensions-for-dotnet-e65fcb2b0eb679a6eed0f8731a9d21a8e8d2dd5b.txt",
+                                                  "sha256":  "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
+                                              },
+    "Microsoft.Data.SqlClient/6.1.7":  {
+                                           "source":  "https://raw.githubusercontent.com/dotnet/sqlclient/efca28cabb8d13fe0b0afd277bf6ff66eb8231e5/LICENSE",
+                                           "file":  "dotnet-sqlclient-efca28cabb8d13fe0b0afd277bf6ff66eb8231e5.txt",
+                                           "sha256":  "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34"
+                                       },
+    "Microsoft.OpenApi/2.12.2":  {
+                                     "source":  "https://raw.githubusercontent.com/Microsoft/OpenAPI.NET/a24aac560adbf013ff5aa63a873e5a7babce38d2/LICENSE",
+                                     "file":  "Microsoft-OpenAPI.NET-a24aac560adbf013ff5aa63a873e5a7babce38d2.txt",
+                                     "sha256":  "5d177f23ecfeb0ea8e050b6a5a16355e1ae9a0b286436ca8f83ed08b3795be6b"
+                                 },
+    "Microsoft.EntityFrameworkCore.Relational/10.0.13":  {
+                                                             "source":  "https://raw.githubusercontent.com/dotnet/dotnet/4099f83977f4d29604a9aeb971fb0a7bc1d5f699/LICENSE.TXT",
+                                                             "file":  "dotnet-dotnet-4099f83977f4d29604a9aeb971fb0a7bc1d5f699.txt",
+                                                             "sha256":  "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+                                                         },
+    "Microsoft.EntityFrameworkCore.Analyzers/10.0.13":  {
+                                                            "source":  "https://raw.githubusercontent.com/dotnet/dotnet/4099f83977f4d29604a9aeb971fb0a7bc1d5f699/LICENSE.TXT",
+                                                            "file":  "dotnet-dotnet-4099f83977f4d29604a9aeb971fb0a7bc1d5f699.txt",
+                                                            "sha256":  "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+                                                        },
+    "Azure.Identity/1.17.1":  {
+                                  "source":  "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/f6aaf7f37262151b1df40b79d1a64dacc7c98021/LICENSE.txt",
+                                  "file":  "Azure-azure-sdk-for-net-f6aaf7f37262151b1df40b79d1a64dacc7c98021.txt",
+                                  "sha256":  "9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa"
+                              },
+    "Microsoft.EntityFrameworkCore.SqlServer/10.0.13":  {
+                                                            "source":  "https://raw.githubusercontent.com/dotnet/dotnet/4099f83977f4d29604a9aeb971fb0a7bc1d5f699/LICENSE.TXT",
+                                                            "file":  "dotnet-dotnet-4099f83977f4d29604a9aeb971fb0a7bc1d5f699.txt",
+                                                            "sha256":  "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+                                                        },
+    "Microsoft.IdentityModel.Protocols.OpenIdConnect/7.7.1":  {
+                                                                  "source":  "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/e65fcb2b0eb679a6eed0f8731a9d21a8e8d2dd5b/LICENSE.txt",
+                                                                  "file":  "AzureAD-azure-activedirectory-identitymodel-extensions-for-dotnet-e65fcb2b0eb679a6eed0f8731a9d21a8e8d2dd5b.txt",
+                                                                  "sha256":  "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
+                                                              },
+    "Azure.Core/1.50.0":  {
+                              "source":  "https://raw.githubusercontent.com/Azure/azure-sdk-for-net/724366b17b92e657d2136d470077c769e89818c7/LICENSE.txt",
+                              "file":  "Azure-azure-sdk-for-net-724366b17b92e657d2136d470077c769e89818c7.txt",
+                              "sha256":  "9b45236978bb5cd5de992021769e1eeaa79f0116d3b02cf8ba065a1ed603d5fa"
+                          },
+    "Microsoft.EntityFrameworkCore.Abstractions/10.0.13":  {
+                                                               "source":  "https://raw.githubusercontent.com/dotnet/dotnet/4099f83977f4d29604a9aeb971fb0a7bc1d5f699/LICENSE.TXT",
+                                                               "file":  "dotnet-dotnet-4099f83977f4d29604a9aeb971fb0a7bc1d5f699.txt",
+                                                               "sha256":  "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+                                                           },
+    "Microsoft.SqlServer.Server/1.0.0":  {
+                                             "source":  "https://raw.githubusercontent.com/dotnet/sqlclient/efca28cabb8d13fe0b0afd277bf6ff66eb8231e5/LICENSE",
+                                             "file":  "dotnet-sqlclient-efca28cabb8d13fe0b0afd277bf6ff66eb8231e5.txt",
+                                             "sha256":  "9fa73cb72fb654d029c9214f0e3eec32c301a0c23be71b50fe3910e61553fa34"
+                                         },
+    "Microsoft.IdentityModel.JsonWebTokens/7.7.1":  {
+                                                        "source":  "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/e65fcb2b0eb679a6eed0f8731a9d21a8e8d2dd5b/LICENSE.txt",
+                                                        "file":  "AzureAD-azure-activedirectory-identitymodel-extensions-for-dotnet-e65fcb2b0eb679a6eed0f8731a9d21a8e8d2dd5b.txt",
+                                                        "sha256":  "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
+                                                    },
+    "Microsoft.IdentityModel.Logging/7.7.1":  {
+                                                  "source":  "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/e65fcb2b0eb679a6eed0f8731a9d21a8e8d2dd5b/LICENSE.txt",
+                                                  "file":  "AzureAD-azure-activedirectory-identitymodel-extensions-for-dotnet-e65fcb2b0eb679a6eed0f8731a9d21a8e8d2dd5b.txt",
+                                                  "sha256":  "cba03f5387b05405e56b688376421acae396136af4b5116738dc6e5160f87ddd"
+                                              }
+}

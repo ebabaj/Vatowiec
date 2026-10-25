@@ -28,7 +28,6 @@ public sealed class PersonalSetupTests
 
     [Theory]
     [InlineData("", "Firma", null)]
-    [InlineData("short", "Firma", null)]
     [InlineData("Fictional-Setup-42!", "", null)]
     [InlineData("Fictional-Setup-42!", "Firma", "1234567890")]
     public void InvalidInputNeverReachesProvisioning(string password, string company, string? nip)
@@ -77,7 +76,7 @@ public sealed class PersonalSetupTests
         {
             var status = await backend.Send(new()); Assert.True(status.Success, status.Message); Assert.False(status.Complete);
             Assert.Equal("Firma fikcyjna kreatora", status.CompanyName);
-            var wrong = Input("short"); var failed = await backend.Send(wrong); Assert.False(failed.Success); Assert.Contains("12", failed.Message); Assert.Null(wrong.Password);
+            var wrong = Input(""); var failed = await backend.Send(wrong); Assert.False(failed.Success); Assert.Contains("puste", failed.Message); Assert.Null(wrong.Password);
             wrong = Input(); wrong.Nip = "1234567890"; failed = await backend.Send(wrong); Assert.False(failed.Success); Assert.Contains("NIP", failed.Message);
             status = await backend.Send(Input(), x => checks.Add(x.Stage)); Assert.True(status.Success, status.Message); Assert.True(status.Complete);
             Assert.Contains("committed", checks);

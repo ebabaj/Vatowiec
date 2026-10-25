@@ -30,6 +30,24 @@ potwierdzona gotowość, obsługa awarii i łagodne zatrzymanie API/LocalDB. Pre
 i Credential Manager wiążą się ze stałym InstallationId i UserId, nie z losowym
 kanałem. [Uruchamianie i wyniki](docs/personal-running.md).
 
+ADR-040 (E15): osobny instalator Personal per-user, Desktop i API Release win-x64
+self-contained. Prywatny Named Pipe, LocalDB 17.x wykrywany bez zależności od PATH.
+Przy braku LocalDB wariant online z weryfikowanym instalatorem Microsoftu i osobną
+zgodą; MSI nie jest dołączony ze względu na zweryfikowany błąd licencji CTP.
+Aktualizacja/deinstalacja zachowują bazy, klucze, preferencje i WCM; nie migrują baz.
+Niezgodna historia migracji System/firmy oznacza odmowę bez resetu.
+[Instrukcja i granice](docs/personal-windows-installation.md),
+[raport](docs/releases/personal-0.1.0-preview.md). Nie oznacza zakończenia E15.
+
+ADR-041 (ORG-003/004/007/008/009/011, DOC-006): nowe Personal 0.1.1-preview ma
+złożoność/historię/ważność haseł wyłączone, minimum 1 i puste hasło niedozwolone;
+MF/WL2 i VIES Production, GUS Test; nowa firma ma pełne 149 walut, aktywny tylko
+PLN, wszystkie flagi NBP false. Jawny provisioning z audytem/checkpointami,
+bez zmiany seedów Network i nadpisywania zakończonych instalacji. Bootstrap 0.1.0
+może wznowić wyłącznie potwierdzone, niezmienione dane początkowe.
+[Decyzja](docs/adr/ADR-041-personal-ustawienia-poczatkowe.md),
+[wyniki 0.1.1](docs/releases/personal-0.1.1-preview.md).
+
 ADR-036: lokalny instalator klienta Windows `0.1.0-preview`, per-user, self-contained
 Release win-x64, bez API, SQL i migracji. Aktualizacja i odinstalowanie zachowują
 preferencje oraz Windows Credential Manager. HTTPS i izolacja tożsamości pozostają

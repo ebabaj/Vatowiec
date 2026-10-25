@@ -36,6 +36,7 @@ public sealed class PersonalBackend : IPersonalBackend
     {
         foreach (var relative in new[] { "Server/Vatowiec.Api.exe", "Vatowiec.Api.exe" })
         { var candidate = Path.Combine(AppContext.BaseDirectory, relative); if (File.Exists(candidate)) return candidate; }
+#if DEBUG
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory != null; directory = directory.Parent)
             if (File.Exists(Path.Combine(directory.FullName, "AGENTS.md")))
             {
@@ -43,6 +44,7 @@ public sealed class PersonalBackend : IPersonalBackend
                 if (File.Exists(api)) return api;
                 break;
             }
+#endif
         throw new InvalidOperationException("Nie znaleziono lokalnego serwera VATowiec Personal. Sprawdź kompletność instalacji.");
     }
     private async Task Start()

@@ -31,20 +31,21 @@ internal static class PersonalSetupUiVerification
                 Capture(wizard);
                 Find<TextBox>(wizard, "PersonalSetupLogin").Text = "wizard.ui.fixture";
                 Find<TextBox>(wizard, "PersonalSetupCompany").Text = "Fikcyjna firma z kreatora Avalonia";
-                Find<TextBox>(wizard, "PersonalSetupPassword").Text = "short";
-                Find<TextBox>(wizard, "PersonalSetupPasswordConfirmation").Text = "short";
+                Assert.Contains("PRODUKCJA", Find<TextBlock>(wizard, "PersonalDefaultsNotice").Text);
+                Find<TextBox>(wizard, "PersonalSetupPassword").Text = "";
+                Find<TextBox>(wizard, "PersonalSetupPasswordConfirmation").Text = "";
                 Click(wizard, "InitializePersonal");
-                await Wait(() => Find<TextBlock>(wizard, "PersonalSetupStatus").Text!.Contains("12"));
+                await Wait(() => Find<TextBlock>(wizard, "PersonalSetupStatus").Text!.Contains("niepuste"));
                 Assert.Empty(Find<TextBox>(wizard, "PersonalSetupPassword").Text!);
                 Assert.Empty(Find<TextBox>(wizard, "PersonalSetupPasswordConfirmation").Text!);
-                Find<TextBox>(wizard, "PersonalSetupPassword").Text = "Fictional-Ui-Setup-42!";
-                Find<TextBox>(wizard, "PersonalSetupPasswordConfirmation").Text = "Fictional-Ui-Setup-42!";
+                Find<TextBox>(wizard, "PersonalSetupPassword").Text = "a";
+                Find<TextBox>(wizard, "PersonalSetupPasswordConfirmation").Text = "a";
                 Find<TextBox>(wizard, "PersonalSetupNip").Text = "1234567890";
                 Click(wizard, "InitializePersonal");
                 await Wait(() => Find<TextBlock>(wizard, "PersonalSetupStatus").Text!.Contains("NIP"));
                 Find<TextBox>(wizard, "PersonalSetupNip").Text = "";
-                Find<TextBox>(wizard, "PersonalSetupPassword").Text = "Fictional-Ui-Setup-42!";
-                Find<TextBox>(wizard, "PersonalSetupPasswordConfirmation").Text = "Fictional-Ui-Setup-42!";
+                Find<TextBox>(wizard, "PersonalSetupPassword").Text = "a";
+                Find<TextBox>(wizard, "PersonalSetupPasswordConfirmation").Text = "a";
                 Click(wizard, "InitializePersonal");
                 await Wait(() => Find<Button>(wizard, "OpenPersonalLogin").IsEffectivelyVisible && Find<Button>(wizard, "OpenPersonalLogin").IsEffectivelyEnabled);
                 Assert.Empty(Find<TextBox>(wizard, "PersonalSetupPassword").Text!);
@@ -53,7 +54,7 @@ internal static class PersonalSetupUiVerification
                 var model = (MainViewModel)login!.DataContext!;
                 Assert.True(PersonalApiIdentity.TryParse(model.ApiAddress, out _));
                 Find<TextBox>(login, "Login").Text = "wizard.ui.fixture";
-                Find<TextBox>(login, "Password").Text = "Fictional-Ui-Setup-42!";
+                Find<TextBox>(login, "Password").Text = "a";
                 Click(login, "LoginButton");
                 await Wait(() => model.IsCompanySelection && !model.IsBusy);
                 Assert.True(model.IsInstallationAdministrator);
@@ -77,7 +78,7 @@ internal static class PersonalSetupUiVerification
                 var model = (MainViewModel)login!.DataContext!;
                 Assert.True(model.IsLogin); // No saved password or automatic login was created by the wizard.
                 Find<TextBox>(login, "Login").Text = "wizard.ui.fixture";
-                Find<TextBox>(login, "Password").Text = "Fictional-Ui-Setup-42!";
+                Find<TextBox>(login, "Password").Text = "a";
                 Click(login, "LoginButton");
                 await Wait(() => !model.IsLogin && !model.IsBusy);
                 Assert.Single(model.Companies);
