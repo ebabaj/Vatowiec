@@ -1,0 +1,19 @@
+{
+  "github.copilot.chat.commitMessageGeneration.instructions": [
+    {
+      "text": "Tytuł i treść commita pisz wyłącznie po polsku."
+    },
+    {
+      "text": "Tytuł rozpoczynaj od właściwego numeru ADR, np. ADR-042: konfiguracja kolejności i szerokości kolumn. Numer ustalaj na podstawie rzeczywistych zmian i dokumentacji projektu, w szczególności docs/adr/ oraz SPECYFIKACJA.md. Podany przykład nie oznacza stałego przypisania do ADR-042."
+    },
+    {
+      "text": "Jeśli nie można jednoznacznie ustalić właściwego ADR, nie wymyślaj numeru i wygeneruj polski tytuł bez numeru ADR."
+    },
+    {
+      "text": "Generuj zwięzły opis konkretnych, rzeczywiście wprowadzonych zmian. Unikaj ogólników typu Update files lub Refactor features."
+    },
+    {
+      "text": "Nie dodawaj niepotrzebnych angielskich podsumowań ani tłumaczeń opisu na angielski."
+    }
+  ]
+}
