@@ -49,7 +49,7 @@ public partial class MainWindow : Window
         Closing += (_, e) =>
         {
             if (confirmedClose) return;
-            if (model.IsBusy) { e.Cancel = true; return; }
+            if (model.IsBusy || model.IsTableLayoutSaving) { e.Cancel = true; return; }
             if (!model.HasUnsavedChanges) return;
             e.Cancel = true;
             model.RequestDiscard(() => { confirmedClose = true; Close(); });
@@ -159,6 +159,19 @@ public partial class MainWindow : Window
     private async void ContractorColumnsClick(object? sender, RoutedEventArgs e) => await model.OpenColumnSettings("Contractors");
     private async void CurrencyColumnsClick(object? sender, RoutedEventArgs e) => await model.OpenColumnSettings("Currencies");
     private async void RateColumnsClick(object? sender, RoutedEventArgs e) => await model.OpenColumnSettings("CurrencyRates");
+    private void TableLayoutPreview(object? sender, ColumnLayoutEventArgs e)
+    {
+        if (sender is ConfigurableTable table && e.Width.HasValue) model.PreviewColumnWidth(table.TableId, e.ColumnId, e.Width.Value);
+    }
+    private async void TableLayoutCommitted(object? sender, ColumnLayoutEventArgs e)
+    {
+        if (sender is ConfigurableTable table) await model.ChangeTableLayout(table.TableId, e.ColumnId, e.BeforeColumnId, e.Width);
+    }
+    private void ColumnUpClick(object? sender, RoutedEventArgs e) { if (sender is Control { DataContext: ColumnChoice choice }) model.MoveColumnChoice(choice, -1); }
+    private void ColumnDownClick(object? sender, RoutedEventArgs e) { if (sender is Control { DataContext: ColumnChoice choice }) model.MoveColumnChoice(choice, 1); }
+    private async void RetryTableLayoutClick(object? sender, RoutedEventArgs e) => await model.RetryTableLayoutSave();
+    private async void AcceptTableLayoutConflictClick(object? sender, RoutedEventArgs e) => await model.RetryTableLayoutSave(true);
+    private async void ReloadTableLayoutClick(object? sender, RoutedEventArgs e) => await model.ReloadSavedTableLayouts();
     private async void SaveMyColumnsClick(object? sender, RoutedEventArgs e) => await model.SaveColumns();
     private async void ResetMyColumnsClick(object? sender, RoutedEventArgs e) => await model.SaveColumns(reset: true);
     private async void SaveInstallationColumnsClick(object? sender, RoutedEventArgs e) => await model.SaveColumns(installation: true);

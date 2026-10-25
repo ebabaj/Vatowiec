@@ -7,6 +7,7 @@ public sealed class TableView
     // Empty means installation default; all other values are immutable Identity UserIds.
     public Guid OwnerId { get; set; }
     public string TableId { get; set; } = "";
+    // Legacy visible-ID array or version-2 layout (visibility, order and logical widths).
     public string? ColumnsJson { get; set; }
     public int? PageSize { get; set; }
     public byte[] RowVersion { get; set; } = [];

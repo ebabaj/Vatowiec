@@ -125,5 +125,47 @@ korzystać z fabrycznego widoku podczas kontrolowanego wdrożenia, lecz zapis
 preferencji wymaga migracji System. Procedura jawnego wdrożenia i testy:
 [interfejs i widoki tabel](../table-views.md).
 
-Nie implementujemy szerokości, zmiany kolejności, przeciągania kolumn, pesymistycznych
-blokad, faktur ani instalatora. Nie deklarujemy ukończenia M0 ani gotowości produkcyjnej.
+Nie implementujemy nowych mechanizmów sortowania, pesymistycznych blokad,
+faktur ani instalatora. Nie deklarujemy ukończenia M0 ani gotowości produkcyjnej.
+
+## Rozszerzenie: kolejność i szerokości kolumn — 2026-10-25
+
+REP-004: wspólny nagłówek obsługuje przeciąganie z oznaczeniem miejsca docelowego
+oraz zmianę szerokości przez prawą granicę. Zmiana szerokości jest podglądem na
+żywo w nagłówku i danych; zapis następuje dopiero po puszczeniu myszy.
+Konfigurator ma też W górę/W dół i pole szerokości. Nie zmienia to kolorów,
+fontów, wysokości, checkboxów walut ani stałego obszaru zębatki.
+
+`TableViewRequest/Response` otrzymują opcjonalne `ColumnOrder` i `ColumnWidths`.
+Kolejność zawiera także kolumny ukryte. Szerokość oznacza całą komórkę wraz
+z dotychczasowymi marginesami: 64–1200 DIP, fabrycznie 166 albo 266 dla Name
+i ParentName. Dane księgowe nadal używają decimal; double dotyczy wyłącznie
+wymiaru UI. Nowe dozwolone kolumny są dopisywane na końcu w porządku katalogu
+i dostają szerokość fabryczną. Nie stają się automatycznie widoczne we własnym
+widoku. Usunięte/niedostępne pola są odfiltrowane z widoczności, kolejności
+i szerokości; jawny zapis niedozwolonych identyfikatorów jest odrzucany.
+
+Nie zmieniamy schematu ani snapshotów EF. Istniejące ColumnsJson jest już
+nvarchar(max); 4096 pozostaje limitem rozmiaru zapisu. Odczyt akceptuje dawną
+tablicę identyfikatorów (kolejność i szerokości fabryczne) oraz obiekt Version=2
+z VisibleColumns, ColumnOrder i ColumnWidths. Zastane rekordy nie są przepisywane
+hurtowo; konwersja następuje przy zapisie ich układu. Starszy zapis samej
+widoczności zachowuje nowe ustawienia kolejności/szerokości. Wdrożenie wymaga
+aktualnego API przed klientem; powrót do starego API, które rozumie tylko tablice,
+wymaga uprzedniego przywrócenia kompatybilnego formatu lub odpowiedniej wersji API.
+
+Cały układ podlega istniejącej hierarchii użytkownik → instalacja → fabryka.
+Samo PageSize nadal nie przypina układu administratora. Pierwszy gest tworzy
+własny układ na podstawie aktualnie widzianego widoku. Globalny zapis jest
+atomowy z audytem pełnego JSON; obie operacje resetu zachowują dawne zakresy.
+Role, CompanyAccess, sesja, CSRF i RowVersion są sprawdzane jak dotychczas.
+
+Klient szereguje zapisy i scala nowsze zakończone gesty oczekujące na poprzedni
+zapis. Odpowiedź poprzedniego zapisu nie zastępuje nowszego podglądu; dostarcza
+mu jedynie aktualną wersję. Nie pobieramy ponownie rekordów po kolejności lub
+szerokości. Błąd pozostawia oznaczony, niezapisany szkic i przycisk ponowienia.
+409 powoduje odczyt i porównanie obu układów, także pól ukrytych; dopiero osobna
+decyzja zapisuje szkic z aktualną wersją. Można zamiast tego wczytać zapisany
+układ. Niezapisany szkic obejmuje dotychczasowa ochrona przed jego porzuceniem.
+
+Dowody i instrukcja ręczna: [widoki tabel](../table-views.md#kolejność-i-szerokości-kolumn).

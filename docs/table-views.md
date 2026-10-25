@@ -64,7 +64,7 @@ identyfikatorami API i zapisanych konfiguracji.
    zapisuje go osobnym przyciskiem „Zapisz jako domyślny dla wszystkich”.
 3. Fabryczne kolumny kontrahenta: Kod, Nazwa kontrahenta, NIP, Kraj, Status, Miasto.
 
-„Resetuj mój widok” usuwa własne kolumny i rozmiar strony tej tabeli, odsłaniając
+„Resetuj mój widok” usuwa własną widoczność, kolejność, szerokości i rozmiar strony tej tabeli, odsłaniając
 domyślny widok instalacji (lub fabryczny). „Resetuj domyślny widok instalacji”
 usuwa tylko konfigurację globalną. Administrator może mieć własny widok; zapis
 globalny nie zastępuje go. Sam zapis rozmiaru strony nie tworzy własnej kopii
@@ -273,7 +273,8 @@ wiązania, kontrolę uprawnień i potwierdzenie zapisu.
 
 Wspólny katalog polskich etykiet `TableDisplayNames` działa wyłącznie w Desktop.
 Nie zmieniono identyfikatorów tabel, API, baz, zapisu preferencji ani układu zębatki.
-Nie dodano sortowania, przeciągania, kolejności ani ustawień szerokości kolumn.
+W tamtej korekcie nie dodawano sortowania, przeciągania, kolejności ani ustawień
+szerokości kolumn; kolejny etap opisano poniżej.
 
 Weryfikacja: nowy natywny `TableAppearanceUiTests` na atrapie API Network przy
 900/1200 px, wszystkie trzy tytuły, style nagłówków/wierszy/zaznaczenia, zapis
@@ -283,3 +284,70 @@ Osobno: 7 testów nazw i operacji zbiorczych oraz natywny test administracji.
 Nie powtarzano wcześniejszych 72 pomiarów pozycjonowania zębatki. Nie uruchamiano
 Personal ani testów SQL. TRX i obrazy:
 `%LOCALAPPDATA%/Vatowiec/Verification/ADR-042/table-appearance`.
+
+## Kolejność i szerokości kolumn
+
+Nagłówki Kontrahentów, Walut i Kursów walut można przeciągać myszą. Niebieska
+linia wskazuje miejsce wstawienia. Przeciągnięcie prawej granicy zmienia wyłącznie
+jedną kolumnę; kursor przy granicy zmienia się na poziomą strzałkę rozmiaru.
+Szerokości są w jednostkach logicznych Avalonia (DIP), 64–1200. Fabryczne 166/266
+zawierają dotychczasowe marginesy tekstu. Nagłówek i dane zmieniają się razem,
+również po przewinięciu poziomym. Zębatka pozostaje nieruchoma po prawej.
+
+Po puszczeniu myszy następuje automatyczny zapis własnych preferencji do System
+przez API. Status „Zapisywanie…” nie jest potwierdzeniem zapisu. Kolejne szybkie
+gesty są szeregowane i mogą być scalane do najnowszego oczekującego układu.
+Sama kolejność/szerokość nie pobiera ponownie rekordów. Zmiana widoczności nadal
+odświeża wyszukiwanie po właściwych polach. Ukrycie pola zachowuje jego miejsce
+i szerokość. W konfiguratorze W górę/W dół i pole szerokości zmieniają szkic,
+zatwierdzany istniejącym przyciskiem zapisu własnego lub domyślnego widoku.
+
+Błąd pozostawia komunikat „Nie zapisano…” i szkic w pamięci. Ponów zapis albo
+wczytaj zapisany układ. Przy konflikcie dwóch stanowisk porównaj pokazane układy
+i dopiero wybierz „Zapisz mój układ po porównaniu”; serwer ponownie sprawdzi wersję.
+Nie ma cichego nadpisania ani mechanizmu force. Zamykanie/nawigacja chronią
+niezapisane zmiany; podczas trwającego zapisu zamknięcie jest odłożone.
+
+Przechowywanie jest nadal wspólne dla firm i komputerów w instalacji, osobne
+dla UserId i TableId. Sam rozmiar strony nie tworzy własnego układu. Układ
+użytkownika ma pierwszeństwo przed pełnym układem administratora; resety są
+niezależne. Stary ColumnsJson, np. `["Code","Name"]`, działa bez konwersji bazy.
+Przy zapisie układu używany jest obiekt JSON Version=2. Nie potrzeba nowej migracji.
+
+### Ręczne sprawdzenie zapisu
+
+1. Zaloguj się, otwórz Kontrahentów. Przeciągnij Nazwę przed Kod i zwolnij mysz
+   przy linii docelowej. Sprawdź od razu tę samą kolejność nagłówków i danych.
+2. Chwyć prawą granicę Nazwy, poszerz ją i puść mysz. Pozostałe szerokości mają
+   zostać bez zmian. Poczekaj na „Zapisano układ tabeli”.
+3. Otwórz inną kartotekę i wróć, następnie zamknij klienta i uruchom ponownie.
+   Zaloguj tę samą osobę, także w drugiej firmie: układ powinien być odtworzony.
+4. Ukryj pole w konfiguratorze, zapisz, ponownie je pokaż: miejsce i szerokość
+   powinny pozostać. Sprawdź W górę/W dół także dla ukrytej kolumny.
+5. Na drugim stanowisku wczytaj ten sam układ. Zmień go w pierwszym, potem
+   w drugim bez odświeżania: drugi zapis ma pokazać konflikt i wymagać porównania.
+6. Powtórz dla Walut i Kursów. W Walutach sprawdź checkboxy, zaznaczanie wielu
+   pozycji i operacje zbiorcze. Sprawdź 900/1200 px i maksymalizację.
+7. Administrator: zapisz domyślny układ; sprawdź go na osobie bez własnego widoku.
+   Osoba z własnym widokiem zachowuje swój. Sprawdź oddzielnie oba resety.
+
+### Wyniki tego etapu
+
+- Debug solution: 0 błędów, 0 ostrzeżeń.
+- Łącznie 28 różnych zaliczonych przypadków; powtórzeń prób naprawczych nie doliczano.
+- Testy modelu/kontraktu: zgodność obu formatów, domyślne wartości, ukryte/nowe
+  i niedostępne pola, kolejka szybkich zmian, błędy/ponowienie/konflikt, odmowy
+  autoryzacji oraz odtworzenie w nowym kliencie i drugiej firmie.
+- Test API + rzeczywisty istniejący SQLEXPRESS: stary zapis widoczności/strony,
+  dwaj użytkownicy i administrator, dwie firmy, oddzielne tabele, hierarchia,
+  oba resety, CSRF, PESEL, zakresy i duplikaty, stare RowVersion z drugiego
+  stanowiska, restart hosta oraz atomowość układu/audytu przy awarii audytu.
+  Wszystkie zmiany są objęte wycofywaną transakcją; nie powstały nowe bazy/instancje.
+- Natywne Avalonia: rzeczywiste gesty myszy dla trzech tabel przy 900/1200 px
+  i po maksymalizacji, podgląd szerokości bez żądań przy ruchach, jedno żądanie
+  po zakończeniu, znacznik wstawienia, przyciski konfiguratora, wyrównanie komórek,
+  przewijanie w obie strony oraz odtworzenie w nowym oknie z nowym VM.
+- Osobna regresja natywna: istniejący wygląd, polskie nazwy, konfigurator,
+  checkboxy i pełne operacje zbiorcze walut. Nie uruchamiano Personal ani LocalDB.
+- TRX i obrazy: `%LOCALAPPDATA%/Vatowiec/Verification/ADR-042/column-layout`.
+  Nie wykonano osobnej próby Linux ani zmiany DPI Windows.

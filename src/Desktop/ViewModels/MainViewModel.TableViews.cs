@@ -16,6 +16,7 @@ public sealed class ColumnChoice(TableColumn column, bool visible) : INotifyProp
 {
     public TableColumn Column { get; } = column;
     public string Label => Column.Label;
+    public double Width { get; set; } = column.Width ?? TableLayouts.DefaultWidth(column.Id);
     private bool selected = visible;
     public bool IsSelected { get => selected; set { selected = value; PropertyChanged?.Invoke(this, new(nameof(IsSelected))); } }
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -37,14 +38,16 @@ public sealed partial class MainViewModel
     public TableColumn[] ContractorColumns => Visible(ContractorTable);
     public TableColumn[] CurrencyColumns => Visible(CurrencyTable);
     public TableColumn[] RateColumns => Visible(RateTable);
-    private static TableColumn[] Visible(TableViewResponse view) => view.Columns.Where(c => view.VisibleColumns.Contains(c.Id, StringComparer.Ordinal)).OrderBy(c => c.Order).ToArray();
+    private static TableColumn[] Visible(TableViewResponse view) => TableLayouts.Visible(view);
     public int[] PageSizes => TableCatalog.PageSizes;
     public int PageSize { get => ContractorTable.PageSize; set { if (!busy && value != PageSize && TableCatalog.PageSizes.Contains(value)) _ = SetContractorPageSize(value); } }
     public Task SetContractorPageSize(int value) => Run(async () =>
     {
         if (!CanBrowse || api == null || profile == null || !TableCatalog.PageSizes.Contains(value)) return;
+        await RequireSavedTableLayouts();
         var response = await api.SaveTableView(profile.CompanyId, "Contractors", new(PageSize: value, RowVersion: ContractorTable.UserVersion), false);
-        tableViews["Contractors"] = response; pageOffset = 0; await LoadPage(0);
+        tableViews["Contractors"] = response; confirmedTableViews["Contractors"] = response;
+        pageOffset = 0; await LoadPage(0);
     });
     private async Task ReadTableViews()
     {
@@ -52,7 +55,12 @@ public sealed partial class MainViewModel
         foreach (var table in new[] { TableCatalog.Contractors, TableCatalog.Currencies, TableCatalog.CurrencyRates })
         {
             if (selectedCompany?.Permissions.Contains(table.ReadPermission, StringComparer.Ordinal) != true) continue;
-            try { tableViews[table.Id] = await api.TableView(profile.CompanyId, table.Id); }
+            try
+            {
+                var view = await api.TableView(profile.CompanyId, table.Id);
+                confirmedTableViews[table.Id] = view;
+                if (!pendingTableLayouts.ContainsKey(table.Id)) tableViews[table.Id] = view;
+            }
             catch (ApiException ex) when (ex.StatusCode == 503)
             {
                 // A controlled rollout may run the new client before the System migration.
@@ -62,7 +70,7 @@ public sealed partial class MainViewModel
             }
         }
     }
-    private void ResetTableViews() { tableViews.Clear(); columnSettingsTable = null; ColumnChoices = []; }
+    private void ResetTableViews() { DiscardPendingTableLayouts(); tableViews.Clear(); confirmedTableViews.Clear(); columnSettingsTable = null; ColumnChoices = []; }
     private string? columnSettingsTable;
     public bool IsColumnSettingsOpen => columnSettingsTable != null;
     public ColumnChoice[] ColumnChoices { get; private set; } = [];
@@ -72,26 +80,42 @@ public sealed partial class MainViewModel
     public Task OpenColumnSettings(string tableId) => Run(async () =>
     {
         if (api == null || profile == null || TableCatalog.Find(tableId) is not { } table || !selectedCompany!.Permissions.Contains(table.ReadPermission)) return;
+        await RequireSavedTableLayouts();
         tableViews[tableId] = await api.TableView(profile.CompanyId, tableId);
+        confirmedTableViews[tableId] = tableViews[tableId];
         columnSettingsTable = tableId; SetColumnChoices();
     });
     private void SetColumnChoices()
     {
         if (columnSettingsTable == null) return;
         var view = View(columnSettingsTable);
-        ColumnChoices = view.Columns.Select(c => new ColumnChoice(c, view.VisibleColumns.Contains(c.Id, StringComparer.Ordinal))).ToArray();
+        var order = view.ColumnOrder ?? view.Columns.OrderBy(c => c.Order).Select(c => c.Id).ToArray();
+        ColumnChoices = order.Where(id => view.Columns.Any(c => c.Id == id)).Select(id => new ColumnChoice(view.Columns.Single(c => c.Id == id), view.VisibleColumns.Contains(id, StringComparer.Ordinal))
+        { Width = view.ColumnWidths?.GetValueOrDefault(id, TableLayouts.DefaultWidth(id)) ?? TableLayouts.DefaultWidth(id) }).ToArray();
+    }
+    public void MoveColumnChoice(ColumnChoice choice, int direction)
+    {
+        if (busy) return;
+        var index = Array.IndexOf(ColumnChoices, choice); var target = index + direction;
+        if (index < 0 || target < 0 || target >= ColumnChoices.Length) return;
+        var items = ColumnChoices.ToArray(); (items[index], items[target]) = (items[target], items[index]);
+        ColumnChoices = items; Changed(nameof(ColumnChoices));
     }
     public void CloseColumnSettings() { if (!busy) { columnSettingsTable = null; ColumnChoices = []; ChangedAll(); } }
     public Task SaveColumns(bool installation = false, bool reset = false) => Run(async () =>
     {
         if (columnSettingsTable == null || api == null || profile == null || installation && !IsInstallationAdministrator) return;
+        await RequireSavedTableLayouts();
         var tableId = columnSettingsTable; var view = View(tableId);
         var selected = ColumnChoices.Where(c => c.IsSelected).Select(c => c.Column.Id).ToArray();
         if (!reset && selected.Length == 0) { message = "Wybierz co najmniej jedną kolumnę."; return; }
-        tableViews[tableId] = await api.SaveTableView(profile.CompanyId, tableId,
-            new(reset ? null : selected, RowVersion: installation ? view.InstallationVersion : view.UserVersion, Reset: reset), installation);
+        var response = await api.SaveTableView(profile.CompanyId, tableId,
+            new(reset ? null : selected, RowVersion: installation ? view.InstallationVersion : view.UserVersion, Reset: reset,
+                ColumnOrder: reset ? null : ColumnChoices.Select(c => c.Column.Id).ToArray(),
+                ColumnWidths: reset ? null : ColumnChoices.ToDictionary(c => c.Column.Id, c => c.Width)), installation);
+        tableViews[tableId] = response; confirmedTableViews[tableId] = response;
         SetColumnChoices();
-        if (tableId == "Contractors") await LoadPage(0);
+        if (tableId == "Contractors" && !view.VisibleColumns.ToHashSet(StringComparer.Ordinal).SetEquals(response.VisibleColumns)) await LoadPage(0);
         message = reset ? "Zresetowano wybrany zakres widoku." : "Zapisano widok tabeli.";
     });
     public WorkspaceOperation[] WorkspaceOperations => IsBrowsingWorkspace ? [
@@ -126,6 +150,7 @@ public sealed partial class MainViewModel
     });
     private void ClearNavigationDrafts()
     {
+        DiscardPendingTableLayouts();
         editor = null; contractorReadOnly = false; ResetDetails(); ResetCurrencyState(); ResetDataPortSettings();
         ResetGusSettings(); ResetUsersSettings(); ResetPasswordPolicy(); ownPasswordForm = false;
     }

@@ -16,6 +16,7 @@ public sealed class ConfigurableTable : Grid
 {
     public static readonly StyledProperty<TableColumn[]?> ColumnsProperty =
         AvaloniaProperty.Register<ConfigurableTable, TableColumn[]?>(nameof(Columns));
+    public static readonly StyledProperty<string> TableIdProperty = AvaloniaProperty.Register<ConfigurableTable, string>(nameof(TableId), "");
     public static readonly StyledProperty<Control?> RowsProperty =
         AvaloniaProperty.Register<ConfigurableTable, Control?>(nameof(Rows));
     public static readonly StyledProperty<string?> SettingsIdProperty =
@@ -42,6 +43,7 @@ public sealed class ConfigurableTable : Grid
     private readonly Grid header;
 
     public TableColumn[]? Columns { get => GetValue(ColumnsProperty); set => SetValue(ColumnsProperty, value); }
+    public string TableId { get => GetValue(TableIdProperty); set => SetValue(TableIdProperty, value); }
     [Content]
     public Control? Rows { get => GetValue(RowsProperty); set => SetValue(RowsProperty, value); }
     public string? SettingsId { get => GetValue(SettingsIdProperty); set => SetValue(SettingsIdProperty, value); }
@@ -49,6 +51,8 @@ public sealed class ConfigurableTable : Grid
     public IBrush? HeaderBackground { get => GetValue(HeaderBackgroundProperty); set => SetValue(HeaderBackgroundProperty, value); }
     public double HeaderInset { get => GetValue(HeaderInsetProperty); set => SetValue(HeaderInsetProperty, value); }
     public event EventHandler<RoutedEventArgs>? ConfigureColumns;
+    public event EventHandler<ColumnLayoutEventArgs>? LayoutPreview;
+    public event EventHandler<ColumnLayoutEventArgs>? LayoutCommitted;
 
     public ConfigurableTable()
     {
@@ -60,6 +64,16 @@ public sealed class ConfigurableTable : Grid
         SetColumn(settings, 1);
         header.Children.Add(heading);
         header.Children.Add(settings);
+        var insertion = new Border { Width = 2, Background = Brushes.DodgerBlue, IsVisible = false, IsHitTestVisible = false, HorizontalAlignment = HorizontalAlignment.Left };
+        header.Children.Add(insertion);
+        cells.InsertionPointChanged += x =>
+        {
+            var point = x.HasValue ? cells.TranslatePoint(new Point(x.Value, 0), header) : null;
+            insertion.IsVisible = point.HasValue;
+            if (point.HasValue) insertion.Margin = new Thickness(Math.Clamp(point.Value.X, 0, Math.Max(0, heading.Bounds.Width - 2)), 0, 0, 0);
+        };
+        cells.LayoutPreview += (_, edit) => LayoutPreview?.Invoke(this, edit);
+        cells.LayoutCommitted += (_, edit) => LayoutCommitted?.Invoke(this, edit);
         SetColumnSpan(header, 2);
         SetRow(body, 1);
         Children.Add(header);
@@ -74,6 +88,10 @@ public sealed class ConfigurableTable : Grid
         });
         settings.Click += (_, e) => ConfigureColumns?.Invoke(this, e);
         body.ScrollChanged += (_, _) => heading.Offset = new Vector(body.Offset.X, 0);
+        heading.ScrollChanged += (_, _) =>
+        {
+            if (Math.Abs(body.Offset.X - heading.Offset.X) > 0.01) body.Offset = new Vector(heading.Offset.X, 0);
+        };
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)

@@ -1,6 +1,6 @@
 # Otwarty następca VATowca — specyfikacja produktu i architektury
 
-**Wersja dokumentu:** 0.20 (interfejs i widoki tabel, ADR-042)
+**Wersja dokumentu:** 0.21 (kolejność i szerokości kolumn, ADR-042)
 **Data:** 2026-10-25
 **Status:** projekt założeń; nie jest potwierdzeniem zgodności podatkowej gotowego oprogramowania  
 **Nazwa projektu:** robocza „Otwarty następca VATowca”; docelowa nazwa i użycie nazwy „VATowiec” wymagają odrębnej decyzji i sprawdzenia praw  
@@ -13,6 +13,12 @@ Automatyczne strony 25/50/100/200, domyślnie aktywni, wyszukiwanie SQL wyłącz
 po wskazanych widocznych, dozwolonych kolumnach. Katalog tabel/kolumn i hierarchia
 własny UserId → instalacja → fabryczny, z kontrolą wersji/CSRF i atomowym audytem
 zmian globalnych w System. PESEL pozostaje chroniony także w metadanych.
+ADR-042 obejmuje teraz również przeciąganie nagłówków, kolejność przyciskami
+konfiguratora i szerokości 64–1200 jednostek logicznych. Układ jest zapisywany
+po zakończeniu gestu, z szeregowaniem zapisów i jawnym rozstrzyganiem konfliktów.
+Wersjonowany ColumnsJson zachowuje odczyt starych tablic widocznych kolumn;
+kolejność i szerokości dotyczą również ukrytych pól. Rozszerzenie nie wymaga
+nowej migracji, nie zmienia stylistyki tabel ani ich nieruchomej zębatki.
 Nowe tabele System wdrażamy jawną migracją; start aplikacji nie aktualizuje baz.
 Zlecenie używało numeru ADR-041, zajętego już
 przez ustawienia początkowe Personal. [Decyzja](docs/adr/ADR-042-interfejs-i-widoki-tabel.md),

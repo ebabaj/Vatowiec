@@ -112,7 +112,7 @@
                    IsVisible="{Binding CannotViewContractors}" TextWrapping="Wrap" />
         <TextBlock Grid.Row="2" Text="{Binding ContractorStatus}" IsVisible="{Binding CanViewContractors}" />
         <Grid Grid.Row="3" IsVisible="{Binding CanViewContractors}" RowDefinitions="*,Auto" RowSpacing="8">
-          <desktop:ConfigurableTable Columns="{Binding ContractorColumns}" ConfigureColumns="ContractorColumnsClick" SettingsId="ContractorColumns" SettingsLabel="Konfiguracja kolumn kontrahentów">
+          <desktop:ConfigurableTable TableId="Contractors" Columns="{Binding ContractorColumns}" LayoutPreview="TableLayoutPreview" LayoutCommitted="TableLayoutCommitted" ConfigureColumns="ContractorColumnsClick" SettingsId="ContractorColumns" SettingsLabel="Konfiguracja kolumn kontrahentów">
           <ListBox ItemsSource="{Binding Contractors}" SelectedItem="{Binding SelectedContractor, Mode=TwoWay}" DoubleTapped="ContractorDoubleTapped" AutomationProperties.AutomationId="Contractors" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="contracts:ContractorResponse">
@@ -159,7 +159,7 @@
               </WrapPanel>
               <TextBlock Text="{Binding CurrencySelectionCount}" AutomationProperties.AutomationId="CurrencySelectionCount"/>
             </StackPanel>
-            <desktop:ConfigurableTable Grid.Row="2" Columns="{Binding CurrencyColumns}" ConfigureColumns="CurrencyColumnsClick" SettingsId="CurrencyColumns" SettingsLabel="Konfiguracja kolumn walut" HeaderInset="28">
+            <desktop:ConfigurableTable Grid.Row="2" TableId="Currencies" Columns="{Binding CurrencyColumns}" LayoutPreview="TableLayoutPreview" LayoutCommitted="TableLayoutCommitted" ConfigureColumns="CurrencyColumnsClick" SettingsId="CurrencyColumns" SettingsLabel="Konfiguracja kolumn walut" HeaderInset="28">
             <ListBox ItemsSource="{Binding VisibleCurrencySelections}" SelectedItem="{Binding SelectedCurrencySelection, Mode=TwoWay}" AutomationProperties.AutomationId="CurrencyList" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
               <ListBox.ItemTemplate><DataTemplate x:DataType="vm:CurrencySelection">
                 <StackPanel Orientation="Horizontal" Spacing="8">
@@ -210,7 +210,7 @@
             <CheckBox Content="Najnowsze najpierw" IsChecked="{Binding RateDescending, Mode=TwoWay}"/>
             <Button Content="Filtruj" Click="FilterRatesClick" AutomationProperties.AutomationId="FilterRates"/><Button Content="Wyczyść filtry" Click="ClearRateFiltersClick"/>
           </WrapPanel>
-          <desktop:ConfigurableTable Grid.Row="1" Columns="{Binding RateColumns}" ConfigureColumns="RateColumnsClick" SettingsId="RateColumns" SettingsLabel="Konfiguracja kolumn kursów">
+          <desktop:ConfigurableTable Grid.Row="1" TableId="CurrencyRates" Columns="{Binding RateColumns}" LayoutPreview="TableLayoutPreview" LayoutCommitted="TableLayoutCommitted" ConfigureColumns="RateColumnsClick" SettingsId="RateColumns" SettingsLabel="Konfiguracja kolumn kursów">
             <ListBox ItemsSource="{Binding RateRows}" AutomationProperties.AutomationId="RateList" ScrollViewer.HorizontalScrollBarVisibility="Disabled"><ListBox.ItemTemplate><DataTemplate x:DataType="contracts:RateResponse"><desktop:TableCells Value="{Binding}" Columns="{Binding $parent[Window].((vm:MainViewModel)DataContext).RateColumns}"/></DataTemplate></ListBox.ItemTemplate></ListBox>
           </desktop:ConfigurableTable>
           <WrapPanel Grid.Row="2"><Button Content="Poprzednie kursy" Click="PreviousRatesClick" IsEnabled="{Binding HasPreviousRates}"/><Button Content="Następne kursy" Click="NextRatesClick" IsEnabled="{Binding HasNextRates}"/><TextBlock Text="{Binding RatePageLabel}" VerticalAlignment="Center"/></WrapPanel>
@@ -540,6 +540,17 @@
       </Grid>
     </Grid>
     <StackPanel Grid.Row="2" Spacing="8">
+      <StackPanel IsVisible="{Binding IsWorkspace}" Spacing="5">
+        <TextBlock Text="{Binding TableLayoutStatus}" TextWrapping="Wrap" AutomationProperties.AutomationId="TableLayoutStatus"/>
+        <StackPanel IsVisible="{Binding HasTableLayoutSaveError}" Spacing="5">
+          <ScrollViewer MaxHeight="130" IsVisible="{Binding HasTableLayoutConflict}"><TextBlock Text="{Binding TableLayoutComparison}" TextWrapping="Wrap"/></ScrollViewer>
+          <WrapPanel>
+            <Button Content="Ponów zapis układu" Click="RetryTableLayoutClick" IsVisible="{Binding !HasTableLayoutConflict}"/>
+            <Button Content="Zapisz mój układ po porównaniu" Click="AcceptTableLayoutConflictClick" IsVisible="{Binding HasTableLayoutConflict}"/>
+            <Button Content="Wczytaj zapisany układ" Click="ReloadTableLayoutClick"/>
+          </WrapPanel>
+        </StackPanel>
+      </StackPanel>
       <ProgressBar IsVisible="{Binding IsBusy}" IsIndeterminate="True" Height="4" />
       <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}"
                  AutomationProperties.AutomationId="StatusMessage" />
@@ -557,7 +568,14 @@
       <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="10">
         <TextBlock Text="{Binding ColumnSettingsTitle}" FontSize="22" FontWeight="SemiBold" AutomationProperties.AutomationId="ColumnSettingsTitle"/>
         <TextBlock Grid.Row="1" Text="{Binding ColumnSettingsSource}"/>
-        <ScrollViewer Grid.Row="2" MaxHeight="330"><ItemsControl ItemsSource="{Binding ColumnChoices}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:ColumnChoice"><CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" IsEnabled="{Binding Column.CanHide}"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
+        <ScrollViewer Grid.Row="2" MaxHeight="330"><ItemsControl ItemsSource="{Binding ColumnChoices}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:ColumnChoice">
+          <Grid ColumnDefinitions="*,110,Auto,Auto" ColumnSpacing="5" Margin="0,2">
+            <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" IsEnabled="{Binding Column.CanHide}"/>
+            <NumericUpDown Grid.Column="1" Value="{Binding Width, Mode=TwoWay}" Minimum="64" Maximum="1200" Increment="8" FormatString="0.#" ToolTip.Tip="Szerokość w jednostkach logicznych interfejsu"/>
+            <Button Grid.Column="2" Content="W górę" Click="ColumnUpClick"/>
+            <Button Grid.Column="3" Content="W dół" Click="ColumnDownClick"/>
+          </Grid>
+        </DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
         <StackPanel Grid.Row="3" Spacing="8" IsEnabled="{Binding CanInteract}">
           <WrapPanel><Button Content="Zapisz mój widok" Click="SaveMyColumnsClick" AutomationProperties.AutomationId="SaveMyColumns"/><Button Content="Resetuj mój widok" Click="ResetMyColumnsClick" AutomationProperties.AutomationId="ResetMyColumns"/></WrapPanel>
           <WrapPanel IsVisible="{Binding IsInstallationAdministrator}"><Button Content="Zapisz jako domyślny dla wszystkich" Click="SaveInstallationColumnsClick" AutomationProperties.AutomationId="SaveInstallationColumns"/><Button Content="Resetuj domyślny widok instalacji" Click="ResetInstallationColumnsClick" AutomationProperties.AutomationId="ResetInstallationColumns"/></WrapPanel>

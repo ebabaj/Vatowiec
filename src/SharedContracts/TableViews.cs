@@ -2,15 +2,17 @@ namespace Vatowiec.SharedContracts;
 
 public sealed record TableColumn(string Id, string Label, string DataType, int Order,
     bool DefaultVisible = false, string? RequiredPermission = null, bool Searchable = true,
-    string? Format = null, bool CanHide = true);
+    string? Format = null, bool CanHide = true, double? Width = null);
 public sealed record TableDefinition(string Id, string ReadPermission, TableColumn[] Columns)
 {
     public TableColumn[] Available(IEnumerable<string> permissions) => Columns.Where(c =>
         c.RequiredPermission == null || permissions.Contains(c.RequiredPermission, StringComparer.Ordinal)).OrderBy(c => c.Order).ToArray();
 }
 public sealed record TableViewResponse(string TableId, TableColumn[] Columns, string[] VisibleColumns,
-    int PageSize, string Source, string? UserVersion, string? InstallationVersion);
-public sealed record TableViewRequest(string[]? Columns = null, int? PageSize = null, string? RowVersion = null, bool Reset = false);
+    int PageSize, string Source, string? UserVersion, string? InstallationVersion,
+    string[]? ColumnOrder = null, Dictionary<string, double>? ColumnWidths = null);
+public sealed record TableViewRequest(string[]? Columns = null, int? PageSize = null, string? RowVersion = null, bool Reset = false,
+    string[]? ColumnOrder = null, Dictionary<string, double>? ColumnWidths = null);
 
 // Stable identifiers are the API/storage contract. Labels and presentation can evolve independently.
 public static class TableCatalog

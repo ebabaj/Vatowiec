@@ -2,6 +2,7 @@ using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
+using Avalonia.Media;
 using Vatowiec.Desktop.ViewModels;
 using Vatowiec.SharedContracts;
 
@@ -14,7 +15,15 @@ public sealed class TableCells : StackPanel
     public static readonly StyledProperty<TableColumn[]?> ColumnsProperty = AvaloniaProperty.Register<TableCells, TableColumn[]?>(nameof(Columns));
     public object? Value { get => GetValue(ValueProperty); set => SetValue(ValueProperty, value); }
     public TableColumn[]? Columns { get => GetValue(ColumnsProperty); set => SetValue(ColumnsProperty, value); }
-    public TableCells() { Orientation = Avalonia.Layout.Orientation.Horizontal; }
+    public event EventHandler<ColumnLayoutEventArgs>? LayoutPreview;
+    public event EventHandler<ColumnLayoutEventArgs>? LayoutCommitted;
+    public event Action<double?>? InsertionPointChanged;
+    public TableCells()
+    {
+        Orientation = Avalonia.Layout.Orientation.Horizontal;
+        Background = Brushes.Transparent;
+        _ = new TableHeaderGestures(this, edit => LayoutPreview?.Invoke(this, edit), edit => LayoutCommitted?.Invoke(this, edit), x => InsertionPointChanged?.Invoke(x));
+    }
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -28,7 +37,7 @@ public sealed class TableCells : StackPanel
             var label = new TextBlock
             {
                 Text = text,
-                Width = column.Id is "Name" or "ParentName" ? 250 : 150
+                Width = (column.Width ?? TableLayouts.DefaultWidth(column.Id)) - 16
             };
             label.Classes.Add("tableCell");
             if (Value == null) label.Classes.Add("tableColumnTitle");

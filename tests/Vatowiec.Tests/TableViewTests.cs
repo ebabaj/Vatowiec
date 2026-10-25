@@ -147,10 +147,14 @@ internal sealed class WorkspaceTestApi : IVatowiecApiClient
     public ContractorSearchRequest? LastSearch;
     public TableViewRequest? SavedView;
     public string? LastSavedTable;
+    public List<TableViewRequest> LayoutWrites = [];
+    public Func<Task>? BeforeTableSave;
+    public Exception? TableSaveError;
     public Task<ContractorResponse[]>? PendingSearch;
     public ApiException? SearchError;
     private readonly Dictionary<string, TableViewResponse> views = [];
-    public Task<SessionResponse> Login(string u, string p) => Task.FromResult(new SessionResponse(u, DateTimeOffset.UtcNow.AddHours(1), true, UserId: Guid.NewGuid()));
+    private readonly Guid userId = Guid.NewGuid();
+    public Task<SessionResponse> Login(string u, string p) => Task.FromResult(new SessionResponse(u, DateTimeOffset.UtcNow.AddHours(1), true, UserId: userId));
     public Task<CompanyResponse[]> Companies() => Task.FromResult(new[] { A, B }.Select((id, i) =>
         new CompanyResponse(id, "Firma " + (i == 0 ? "A" : "B"), Editable ? ["ViewProfile", "ViewContractors", "EditContractors", "ViewExchangeRates", .. AdditionalPermissions] : ["ViewProfile", "ViewContractors"])).ToArray());
     public Task<CompanyProfileResponse> Profile(Guid id) => Task.FromResult(new CompanyProfileResponse(id, id == A ? "Firma A" : "Firma B", null, null));
@@ -164,8 +168,13 @@ internal sealed class WorkspaceTestApi : IVatowiecApiClient
     public async Task<TableViewResponse> SaveTableView(Guid id, string table, TableViewRequest value, bool global)
     {
         SavedView = value; LastSavedTable = table;
+        LayoutWrites.Add(value);
+        if (BeforeTableSave != null) await BeforeTableSave();
+        if (TableSaveError != null) throw TableSaveError;
         var current = await TableView(id, table);
-        return views[table] = current with { PageSize = value.PageSize ?? current.PageSize, VisibleColumns = value.Columns ?? current.VisibleColumns, UserVersion = Guid.NewGuid().ToString() };
+        if (value.Reset) { views.Remove(table); return TableCatalog.Factory(table, []); }
+        return views[table] = current with { PageSize = value.PageSize ?? current.PageSize, VisibleColumns = value.Columns ?? current.VisibleColumns,
+            ColumnOrder = value.ColumnOrder ?? current.ColumnOrder, ColumnWidths = value.ColumnWidths ?? current.ColumnWidths, UserVersion = Guid.NewGuid().ToString() };
     }
     public Task Logout() => Task.CompletedTask;
     public Task<CurrencyResponse[]> Currencies(Guid companyId) => Task.FromResult(CurrencyData.Select(c => c with { CompanyId = companyId }).ToArray());

@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Text.Json;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
 using Vatowiec.Core.Domain;
@@ -39,7 +38,6 @@ public static class TableViewEndpoints
         if (permissions == null) return Error(403, "table_access_denied", "Brak dostępu do tabeli w tej firmie.");
         return Results.Ok(await Response(tableId, User(http), permissions, db, http.RequestAborted));
     }
-    private static string[]? Columns(TableView? row) => row?.ColumnsJson == null ? null : JsonSerializer.Deserialize<string[]>(row.ColumnsJson);
     private static string? Version(TableView? row) => row == null ? null : Convert.ToBase64String(row.RowVersion);
     private static async Task<TableViewResponse> Response(string tableId, Guid userId, string[] permissions, SystemDbContext db, CancellationToken ct)
     {
@@ -48,8 +46,10 @@ public static class TableViewEndpoints
             (x.OwnerId == userId || x.OwnerId == Guid.Empty)).ToArrayAsync(ct);
         var own = rows.SingleOrDefault(x => x.OwnerId == userId); var global = rows.SingleOrDefault(x => x.OwnerId == Guid.Empty);
         var table = TableCatalog.Find(tableId)!;
-        return new(tableId, table.Available(permissions), TableCatalog.EffectiveColumns(table, permissions, Columns(own), Columns(global)),
-            own?.PageSize ?? 50, own?.ColumnsJson != null ? "User" : global?.ColumnsJson != null ? "Installation" : "Factory", Version(own), Version(global));
+        var ownLayout = TableViewLayoutJson.Read(own?.ColumnsJson); var globalLayout = TableViewLayoutJson.Read(global?.ColumnsJson);
+        var layout = TableLayouts.Effective(table, permissions, ownLayout, globalLayout);
+        return new(tableId, table.Available(permissions), layout.VisibleColumns,
+            own?.PageSize ?? 50, ownLayout != null ? "User" : globalLayout != null ? "Installation" : "Factory", Version(own), Version(global), layout.ColumnOrder, layout.ColumnWidths);
     }
     private static async Task<IResult> Write(Guid companyId, string tableId, TableViewRequest value, bool global,
         HttpContext http, SystemDbContext db, IAntiforgery csrf, TimeProvider clock)
@@ -57,8 +57,8 @@ public static class TableViewEndpoints
         try { await csrf.ValidateRequestAsync(http); }
         catch (AntiforgeryValidationException) { return Error(400, "csrf_invalid", "Nie udało się potwierdzić żądania."); }
         if (value.PageSize.HasValue && (!TableCatalog.PageSizes.Contains(value.PageSize.Value) || global) ||
-            value.Reset && (value.Columns != null || value.PageSize != null) ||
-            !value.Reset && value.Columns == null && value.PageSize == null)
+            value.Reset && (value.Columns != null || value.PageSize != null || value.ColumnOrder != null || value.ColumnWidths != null) ||
+            !value.Reset && value.Columns == null && value.PageSize == null && value.ColumnOrder == null && value.ColumnWidths == null)
             return Error(400, "table_view_invalid", "Wybierz kolumny lub prawidłowy rozmiar strony.");
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         // Same lock as role/access mutations: check the current role and company permissions inside the transaction.
@@ -75,6 +75,10 @@ public static class TableViewEndpoints
         if (value.Columns is { } selected && (selected.Length == 0 || selected.Length > available.Count ||
             selected.Distinct(StringComparer.Ordinal).Count() != selected.Length || selected.Any(c => !available.Contains(c))))
             return Error(400, "table_columns_invalid", "Wybierz co najmniej jedną dostępną kolumnę. Odśwież konfigurację.");
+        if (value.ColumnOrder is { } order && (order.Length == 0 || order.Length > available.Count ||
+            order.Distinct(StringComparer.Ordinal).Count() != order.Length || order.Any(c => !available.Contains(c))) ||
+            value.ColumnWidths is { } widths && (widths.Count > available.Count || widths.Any(w => !available.Contains(w.Key) || !TableLayouts.ValidWidth(w.Value))))
+            return Error(400, "table_layout_invalid", "Nieprawidłowa kolejność lub szerokość kolumn. Dozwolony zakres: 64–1200 jednostek interfejsu.");
         var installation = await db.InstallationIdentities.AsNoTracking().Select(x => x.Id).SingleAsync(http.RequestAborted);
         var owner = global ? Guid.Empty : userId;
         var row = await db.TableViews.SingleOrDefaultAsync(x => x.InstallationId == installation && x.OwnerId == owner && x.TableId == tableId, http.RequestAborted);
@@ -85,7 +89,17 @@ public static class TableViewEndpoints
         else
         {
             if (row == null) { row = new() { InstallationId = installation, OwnerId = owner, TableId = tableId }; db.TableViews.Add(row); }
-            if (value.Columns != null) row.ColumnsJson = JsonSerializer.Serialize(value.Columns);
+            if (value.Columns != null || value.ColumnOrder != null || value.ColumnWidths != null)
+            {
+                var current = await Response(tableId, userId, permissions, db, http.RequestAborted);
+                // A global edit is based on the global layout, never on the administrator's personal override.
+                var basis = global ? TableLayouts.Effective(TableCatalog.Find(tableId)!, permissions, null, TableViewLayoutJson.Read(before)) : TableLayouts.From(current);
+                var mergedWidths = new Dictionary<string, double>(basis.ColumnWidths ?? [], StringComparer.Ordinal);
+                foreach (var pair in value.ColumnWidths ?? []) mergedWidths[pair.Key] = pair.Value;
+                var layout = new TableLayout(value.Columns ?? basis.VisibleColumns, value.ColumnOrder ?? basis.ColumnOrder, mergedWidths);
+                row.ColumnsJson = TableViewLayoutJson.Write(layout);
+                if (row.ColumnsJson.Length > 4096) return Error(400, "table_layout_invalid", "Układ tabeli jest zbyt duży.");
+            }
             if (value.PageSize != null) row.PageSize = value.PageSize;
         }
         if (global && (before != (value.Reset ? null : row?.ColumnsJson)))
