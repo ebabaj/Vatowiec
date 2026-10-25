@@ -308,4 +308,12 @@ Narzędzie wdrożeniowe jest dostępne poza API; pełny provisioning z aplikacji
 pozostaje osobnym etapem. Nie przeniesiono danych z usuniętej Vatowiec_Dev.
 
 Nie zaimplementowano podatków, KSeF, JPK ani wtyczek. M0 nie jest ukończone;
-nazwa pozostaje robocza, a licencja źródeł wymaga decyzji ADR-002.
+nazwa pozostaje robocza.
+
+## Licencja
+
+VATowiec jest udostępniany na licencji **MIT**. Pełny tekst licencji znajduje się
+w pliku [LICENSE](LICENSE).
+
+Biblioteki zewnętrzne zachowują własne licencje; informacje o nich znajdują się
+w katalogu [licenses](licenses/) oraz w [THIRD-PARTY-NOTICES.md](licenses/THIRD-PARTY-NOTICES.md).
