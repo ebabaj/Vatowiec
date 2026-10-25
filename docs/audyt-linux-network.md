@@ -114,5 +114,3 @@ Zależności publikacji obejmują Avalonia **12.1.4**, SkiaSharp **3.119.4**, Ha
 **Ocena wykonalności: dobra.** Podstawowy Network z ręcznym logowaniem wygląda na zadanie rzędu kilku dni. Pełne dopracowanie poświadczeń i dystrybucji wymaga wyraźnie większego nakładu. Nie ma obecnie dowodu, że potrzebna byłaby przebudowa klienta lub zmiana API.
 
 Podczas audytu nie zmieniono źródeł, projektów, konfiguracji, dokumentacji ani baz; nie zatrzymywano ani nie uruchamiano API. Końcowy `git status` audytu był czysty. Niniejszy dokument jest późniejszym zapisem raportu na polecenie użytkownika; przy jego zapisywaniu nie powtarzano analizy ani kompilacji.
-
-Automatyczna kontrola wykonania odrzuciła usunięcie artefaktów komunikatem „blocked by policy”. W chwili zakończenia audytu pozostały wyłącznie w utworzonym na potrzeby próby katalogu tymczasowym `C:\Users\admin\AppData\Local\Temp\vscode-agent-codex-sandbox-YOAyqk\Vatowiec-LinuxAudit-9e038c914c4e4a3dbbc13f237c23ad02`, poza repozytorium.
