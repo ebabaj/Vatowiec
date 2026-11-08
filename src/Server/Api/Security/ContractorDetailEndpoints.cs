@@ -109,7 +109,7 @@ public static class ContractorDetailEndpoints
         var data = value.Data;
         if (kind == "bank-accounts" && data.AccountNumber is not null)
             data = data with { AccountNumber = BankAccountPreparation.Normalize(data.AccountNumber), CurrencyCode = string.IsNullOrWhiteSpace(data.CurrencyCode) ? null : data.CurrencyCode.Trim().ToUpperInvariant() };
-        var errors = DetailValidation.Validate(kind, data);
+        var errors = new Dictionary<string, string[]>();
         byte[] version = [];
         if (detailId.HasValue)
         {
@@ -124,27 +124,33 @@ public static class ContractorDetailEndpoints
         var db = access.Context;
         var issuer = await system.InstallationIdentities.Select(x => x.Id).SingleOrDefaultAsync();
         if (issuer == Guid.Empty || string.IsNullOrWhiteSpace(http.User.Identity?.Name)) return Error(503, "audit_identity_unavailable", "Zapis zablokowany: brak identyfikacji wykonawcy.");
-        var normalized = New(kind, contractorId, data);
-        Apply(normalized, data);
-        var fingerprint = Hash(JsonSerializer.Serialize(new { kind, contractorId, Data = Values(normalized) }));
-        var check = kind == "bank-accounts" ? validator.Validate(data.AccountNumber!) : null;
-        var warningHash = Hash(JsonSerializer.Serialize(new { check, fingerprint, companyId, contractorId,
-            ActorId = Actor(http), issuer, value.Id, value.RowVersion, value.OperationId }));
-        var warning = check?.RequiresWarning == true;
         await using var transaction = await db.Database.BeginTransactionAsync();
         try
         {
             await CompanyWriteLock.Acquire(db, "ContractorDetails");
             if (!await db.Contractors.AnyAsync(x => x.Id == contractorId)) return Error(404, "contractor_not_found", "Nie znaleziono kontrahenta.");
+            var entity = detailId.HasValue ? await Find(db, contractorId, detailId.Value, kind) : null;
+            if (detailId.HasValue && entity is null) return Error(404, "detail_not_found", "Nie znaleziono pozycji.");
+            if (detailId.HasValue && !Version(entity!).SequenceEqual(version)) return Conflict(entity!, kind, companyId, contractorId, validator);
+            var original = entity is null ? null : Values(entity);
+            errors = DetailValidation.Validate(kind, data, original);
+            if (errors.Count != 0) return Results.Json(new { code = "validation_failed", errors }, statusCode: 400);
+            if (kind == "contacts") data = data with { Phone = original is null
+                ? PhoneNumberService.NormalizeForStorage(data.Phone) : PhoneNumberService.NormalizeForUpdate(data.Phone, original.Phone) };
+            var normalized = New(kind, contractorId, data);
+            Apply(normalized, data);
+            var fingerprint = Hash(JsonSerializer.Serialize(new { kind, contractorId, Data = Values(normalized) }));
+            var check = kind == "bank-accounts" ? validator.Validate(data.AccountNumber!) : null;
+            var warningHash = Hash(JsonSerializer.Serialize(new { check, fingerprint, companyId, contractorId,
+                ActorId = Actor(http), issuer, value.Id, value.RowVersion, value.OperationId }));
+            var warning = check?.RequiresWarning == true;
             if (!detailId.HasValue)
             {
                 var previous = await db.ContractorCreateOperations.SingleOrDefaultAsync(x => x.ActorId == Actor(http) && x.ActorIssuerId == issuer && x.OperationKind == Type(kind) && x.OperationId == value.OperationId);
                 if (previous is not null) return previous.RequestHash == fingerprint ? Results.Content(previous.ResponseJson, "application/json", statusCode: 200)
                     : Error(409, "operation_payload_mismatch", "Ta operacja została już zapisana z innymi danymi. Odśwież listę.");
             }
-            var entity = detailId.HasValue ? await Find(db, contractorId, detailId.Value, kind) : normalized;
-            if (entity is null) return Error(404, "detail_not_found", "Nie znaleziono pozycji.");
-            if (detailId.HasValue && !Version(entity).SequenceEqual(version)) return Conflict(entity, kind, companyId, contractorId, validator);
+            entity ??= normalized;
             if (warning)
             {
                 if (!value.AcceptWarning || value.WarningHash != warningHash)

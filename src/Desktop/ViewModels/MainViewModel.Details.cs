@@ -196,7 +196,7 @@ public sealed partial class MainViewModel
     public Task SaveDetail(bool acceptWarning = false) => Run(async () =>
     {
         if (api is null || profile is null || editor is null || detailEditor is null || !CanEditDetails || HasDetailConflict) return;
-        detailEditor.SetErrors(DetailValidation.Validate(DetailKind, detailEditor.Values()));
+        detailEditor.SetErrors(detailEditor.Validate());
         if (detailEditor.HasErrors) { message = "Popraw pola zaznaczone w formularzu."; return; }
         var request = detailEditor.Request() with { AcceptWarning = acceptWarning, WarningHash = acceptWarning ? warningHash : null };
         try
@@ -309,9 +309,12 @@ public sealed class DetailEditor : System.ComponentModel.INotifyPropertyChanged
         Kind = row.Kind;
         RowVersion = row.RowVersion;
         foreach (var property in typeof(DetailValues).GetProperties()) GetType().GetProperty(property.Name)!.SetValue(this, property.GetValue(row.Data));
+        storedPhone = row.Data.Phone;
+        if (Kind == "contacts") Phone = PhoneNumberService.FormatForDisplay(storedPhone);
         original = JsonSerializer.Serialize(Values());
     }
     private readonly string original;
+    private readonly string? storedPhone;
     public string Kind { get; }
     public int Id { get; }
     public Guid OperationId { get; } = Guid.NewGuid();
@@ -365,6 +368,13 @@ public sealed class DetailEditor : System.ComponentModel.INotifyPropertyChanged
         foreach (var property in typeof(DetailValues).GetProperties()) property.SetValue(values, GetType().GetProperty(property.Name)!.GetValue(this));
         return values;
     }
-    public DetailWriteRequest Request() => new(Id, Values(), RowVersion, Id == 0 ? OperationId : null);
+    public Dictionary<string, string[]> Validate() => DetailValidation.Validate(Kind, Values(), Id == 0 ? null : new() { Phone = storedPhone });
+    public DetailWriteRequest Request()
+    {
+        var data = Values();
+        if (Kind == "contacts") data = data with { Phone = Id == 0
+            ? PhoneNumberService.NormalizeForStorage(Phone) : PhoneNumberService.NormalizeForUpdate(Phone, storedPhone) };
+        return new(Id, data, RowVersion, Id == 0 ? OperationId : null);
+    }
     public string Summary() => $"Nazwa: {Name}\nAdres: {Street} {BuildingNo}/{ApartmentNo}, {PostalCode} {City}, {Region} {CountryCode}\nRodzaj: {AddressTypeId}; preferowany: {IsDefault}; aktywny: {IsActive}\nKontakt: {Position} · {Email} · {Phone}\nRachunek: {AccountNumber} · {BankName} · {Bic} · {CurrencyCode ?? "bez waluty"} · {AccountHolderName}\nUwagi: {Notes}";
 }

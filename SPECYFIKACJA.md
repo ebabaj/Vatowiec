@@ -903,6 +903,16 @@ Załączniki mogą być przechowywane w katalogu kontrolowanym przez serwer lub 
 
 **Kontakty:** jedna core.ContractorContacts dla osób, skrzynek, działów i miejsc, bez rozdzielania ich na osobne tabele i bez CRM. Kontakt ma jedno obowiązkowe Name; opcjonalne są funkcja/stanowisko, telefon, e-mail, własne pola adresowe i uwagi. Może zawierać jednocześnie telefon, e-mail i adres. Adres kontaktu nie ma powiązania z ContractorAddresses i nie jest automatycznie synchronizowany z kartoteką adresów.
 
+**KON-TEL-001 — telefony kontaktów:** wspólny `PhoneNumberService` w SharedContracts
+używa libphonenumber-csharp 9.0.42. Nowe i zmienione numery API zapisuje jako E.164;
+domyślny region wejścia to PL. Avalonia pokazuje polski numer bez +48 wyłącznie
+po potwierdzeniu regionu PL przez metadane. Pozostałe numery pozostają w E.164,
+bez separatorów. Telefon jest opcjonalny. Błędne lub niejednoznaczne nowe wartości
+są blokowane z polskim komunikatem, także przy bezpośrednim wywołaniu API.
+Nie sprawdzamy aktywności numeru. Brak migracji: historyczny telefon pozostaje
+niezmieniony przy odczycie i zapisie bez jego zmiany, również przy edycji innych pól.
+Szczegóły i wyjątek w przykładzie niemieckim: [ADR-043](docs/adr/ADR-043-numery-telefoniczne.md).
+
 **Rachunki:** jedna core.ContractorBankAccounts obejmuje Id int IDENTITY, ContractorId, AccountNumber, BankName, Bic, CurrencyCode char(3) NULL, AccountHolderName, Name, IsDefault bit, IsActive, Notes i RowVersion. Pełne typy SQL, długości i wymagalność określa [ADR-018 §3.9](docs/adr/ADR-018-docelowy-model-kontrahentow.md#39-rachunki-bankowe-i-domyślność-według-waluty); AccountNumber to wymagany nvarchar(100), a Bic to varchar(11) NULL. Kontrahent może mieć wiele rachunków. Najwyżej jeden domyślny na każdą walutę; NULL jest osobną grupą z takim samym limitem. Brak domyślnego jest dozwolony. Wybranie nowego automatycznie odznacza poprzedni z tej samej grupy w atomowej, audytowanej operacji, a unikalność domyślności zabezpiecza baza. Numery rachunków nie muszą być unikalne. Ich walidacja odbywa się w Application/API, ze świadomą akceptacją ostrzeżenia przez uprawnionego użytkownika i audytem odstępstwa. Nie tworzymy ContractorDefaultBankAccounts ani osobnej kartoteki banków na tym etapie.
 
 **„Użytkownik ma zawsze rację”:** po wyjaśnieniu ostrzeżenia użytkownik z prawem akceptacji ostrzeżeń może świadomie zapisać błędną wartość lub duplikat **bez podawania uzasadnienia**. Odstępstwo jest audytowane wraz ze zmianą, wykonawcą, czasem i kontekstem ostrzeżenia/reguły. Nie jest to uznanie numeru za poprawny ani obejście praw, spójności, rowversion, CSRF czy wymagań zewnętrznych. ADR-020 wdraża AcceptWarnings=8 oraz potwierdzenie związane z hashem dla podstawowej kontroli zapisu rachunku. ADR-021 rozszerza ten mechanizm na identyfikatory; kolejne krajowe algorytmy pozostają do opracowania. Nie wymagamy uzasadnienia.
@@ -1190,6 +1200,7 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | [ADR-018](docs/adr/ADR-018-docelowy-model-kontrahentow.md) | Docelowy model kontrahentów i niezależne weryfikacje | Uzupełniony o ParentId bez dziedziczenia, nazwy tabel, reguły identyfikatorów i domyślność walutową; ślad rozstrzygnięć K-01–K-09, pozostałe doprecyzowania w §4; podstawa implementacji ADR-019, bez migracji danych demonstracyjnych |
 | [ADR-030](docs/adr/ADR-030-standardowe-identyfikatory-kontrahenta.md) | REGON, KRS, BDO i PESEL | Opcjonalne teksty, kontrola sum/formatu, osobne firmowe prawo PESEL, bezpieczne wyszukiwanie POST, addytywne migracje i audyt wersji 3 |
 | [ADR-031](docs/adr/ADR-031-warunki-finansowe-kontrahenta.md) | Warunki finansowe kontrahenta | Sale/Purchase, opcjonalne warunki, słownik sposobów, limity per waluta, osobne szkice i atomowy audyt bez dokumentów/sald |
+| [ADR-043](docs/adr/ADR-043-numery-telefoniczne.md) | Numery telefoniczne | libphonenumber-csharp, E.164 w nowych zapisach API, uproszczone PL w Avalonia, ścisła walidacja i zachowanie niezmienionej historii bez migracji |
 | ADR-006 | Podpisywanie XML i przechowywanie certyfikatów | Przed implementacją wysyłek MF; nie przechowywać sekretów w zwykłej bazie |
 | ADR-007 | API pluginów: manifest, sandbox, granice dostępu | Przed pierwszą wykonywalną wtyczką |
 | ADR-008 | Pełny wykaz typów VAT i deklaracji na 1.0 | Przed M3; uzgodnić precyzyjne scenariusze |

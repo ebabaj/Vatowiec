@@ -38,7 +38,7 @@ internal static class ContractorDetailMapping
             var target = entity.GetType().GetProperty(property.Name);
             if (target?.SetMethod?.IsPublic != true) continue;
             var value = property.GetValue(data);
-            if (value is string text)
+            if (value is string text && !(entity is ContractorContact && property.Name == nameof(DetailValues.Phone)))
             {
                 value = string.IsNullOrWhiteSpace(text) ? null : text.Trim();
                 if (property.Name is "CountryCode" or "Bic") value = ((string?)value)?.ToUpperInvariant();

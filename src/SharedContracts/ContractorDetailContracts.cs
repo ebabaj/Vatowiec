@@ -34,7 +34,7 @@ public sealed record DetailResponse(int Id, Guid CompanyId, int ContractorId, st
     public override string ToString() => Kind switch
     {
         "addresses" => $"{AddressTypeName ?? "Adres"} · {Data.Name ?? Data.Street} · {Data.City} · {(Data.IsDefault ? "preferowany" : "")} · {(Data.IsActive ? "aktywny" : "nieaktywny")}",
-        "contacts" => $"{Data.Name} · {Data.Email} · {Data.Phone} · {Data.City}",
+        "contacts" => $"{Data.Name} · {Data.Email} · {PhoneNumberService.FormatForDisplay(Data.Phone)} · {Data.City}",
         _ => $"{Data.Name ?? Data.BankName ?? "Rachunek"} · {Data.AccountNumber} · {Data.CurrencyCode ?? "bez waluty"} · {(Data.IsDefault ? "domyślny" : "")} · {(Data.IsActive ? "aktywny" : "nieaktywny")} · {BankValidation?.Message}",
     };
 }
@@ -55,7 +55,7 @@ public sealed record BankLookupResponse(string Status, string Message, string Cl
 
 public static class DetailValidation
 {
-    public static Dictionary<string, string[]> Validate(string kind, DetailValues value)
+    public static Dictionary<string, string[]> Validate(string kind, DetailValues value, DetailValues? original = null)
     {
         var errors = new Dictionary<string, string[]>();
         void Length(string key, string? text, int max, string label, bool required = false)
@@ -79,6 +79,11 @@ public static class DetailValidation
             Length("Position", value.Position, 100, "Stanowisko/funkcja");
             Length("Email", value.Email, 256, "E-mail");
             Length("Phone", value.Phone, 100, "Telefon");
+            if (original is null || !PhoneNumberService.IsUnchanged(value.Phone, original.Phone))
+            {
+                var phone = PhoneNumberService.Validate(value.Phone);
+                if (!phone.CanSave) errors["Phone"] = [phone.Message!];
+            }
         }
         if (kind == "bank-accounts")
         {

@@ -5,5 +5,7 @@
              Link="licenses/IbanNet/LICENSE.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="$(MSBuildThisFileDirectory)licenses/THIRD-PARTY-NOTICES.md"
              Link="licenses/THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(MSBuildThisFileDirectory)licenses/libphonenumber-csharp/LICENSE.txt"
+             Link="licenses/libphonenumber-csharp/LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

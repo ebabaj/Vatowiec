@@ -74,7 +74,7 @@ public sealed partial class AuthenticationIntegrationTests
         Assert.Null(email.Data.Street);
         var postal = await CreateDetail(client, "contacts", new() { Name = "Magazyn", Street = "Fikcyjna", BuildingNo = "1", ApartmentNo = "2", City = "Miasto testowe", CountryCode = "PL", Notes = "Dane fikcyjne" });
         Assert.Null(postal.Data.Email);
-        using var edit = await client.PutAsJsonAsync($"{DetailsPath("contacts")}/{email.Id}", ChangeDetail(email, email.Data with { Phone = "TEST", Position = "Fikcyjna funkcja" }));
+        using var edit = await client.PutAsJsonAsync($"{DetailsPath("contacts")}/{email.Id}", ChangeDetail(email, email.Data with { Phone = "501 234 567", Position = "Fikcyjna funkcja" }));
         Assert.Equal(HttpStatusCode.OK, edit.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync(DetailsPath("contacts"), NewDetail(new() { Email = "demo@example.invalid" }))).StatusCode);
         await using var db = Company(false, companyA);
