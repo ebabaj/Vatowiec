@@ -114,8 +114,8 @@ public sealed class CompanyModelTests
     {
         using var system = new SystemDbContextFactory().CreateDbContext([]);
         using var company = new CompanyDbContextFactory().CreateDbContext([]);
-        Assert.Equal(17, system.Database.GetMigrations().Count());
-        Assert.EndsWith("_CompanyBackups", system.Database.GetMigrations().Last());
+        Assert.Equal(18, system.Database.GetMigrations().Count());
+        Assert.EndsWith("_CompanyDeletion", system.Database.GetMigrations().Last());
         Assert.Equal(9, company.Database.GetMigrations().Count());
         Assert.EndsWith("_ContractorFinance", company.Database.GetMigrations().Last());
         Assert.False(system.Database.HasPendingModelChanges());

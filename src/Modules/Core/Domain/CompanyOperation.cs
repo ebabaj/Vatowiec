@@ -5,6 +5,7 @@ public static class CompanyOperationKinds
 {
     public const string Provision = "Provision";
     public const string Backup = "Backup";
+    public const string Delete = "Delete";
 }
 
 public static class CompanyOperationStages
@@ -15,13 +16,19 @@ public static class CompanyOperationStages
     public const string ProfileInitialized = "ProfileInitialized";
     public const string BackupWritten = "BackupWritten";
     public const string BackupVerified = "BackupVerified";
+    public const string CompanyDeactivated = "CompanyDeactivated";
+    public const string ArchiveWritten = "ArchiveWritten";
+    public const string ArchiveVerified = "ArchiveVerified";
+    public const string DatabaseDropped = "DatabaseDropped";
     public const string Ready = "Ready";
     public static readonly string[] Provisioning = [Requested, DatabaseCreated, SchemaApplied, ProfileInitialized, Ready];
     public static readonly string[] Backup = [Requested, BackupWritten, BackupVerified, Ready];
+    public static readonly string[] Delete = [Requested, CompanyDeactivated, ArchiveWritten, ArchiveVerified, DatabaseDropped, Ready];
     public static string[] For(string kind) => kind switch
     {
         CompanyOperationKinds.Provision => Provisioning,
         CompanyOperationKinds.Backup => Backup,
+        CompanyOperationKinds.Delete => Delete,
         _ => throw new ArgumentException("Nieznany rodzaj operacji.", nameof(kind))
     };
 }
@@ -33,6 +40,7 @@ public static class CompanyOperationStatuses
     public const string Failed = "Failed";
     public const string NeedsReconciliation = "NeedsReconciliation";
     public const string Completed = "Completed";
+    public const string Cancelled = "Cancelled";
 }
 
 public sealed class CompanyOperation : ITrackedEntity
@@ -83,6 +91,30 @@ public sealed class CompanyOperation : ITrackedEntity
             Status = CompanyOperationStatuses.Pending
         };
 
+    // ADR-045: usunięcie firmy przez administratora instalacji; archiveFileName == null: bez kopii archiwalnej.
+    public static CompanyOperation Delete(Guid id, Guid operationKey, Guid companyId, string companyName,
+        Guid requestedById, string requestedByName, Guid actorIssuerId, string requestHash,
+        string serverName, string connectionProfileKey, string databaseName, string? archiveFileName, DateTimeOffset? notBefore = null) => new()
+        {
+            NextAttemptAtUtc = notBefore,
+            Id = EntityText.Id(id, nameof(id)),
+            Kind = CompanyOperationKinds.Delete,
+            OperationKey = EntityText.Id(operationKey, nameof(operationKey)),
+            CompanyId = EntityText.Id(companyId, nameof(companyId)),
+            CompanyName = EntityText.Required(companyName, 256, nameof(companyName)),
+            RequestedById = EntityText.Id(requestedById, nameof(requestedById)),
+            RequestedByName = EntityText.Required(requestedByName, 256, nameof(requestedByName)),
+            ActorIssuerId = EntityText.Id(actorIssuerId, nameof(actorIssuerId)),
+            RequestHash = EntityText.Required(requestHash, 64, nameof(requestHash)),
+            ServerName = EntityText.Required(serverName, 128, nameof(serverName)),
+            ConnectionProfileKey = EntityText.Required(connectionProfileKey, 128, nameof(connectionProfileKey)),
+            DatabaseName = EntityText.Required(databaseName, 128, nameof(databaseName)),
+            CreateArchive = archiveFileName is not null,
+            BackupFileName = archiveFileName is null ? null : EntityText.Required(archiveFileName, 260, nameof(archiveFileName)),
+            Stage = CompanyOperationStages.Requested,
+            Status = CompanyOperationStatuses.Pending
+        };
+
     public Guid Id { get; private set; }
     public string Kind { get; private set; } = null!;
     public Guid OperationKey { get; private set; }
@@ -90,6 +122,7 @@ public sealed class CompanyOperation : ITrackedEntity
     public string CompanyName { get; private set; } = null!;
     public Guid? RequestedById { get; private set; }
     public string? BackupFileName { get; private set; }
+    public bool? CreateArchive { get; private set; }
     public string RequestedByName { get; private set; } = null!;
     public Guid ActorIssuerId { get; private set; }
     public string RequestHash { get; private set; } = null!;
@@ -110,6 +143,10 @@ public sealed class CompanyOperation : ITrackedEntity
 
     public bool IsFinished => Status == CompanyOperationStatuses.Completed;
     public bool CanRetry => Status is CompanyOperationStatuses.Failed or CompanyOperationStatuses.NeedsReconciliation;
+    // Usunięcie można anulować, dopóki baza nie została usunięta i operacja nie jest wykonywana.
+    public bool CanCancel => Kind == CompanyOperationKinds.Delete &&
+        Status is CompanyOperationStatuses.Pending or CompanyOperationStatuses.Failed or CompanyOperationStatuses.NeedsReconciliation &&
+        Array.IndexOf(CompanyOperationStages.Delete, Stage) < Array.IndexOf(CompanyOperationStages.Delete, CompanyOperationStages.DatabaseDropped);
 
     public bool IsClaimable(DateTimeOffset now) =>
         (Status == CompanyOperationStatuses.Pending && (NextAttemptAtUtc is null || NextAttemptAtUtc <= now)) ||
@@ -180,6 +217,13 @@ public sealed class CompanyOperation : ITrackedEntity
         Status = CompanyOperationStatuses.Pending;
         NextAttemptAtUtc = now;
         Attempt = 0;
+    }
+
+    public void Cancel()
+    {
+        if (!CanCancel) throw new InvalidOperationException("Anulować można wyłącznie usunięcie firmy przed usunięciem jej bazy.");
+        Status = CompanyOperationStatuses.Cancelled;
+        NextAttemptAtUtc = null;
     }
 
     private void RequireRunning()

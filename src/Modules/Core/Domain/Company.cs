@@ -19,4 +19,8 @@ public sealed class Company : ITrackedEntity
     public byte[] RowVersion { get; private set; } = [];
 
     public void Rename(string name) => Name = EntityText.Required(name, 256, nameof(name));
+
+    // ADR-045: na czas usuwania firma jest niedostępna dla resolvera i listy firm; anulowanie przywraca dostęp.
+    public void Deactivate() => IsActive = false;
+    public void Activate() => IsActive = true;
 }

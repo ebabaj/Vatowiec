@@ -93,7 +93,16 @@ znacznikiem własnej operacji (lub puste bazy utworzone przez ten sam test).
   nazwa, NIP/REGON, data, kto usunął. CompanyId zablokowany poza przywróceniem z archiwum.
 - Kolejność: nazwy baz (wdrożone, baza Tenjin → `Vatowiec_Tenjin`) → kopia z rotacją
   i harmonogramem (wdrożone 2026-11-22, [docs/company-backups.md](docs/company-backups.md))
-  → usuwanie → odtwarzanie (istniejącej i usuniętej firmy).
+  → usuwanie (wdrożone 2026-11-22, [docs/company-deletion.md](docs/company-deletion.md))
+  → odtwarzanie (istniejącej i usuniętej firmy).
+- Usuwanie: czyszczenie historii jest możliwe wyłącznie w transakcji usługi Operations
+  z `SESSION_CONTEXT('Vatowiec.PurgeCompanyId')`; triggery odrzucają UPDATE zawsze, a DELETE
+  wierszy innych firm. Nie dodawaj innych ścieżek usuwania historii.
+- Decyzje właściciela (2026-11-22): usuwanie z archiwum zapisuje usuwaną historię System do
+  `….history.json` obok kopii; firma jest dezaktywowana już przy przyjęciu zlecenia.
+  Usunięcie **bez** archiwum ma ukryte 10-minutowe opóźnienie wykonania (czas na
+  „Anuluj usuwanie”) — **nie opisuj go w instrukcji użytkownika ani w interfejsie**
+  i nie usuwaj jako „błędu”.
 - Kopie: plik tworzy wyłącznie usługa Operations w `Operations:BackupRoot` (zapis dla konta
   usługi SQL, odczyt/usuwanie dla usługi). Rotacja usuwa tylko pliki z `ops.CompanyBackups`
   potwierdzone manifestem; obcych plików nie dotyka. Developerski katalog:

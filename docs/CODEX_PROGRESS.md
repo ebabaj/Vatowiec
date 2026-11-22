@@ -58,6 +58,15 @@ z aplikacji obok A/B. Weryfikacja: build 0/0; 604 zaliczonych, 0 błędów, 109 
 formatowanie bez uwag; po testach brak plików i wierszy testowych; usługa uruchomiona
 próbnie. Nie wykonano próby w oknie Avalonia.
 
+Zadanie 2026-11-22 (ADR-045 — usuwanie firmy, bez Commit i Push): operacja `Delete`
+(dezaktywacja, archiwum, DROP, czyszczenie w jednej transakcji System), status `Cancelled`
+i anulowanie, `ops.DeletedCompanies`, triggery historii z kontrolowanym DELETE przez
+`SESSION_CONTEXT`, migracja `CompanyDeletion` (wykonana `migrate-system`), endpointy
+usuwania/anulowania/katalogu firm/rejestru usuniętych, sekcja „Usuwanie firmy” w Avalonia.
+Weryfikacja: build 0/0; 610 zaliczonych, 0 błędów, 109 pominiętych; formatowanie bez uwag;
+po testach brak baz, plików i wierszy testowych. Kopia Tenjin zlecona przez właściciela
+z aplikacji zakończyła się poprawnie (plik i manifest w katalogu kopii).
+
 ## Archiwum: naprawa zakładki Finansowe
 
 2026-10-23. Ukończone. BEZ Commit i Push.

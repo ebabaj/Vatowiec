@@ -32,6 +32,7 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
     public DbSet<CompanyBackupSchedule> CompanyBackupSchedules => Set<CompanyBackupSchedule>();
     public DbSet<BackupSettingChange> BackupSettingChanges => Set<BackupSettingChange>();
     public DbSet<BackupReminderSnooze> BackupReminderSnoozes => Set<BackupReminderSnooze>();
+    public DbSet<DeletedCompany> DeletedCompanies => Set<DeletedCompany>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -151,6 +152,7 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
         modelBuilder.ApplyConfiguration(new CompanyBackupScheduleConfiguration());
         modelBuilder.ApplyConfiguration(new BackupSettingChangeConfiguration());
         modelBuilder.ApplyConfiguration(new BackupReminderSnoozeConfiguration());
+        modelBuilder.ApplyConfiguration(new DeletedCompanyConfiguration());
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)

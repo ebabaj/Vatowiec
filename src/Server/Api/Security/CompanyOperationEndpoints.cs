@@ -28,6 +28,35 @@ public static class CompanyOperationEndpoints
         group.MapGet("/server-profiles", (IConfiguration configuration) => Results.Ok(Profiles(configuration)));
         group.MapPost("/provision", Provision);
         group.MapPost("/{operationId:guid}/retry", Retry);
+        group.MapPost("/delete", async (DeleteCompanyRequest value, HttpContext http, IAntiforgery csrf, CompanyOperationRequests requests) =>
+        {
+            if (!await ValidCsrf(csrf, http)) return Error(400, "csrf_invalid", "Nie udało się potwierdzić żądania.");
+            try
+            {
+                var (operation, created) = await requests.RequestDelete(Requester(http), value.OperationKey, value.CompanyId,
+                    value.CreateArchive, value.ConfirmWithoutArchive, http.RequestAborted);
+                return created ? Results.Json(Response(operation), statusCode: 202) : Results.Ok(Response(operation));
+            }
+            catch (CompanyOperationException error) { return Error(error.Status, error.Code, error.Message); }
+        });
+        group.MapPost("/{operationId:guid}/cancel", async (Guid operationId, CompanyOperationRetryRequest value, HttpContext http,
+            IAntiforgery csrf, CompanyOperationRequests requests) =>
+        {
+            if (!await ValidCsrf(csrf, http)) return Error(400, "csrf_invalid", "Nie udało się potwierdzić żądania.");
+            try { return Results.Ok(Response(await requests.Cancel(Requester(http), operationId, value.RowVersion, http.RequestAborted))); }
+            catch (CompanyOperationException error) { return Error(error.Status, error.Code, error.Message); }
+        });
+
+        // Katalog firm instalacji (tylko nazwy i bazy, bez danych firm) i rejestr usuniętych firm.
+        var installation = app.MapGroup("/api/v1/installation").RequireAuthorization(InstallationAdministration.Policy);
+        installation.MapGet("/companies", async (SystemDbContext system, CancellationToken ct) => Results.Ok(await (
+            from company in system.Companies.AsNoTracking()
+            join database in system.CompanyDatabases.AsNoTracking() on company.Id equals database.CompanyId
+            orderby company.Name
+            select new InstallationCompanyResponse(company.Id, company.Name, database.DatabaseName, company.IsActive)).ToArrayAsync(ct)));
+        installation.MapGet("/deleted-companies", async (SystemDbContext system, CancellationToken ct) => Results.Ok(
+            (await system.DeletedCompanies.AsNoTracking().OrderByDescending(x => x.DeletedAtUtc).Take(200).ToArrayAsync(ct))
+            .Select(x => new DeletedCompanyResponse(x.CompanyId, x.CompanyName, x.Nip, x.Regon, x.DeletedAtUtc, x.DeletedByName, x.ArchiveFileName != null))));
     }
 
     private static async Task<IResult> Provision(ProvisionCompanyRequest value, HttpContext http, IAntiforgery csrf,
@@ -89,7 +118,7 @@ public static class CompanyOperationEndpoints
 
     internal static CompanyOperationResponse Response(CompanyOperation x) => new(x.Id, x.Kind, x.CompanyId, x.CompanyName, x.Stage,
         x.Status, x.Attempt, x.LastErrorCode, x.RequestedByName, x.CreatedAtUtc, x.UpdatedAtUtc, x.CompletedAtUtc,
-        Convert.ToBase64String(x.RowVersion));
+        Convert.ToBase64String(x.RowVersion), x.CreateArchive);
 
     private static IResult Error(int status, string code, string message) => Results.Json(new { code, message }, statusCode: status);
 }

@@ -77,6 +77,10 @@ public interface IVatowiecApiClient : IDisposable
     Task<CompanyBackupStatusResponse> SnoozeBackupReminder(Guid companyId) => throw new NotSupportedException();
     Task<BackupPolicyResponse> BackupPolicy() => throw new NotSupportedException();
     Task<BackupPolicyResponse> SaveBackupPolicy(BackupPolicyRequest value) => throw new NotSupportedException();
+    Task<InstallationCompanyResponse[]> InstallationCompanies() => throw new NotSupportedException();
+    Task<DeletedCompanyResponse[]> DeletedCompanies() => throw new NotSupportedException();
+    Task<CompanyOperationResponse> DeleteCompany(DeleteCompanyRequest value) => throw new NotSupportedException();
+    Task<CompanyOperationResponse> CancelCompanyOperation(Guid operationId, CompanyOperationRetryRequest value) => throw new NotSupportedException();
 }
 
 public sealed class ApiException(int statusCode, string message) : Exception(message)
@@ -184,6 +188,12 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         Post<CompanyBackupStatusResponse>($"api/v1/companies/{companyId}/backups/reminder/snooze", new { });
     public Task<BackupPolicyResponse> BackupPolicy() => Get<BackupPolicyResponse>("api/v1/installation/backup-policy");
     public Task<BackupPolicyResponse> SaveBackupPolicy(BackupPolicyRequest value) => Write<BackupPolicyResponse>("api/v1/installation/backup-policy", value, true);
+    public Task<InstallationCompanyResponse[]> InstallationCompanies() => Get<InstallationCompanyResponse[]>("api/v1/installation/companies");
+    public Task<DeletedCompanyResponse[]> DeletedCompanies() => Get<DeletedCompanyResponse[]>("api/v1/installation/deleted-companies");
+    public Task<CompanyOperationResponse> DeleteCompany(DeleteCompanyRequest value) =>
+        Post<CompanyOperationResponse>("api/v1/installation/company-operations/delete", value);
+    public Task<CompanyOperationResponse> CancelCompanyOperation(Guid operationId, CompanyOperationRetryRequest value) =>
+        Post<CompanyOperationResponse>($"api/v1/installation/company-operations/{operationId}/cancel", value);
     public Task<RegistryConfigurationResponse[]> RegistryConfigurations() => Get<RegistryConfigurationResponse[]>("api/v1/installation/integrations/registries");
     public Task<RegistryConfigurationResponse> SaveRegistryConfiguration(string source, RegistryConfigurationRequest value) =>
         Write<RegistryConfigurationResponse>($"api/v1/installation/integrations/registries/{Uri.EscapeDataString(source)}", value, true);

@@ -15,7 +15,8 @@ public sealed partial class CompanyOperationExecutor
 {
     public const string ManifestFormat = "vatowiec-company-backup-v1";
 
-    internal sealed record BackupManifest(string Format, Guid InstallationId, Guid CompanyId, string CompanyName, string DatabaseName,
+    // Kind: Regular (kopia z rotacją) albo Archive (kopia przed usunięciem firmy, poza rotacją).
+    internal sealed record BackupManifest(string Format, string Kind, Guid InstallationId, Guid CompanyId, string CompanyName, string DatabaseName,
         Guid OperationId, DateTimeOffset CreatedAtUtc, string RequestedBy, bool Automatic, long SizeBytes, string Sha256,
         string[] Migrations, string Application);
 
@@ -26,29 +27,37 @@ public sealed partial class CompanyOperationExecutor
         var path = storage.FullPath(operation.BackupFileName ?? throw new OperationFailure("backup_path_invalid", reconcile: true));
         var migrations = await VerifyBackupSource(operation, ct);
         await Renew(operation, LongLease, ct);
-        if (!HasReached(operation, CompanyOperationStages.BackupVerified))
+        var (size, sha, createdAt) = await WriteVerifiedBackup(operation, path, CompanyOperationStages.BackupWritten,
+            CompanyOperationStages.BackupVerified, CompanyBackup.RegularKind, migrations, ct);
+        await PublishBackup(operation, size, sha, createdAt, ct);
+        await Rotate(operation.CompanyId, operation.ActorIssuerId, ct);
+    }
+
+    // Wspólne dla kopii i archiwum: BACKUP (od nowa, gdy brak pliku lub checkpointu), VERIFYONLY, SHA-256, manifest.
+    private async Task<(long Size, string Sha, DateTimeOffset CreatedAt)> WriteVerifiedBackup(CompanyOperation operation, string path,
+        string writtenStage, string verifiedStage, string kind, string[] migrations, CancellationToken ct)
+    {
+        if (!HasReached(operation, verifiedStage))
         {
-            // Plik z planu tej operacji: brak pliku albo brak checkpointu = zapis od nowa (INIT, FORMAT).
-            if (!HasReached(operation, CompanyOperationStages.BackupWritten) || !File.Exists(path))
+            if (!HasReached(operation, writtenStage) || !File.Exists(path))
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
                 // Nazwa bazy z rejestracji, sprawdzona ścisłym wzorcem identyfikatora.
                 await ExecuteMaster(operation, $"BACKUP DATABASE [{operation.DatabaseName}] TO DISK = @path WITH COPY_ONLY, CHECKSUM, INIT, FORMAT, NAME = @name;",
                     path, ct, ("@name", ("VATowiec " + operation.CompanyName)[..Math.Min(128, 9 + operation.CompanyName.Length)]));
             }
-            await Checkpoint(operation, CompanyOperationStages.BackupWritten, ct);
+            await Checkpoint(operation, writtenStage, ct);
             await ExecuteMaster(operation, "RESTORE VERIFYONLY FROM DISK = @path WITH CHECKSUM;", path, ct);
         }
         else if (!File.Exists(path)) throw new OperationFailure("backup_file_missing", reconcile: true);
         var (size, sha) = await Hash(path, ct);
         var createdAt = clock.GetUtcNow();
-        var manifest = new BackupManifest(ManifestFormat, operation.ActorIssuerId, operation.CompanyId, operation.CompanyName,
+        var manifest = new BackupManifest(ManifestFormat, kind, operation.ActorIssuerId, operation.CompanyId, operation.CompanyName,
             operation.DatabaseName, operation.Id, createdAt, operation.RequestedByName, operation.RequestedById is null, size, sha, migrations,
             typeof(CompanyOperationExecutor).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown");
         await File.WriteAllTextAsync(BackupStorage.ManifestPath(path), JsonSerializer.Serialize(manifest, ManifestJson), ct);
-        await Checkpoint(operation, CompanyOperationStages.BackupVerified, ct);
-        await PublishBackup(operation, size, sha, createdAt, ct);
-        await Rotate(operation.CompanyId, operation.ActorIssuerId, ct);
+        await Checkpoint(operation, verifiedStage, ct);
+        return (size, sha, createdAt);
     }
 
     // Źródło kopii musi nadal być zarejestrowaną bazą tej firmy, z jej własnym profilem.
@@ -106,20 +115,11 @@ public sealed partial class CompanyOperationExecutor
                 .OrderByDescending(x => x.CreatedAtUtc).ThenByDescending(x => x.Id).Skip(retained).ToListAsync(ct);
             foreach (var backup in expired)
             {
-                var path = storage.FullPath(backup.FileName);
-                var manifestPath = BackupStorage.ManifestPath(path);
-                if (!File.Exists(path) && !File.Exists(manifestPath)) { backup.MarkRemoved(clock.GetUtcNow(), "Missing"); continue; }
-                var manifest = File.Exists(manifestPath)
-                    ? JsonSerializer.Deserialize<BackupManifest>(await File.ReadAllTextAsync(manifestPath, ct), ManifestJson) : null;
-                if (manifest is null || manifest.Format != ManifestFormat || manifest.InstallationId != installationId ||
-                    manifest.CompanyId != backup.CompanyId || manifest.OperationId != backup.OperationId)
+                switch (await DeleteOwnedBackupFiles(backup, installationId, ct))
                 {
-                    logger.LogWarning("Backup {BackupId} kept: manifest does not confirm ownership", backup.Id);
-                    continue;
+                    case BackupFiles.Missing: backup.MarkRemoved(clock.GetUtcNow(), "Missing"); break;
+                    case BackupFiles.Deleted: backup.MarkRemoved(clock.GetUtcNow(), "Rotation"); break;
                 }
-                if (File.Exists(path)) File.Delete(path);
-                File.Delete(manifestPath);
-                backup.MarkRemoved(clock.GetUtcNow(), "Rotation");
             }
             await system.SaveChangesAsync(ct);
         }
@@ -128,5 +128,26 @@ public sealed partial class CompanyOperationExecutor
             logger.LogWarning("Backup rotation for company {CompanyId} incomplete ({ErrorType})", companyId, error.GetType().Name);
             system.ChangeTracker.Clear();
         }
+    }
+
+    internal enum BackupFiles { Deleted, Missing, NotOwned }
+
+    // Usuwa plik kopii i manifest wyłącznie, gdy manifest potwierdza tę instalację, firmę i operację.
+    private async Task<BackupFiles> DeleteOwnedBackupFiles(CompanyBackup backup, Guid installationId, CancellationToken ct)
+    {
+        var path = storage.FullPath(backup.FileName);
+        var manifestPath = BackupStorage.ManifestPath(path);
+        if (!File.Exists(path) && !File.Exists(manifestPath)) return BackupFiles.Missing;
+        var manifest = File.Exists(manifestPath)
+            ? JsonSerializer.Deserialize<BackupManifest>(await File.ReadAllTextAsync(manifestPath, ct), ManifestJson) : null;
+        if (manifest is null || manifest.Format != ManifestFormat || manifest.InstallationId != installationId ||
+            manifest.CompanyId != backup.CompanyId || manifest.OperationId != backup.OperationId)
+        {
+            logger.LogWarning("Backup {BackupId} kept: manifest does not confirm ownership", backup.Id);
+            return BackupFiles.NotOwned;
+        }
+        if (File.Exists(path)) File.Delete(path);
+        File.Delete(manifestPath);
+        return BackupFiles.Deleted;
     }
 }

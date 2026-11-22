@@ -3,7 +3,15 @@ namespace Vatowiec.SharedContracts;
 // ADR-044: operacje techniczne firm (krok 1: tworzenie firmy). Bez ścieżek plików i connection stringów.
 public sealed record CompanyOperationResponse(Guid Id, string Kind, Guid CompanyId, string CompanyName, string Stage,
     string Status, int Attempt, string? LastErrorCode, string RequestedByName, DateTimeOffset CreatedAtUtc,
-    DateTimeOffset UpdatedAtUtc, DateTimeOffset? CompletedAtUtc, string RowVersion);
+    DateTimeOffset UpdatedAtUtc, DateTimeOffset? CompletedAtUtc, string RowVersion, bool? CreateArchive = null);
+
+// ADR-045: usuwanie firmy.
+public sealed record DeleteCompanyRequest(Guid OperationKey, Guid CompanyId, bool CreateArchive, bool ConfirmWithoutArchive);
+
+public sealed record InstallationCompanyResponse(Guid CompanyId, string Name, string DatabaseName, bool IsActive);
+
+public sealed record DeletedCompanyResponse(Guid CompanyId, string CompanyName, string? Nip, string? Regon,
+    DateTimeOffset DeletedAtUtc, string DeletedByName, bool HasArchive);
 
 public sealed record ProvisionCompanyRequest(Guid OperationKey, string CompanyName, string ConnectionProfileKey);
 

@@ -92,6 +92,10 @@ public partial class MainWindow : Window
     private async void CompanyOperationsNextClick(object? sender, RoutedEventArgs e) => await model.RefreshCompanyOperations(1);
     private async void CloseCompanyOperationsClick(object? sender, RoutedEventArgs e) => await model.CloseCompanyOperations();
     private async void SaveBackupPolicyClick(object? sender, RoutedEventArgs e) => await model.SaveBackupPolicy();
+    private void RequestCompanyDeleteClick(object? sender, RoutedEventArgs e) => model.RequestCompanyDelete();
+    private async void ConfirmCompanyDeleteClick(object? sender, RoutedEventArgs e) => await model.ConfirmCompanyDelete();
+    private void CancelCompanyDeleteConfirmationClick(object? sender, RoutedEventArgs e) => model.CancelCompanyDeleteConfirmation();
+    private async void CancelCompanyOperationClick(object? sender, RoutedEventArgs e) => await model.CancelCompanyOperation();
     private async void CompanyBackupsClick(object? sender, RoutedEventArgs e) => await model.OpenCompanyBackups();
     private async void RequestCompanyBackupClick(object? sender, RoutedEventArgs e) => await model.RequestCompanyBackup();
     private async void RefreshCompanyBackupsClick(object? sender, RoutedEventArgs e) => await model.RefreshCompanyBackups();

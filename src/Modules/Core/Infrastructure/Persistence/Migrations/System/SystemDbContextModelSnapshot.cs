@@ -508,6 +508,9 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
+                    b.Property<bool?>("CreateArchive")
+                        .HasColumnType("bit");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -596,23 +599,27 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                         .IsUnique()
                         .HasFilter("[Kind] = N'Backup' AND [Status] IN (N'Pending', N'Running')");
 
+                    b.HasIndex(new[] { "CompanyId" }, "IX_CompanyOperations_ActiveDelete")
+                        .IsUnique()
+                        .HasFilter("[Kind] = N'Delete' AND [Status] <> N'Cancelled'");
+
                     b.ToTable("CompanyOperations", "ops", t =>
                         {
                             t.HasCheckConstraint("CK_CompanyOperations_Attempt", "[Attempt] >= 0");
 
-                            t.HasCheckConstraint("CK_CompanyOperations_BackupFile", "([Kind] = N'Backup' AND [BackupFileName] IS NOT NULL) OR ([Kind] <> N'Backup' AND [BackupFileName] IS NULL)");
+                            t.HasCheckConstraint("CK_CompanyOperations_BackupFile", "([Kind] = N'Backup' AND [BackupFileName] IS NOT NULL) OR ([Kind] = N'Provision' AND [BackupFileName] IS NULL) OR ([Kind] = N'Delete' AND [CreateArchive] IS NOT NULL AND (([CreateArchive] = 1 AND [BackupFileName] IS NOT NULL) OR ([CreateArchive] = 0 AND [BackupFileName] IS NULL)))");
 
                             t.HasCheckConstraint("CK_CompanyOperations_Completed", "([Status] = N'Completed' AND [Stage] = N'Ready' AND [CompletedAtUtc] IS NOT NULL) OR ([Status] <> N'Completed' AND [CompletedAtUtc] IS NULL)");
 
-                            t.HasCheckConstraint("CK_CompanyOperations_Kind", "[Kind] IN (N'Provision', N'Backup')");
+                            t.HasCheckConstraint("CK_CompanyOperations_Kind", "[Kind] IN (N'Provision', N'Backup', N'Delete')");
 
                             t.HasCheckConstraint("CK_CompanyOperations_Lease", "([Status] = N'Running' AND [LeaseOwner] IS NOT NULL AND [LeaseExpiresAtUtc] IS NOT NULL) OR ([Status] <> N'Running' AND [LeaseOwner] IS NULL AND [LeaseExpiresAtUtc] IS NULL)");
 
                             t.HasCheckConstraint("CK_CompanyOperations_Requester", "[Kind] = N'Backup' OR [RequestedById] IS NOT NULL");
 
-                            t.HasCheckConstraint("CK_CompanyOperations_Stage", "[Stage] IN (N'Requested', N'DatabaseCreated', N'SchemaApplied', N'ProfileInitialized', N'BackupWritten', N'BackupVerified', N'Ready')");
+                            t.HasCheckConstraint("CK_CompanyOperations_Stage", "[Stage] IN (N'Requested', N'DatabaseCreated', N'SchemaApplied', N'ProfileInitialized', N'BackupWritten', N'BackupVerified', N'CompanyDeactivated', N'ArchiveWritten', N'ArchiveVerified', N'DatabaseDropped', N'Ready')");
 
-                            t.HasCheckConstraint("CK_CompanyOperations_Status", "[Status] IN (N'Pending', N'Running', N'Failed', N'NeedsReconciliation', N'Completed')");
+                            t.HasCheckConstraint("CK_CompanyOperations_Status", "[Status] IN (N'Pending', N'Running', N'Failed', N'NeedsReconciliation', N'Completed', N'Cancelled')");
                         });
                 });
 
@@ -675,6 +682,56 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                         });
 
                     b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.DeletedCompany", b =>
+                {
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ArchiveFileName")
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.Property<string>("ArchiveSha256")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("char(64)")
+                        .IsFixedLength();
+
+                    b.Property<long?>("ArchiveSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("CompanyName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("DeletedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("DeletedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DeletedByName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Nip")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("Regon")
+                        .HasMaxLength(14)
+                        .HasColumnType("nvarchar(14)");
+
+                    b.HasKey("CompanyId");
+
+                    b.ToTable("DeletedCompanies", "ops", t =>
+                        {
+                            t.HasCheckConstraint("CK_DeletedCompanies_Archive", "([ArchiveFileName] IS NULL AND [ArchiveSizeBytes] IS NULL AND [ArchiveSha256] IS NULL) OR ([ArchiveFileName] IS NOT NULL AND [ArchiveSizeBytes] > 0 AND [ArchiveSha256] IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Vatowiec.Core.Domain.GusConfiguration", b =>

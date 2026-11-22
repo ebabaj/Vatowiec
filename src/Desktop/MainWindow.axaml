@@ -305,6 +305,7 @@
           <WrapPanel>
             <Button Content="Odśwież" Click="RefreshCompanyOperationsClick" AutomationProperties.AutomationId="RefreshCompanyOperations"/>
             <Button Content="Ponów wybraną operację" Click="RetryCompanyOperationClick" IsEnabled="{Binding CanRetryCompanyOperation}" AutomationProperties.AutomationId="RetryCompanyOperation"/>
+            <Button Content="Anuluj usuwanie" Click="CancelCompanyOperationClick" IsEnabled="{Binding CanCancelCompanyOperation}" AutomationProperties.AutomationId="CancelCompanyOperation"/>
             <Button Content="Poprzednie" Click="CompanyOperationsPreviousClick" IsEnabled="{Binding CompanyOperationsHasPrevious}"/>
             <Button Content="Następne" Click="CompanyOperationsNextClick" IsEnabled="{Binding CompanyOperationsHasNext}"/>
           </WrapPanel>
@@ -317,6 +318,29 @@
             <TextBlock Text="Liczba zachowywanych kopii każdej firmy (1–365); starsze są usuwane automatycznie"/>
             <TextBox Text="{Binding PolicyRetained, Mode=TwoWay}" MaxLength="3" Width="80" HorizontalAlignment="Left" AutomationProperties.AutomationId="PolicyRetained"/>
             <WrapPanel><Button Content="Zapisz ustawienia kopii" Click="SaveBackupPolicyClick" IsEnabled="{Binding CanSaveBackupPolicy}" AutomationProperties.AutomationId="SaveBackupPolicy"/></WrapPanel>
+          </StackPanel>
+          <TextBlock Text="Usuwanie firmy" FontSize="20"/>
+          <TextBlock Text="Usunięcie czyści bazę firmy, jej kopie, prawa użytkowników, historię operacji i audyt. Zostaje tylko wpis w rejestrze usuniętych firm (nazwa, NIP, REGON, data, wykonawca) oraz — jeśli wybrano — kopia archiwalna na serwerze." TextWrapping="Wrap" Opacity="0.7"/>
+          <ComboBox ItemsSource="{Binding InstallationCompanies}" SelectedItem="{Binding CompanyToDelete, Mode=TwoWay}" HorizontalAlignment="Stretch" PlaceholderText="Wybierz firmę" AutomationProperties.AutomationId="CompanyToDelete">
+            <ComboBox.ItemTemplate><DataTemplate x:DataType="contracts:InstallationCompanyResponse"><TextBlock><Run Text="{Binding Name}"/><Run Text=" — "/><Run Text="{Binding DatabaseName}"/></TextBlock></DataTemplate></ComboBox.ItemTemplate>
+          </ComboBox>
+          <CheckBox IsChecked="{Binding DeleteWithArchive, Mode=TwoWay}" AutomationProperties.AutomationId="DeleteWithArchive">
+            <TextBlock Text="Przed usunięciem utwórz kopię archiwalną na serwerze (zalecane)" TextWrapping="Wrap"/>
+          </CheckBox>
+          <WrapPanel><Button Content="Usuń firmę…" Click="RequestCompanyDeleteClick" IsEnabled="{Binding CanRequestCompanyDelete}" AutomationProperties.AutomationId="RequestCompanyDelete"/></WrapPanel>
+          <StackPanel IsVisible="{Binding IsDeleteConfirmVisible}" Spacing="8">
+            <TextBlock Text="{Binding DeleteConfirmText}" TextWrapping="Wrap" FontWeight="SemiBold"/>
+            <WrapPanel><Button Content="Tak, usuń firmę" Click="ConfirmCompanyDeleteClick" AutomationProperties.AutomationId="ConfirmCompanyDelete"/><Button Content="Anuluj" Click="CancelCompanyDeleteConfirmationClick"/></WrapPanel>
+          </StackPanel>
+          <StackPanel IsVisible="{Binding IsDeleteWithoutArchiveWarningVisible}" Spacing="8">
+            <TextBlock Text="{Binding DeleteWithoutArchiveText}" TextWrapping="Wrap" Foreground="#B42318" FontWeight="SemiBold"/>
+            <WrapPanel><Button Content="Usuń bez kopii archiwalnej" Click="ConfirmCompanyDeleteClick" AutomationProperties.AutomationId="ConfirmCompanyDeleteWithoutArchive"/><Button Content="Anuluj" Click="CancelCompanyDeleteConfirmationClick"/></WrapPanel>
+          </StackPanel>
+          <StackPanel IsVisible="{Binding HasDeletedCompanies}" Spacing="4">
+            <TextBlock Text="Usunięte firmy" FontSize="16"/>
+            <ItemsControl ItemsSource="{Binding DeletedCompanyLines}" AutomationProperties.AutomationId="DeletedCompanies">
+              <ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" TextWrapping="Wrap" Opacity="0.8"/></DataTemplate></ItemsControl.ItemTemplate>
+            </ItemsControl>
           </StackPanel>
           <WrapPanel><Button Content="Wróć" Click="CloseCompanyOperationsClick" AutomationProperties.AutomationId="CloseCompanyOperations"/><Button Content="Wyloguj" Click="LogoutClick"/></WrapPanel>
         </StackPanel>

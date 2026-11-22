@@ -61,8 +61,18 @@ potem żona, potem sp. z o.o. — kolejno, nie jednocześnie).
 ## Kolejność wdrożenia
 
 1. Nazwy baz z nazwy firmy i zmiana nazwy bazy Tenjin — **wdrożone 2026-11-22**.
-2. ADR-044 krok 2: kopia z rotacją i harmonogramem.
-3. Usuwanie firmy z kopią archiwalną i rejestrem usuniętych firm.
+2. ADR-044 krok 2: kopia z rotacją i harmonogramem — **wdrożone 2026-11-22**.
+3. Usuwanie firmy z kopią archiwalną i rejestrem usuniętych firm — **wdrożone 2026-11-22**
+   ([instrukcja](../company-deletion.md)). Rozstrzygnięcia techniczne: firma jest
+   dezaktywowana od początku usuwania; anulowanie możliwe do chwili usunięcia bazy;
+   usuwane są też pliki zwykłych kopii firmy; archiwum w `{BackupRoot}\_archive\`;
+   wyjątek od niezmienności historii przez `SESSION_CONTEXT` tylko w transakcji
+   czyszczenia i tylko dla wierszy usuwanej firmy.
+   Uzupełnienie decyzji właściciela (2026-11-22): przy usuwaniu z kopią archiwalną
+   usuwana historia z System jest zapisywana do `….history.json` obok archiwum; firma
+   jest dezaktywowana już przy przyjęciu zlecenia. Usunięcie **bez** archiwum startuje
+   najwcześniej po 10 minutach (czas na anulowanie) — celowo nieopisane w instrukcji
+   użytkownika ani w interfejsie (`CompanyOperationRequests.DeleteWithoutArchiveGrace`).
 4. ADR-044 krok 3: odtworzenie istniejącej firmy oraz przywrócenie usuniętej.
 
 ## Konsekwencje i ryzyko
