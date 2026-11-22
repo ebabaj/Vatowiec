@@ -262,7 +262,7 @@ Hash jest związany z regułami/binary biblioteki, wynikiem, danymi, firmą, akt
 operacją i rowversion. Zmiana reguł wymaga nowego potwierdzenia niezapisanego
 żądania. Udany retry POST zwraca historyczny wynik bez kolejnego audytu.
 
-IbanNet 6.2.0 jest przypięty centralnie, bez aktualizacji w trakcie działania.
+IbanNet 6.2.1 jest przypięty centralnie, bez aktualizacji w trakcie działania.
 Dependabot sprawdza tylko ten pakiet co tydzień i może otworzyć PR; nie zatwierdza
 ani nie scala go automatycznie. Aktualizacja pakietu/reguł krajowych wymaga testów
 i wydania VATowca. [Licencja i autor](../licenses/THIRD-PARTY-NOTICES.md),

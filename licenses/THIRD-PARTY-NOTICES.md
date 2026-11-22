@@ -1,12 +1,12 @@
 # IbanNet
 
-VATowiec wykorzystuje niezmodyfikowany oficjalny pakiet NuGet **IbanNet 6.2.0**.
+VATowiec wykorzystuje niezmodyfikowany oficjalny pakiet NuGet **IbanNet 6.2.1**.
 Autor: **Martijn Bodeman** (skwasjer). Metadane pakietu: Copyright © 2019.
 Licencja: **Apache License, Version 2.0**; pełny tekst: [IbanNet/LICENSE.md](IbanNet/LICENSE.md).
 
-- Pakiet: https://www.nuget.org/packages/IbanNet/6.2.0
-- Źródło: https://github.com/skwasjer/IbanNet/tree/v6.2.0
-- Commit wydania: 4c46768a0697aebaefd3afd73677ab3c0b158c3e
+- Pakiet: https://www.nuget.org/packages/IbanNet/6.2.1
+- Źródło: https://github.com/skwasjer/IbanNet/tree/v6.2.1
+- Commit wydania: 845cf64e9280facceedd7ebd4be2640edf0e7d5d
 - Licencja pochodzi z LICENSE.md tego wydania. Pakiet deklaruje Apache-2.0
   w nuspec; w archiwum NuGet i drzewie wydania nie znaleziono dodatkowego NOTICE.
 

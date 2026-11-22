@@ -304,7 +304,7 @@ identyfikują pozycję w ContractorChanges; OperationKind rozszerza istniejącą
 operacji na wszystkie kartoteki i dodawanie rodzaju adresu, bez nowej tabeli.
 
 Przygotowanie rachunku w Application/API usuwa białe znaki i zmienia litery
-na wielkie. ADR-025 zastępuje bank-text-v1 kontrolą IbanNet 6.2.0 za własnym
+na wielkie. ADR-025 zastępuje bank-text-v1 kontrolą IbanNet (obecnie 6.2.1) za własnym
 IBankAccountValidator. NRB (26 cyfr) sprawdzamy na kopii z PL, bez zmiany formatu
 zapisu. IBAN ma kontrolę kraju, struktury i sumy kontrolnej. Wynik nie potwierdza
 istnienia rachunku, właściciela, banku ani BIC. Format spoza IBAN pozostaje
@@ -1197,7 +1197,7 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | [ADR-022](docs/adr/ADR-022-dataport-i-sekrety-firmy.md) | DataPort i ustawienia firmy | Osobny adapter pośrednika, szyfrowany lokalny klucz, kontrola uprawnień i selektywny import do szkicu; bez zmiany oficjalnych adapterów TEST |
 | [ADR-023](docs/adr/ADR-023-waluty-i-reczne-kursy-nbp.md) | Waluty i ręczne kursy NBP | Lokalny słownik/ustawienia A/B/C, kursy decimal, jawne konflikty i audyt, stronicowany ekran Avalonia; bez harmonogramu i reguł faktur |
 | [ADR-024](docs/adr/ADR-024-kod-iso-jako-klucz-waluty.md) | ISO 4217 jako jedyny identyfikator waluty | Code char(3) PK, CurrencyCode FK, brak numerycznego Id waluty; odtworzenie wyłącznie demonstracyjnego modułu walut i kursów |
-| [ADR-025](docs/adr/ADR-025-walidacja-rachunkow-ibannet.md) | Walidacja rachunków | IbanNet 6.2.0 za interfejsem Application, NRB/IBAN, wersjonowane potwierdzenie ostrzeżeń, wynik w Avalonia, licencja i kontrolowane aktualizacje |
+| [ADR-025](docs/adr/ADR-025-walidacja-rachunkow-ibannet.md) | Walidacja rachunków | IbanNet (obecnie 6.2.1) za interfejsem Application, NRB/IBAN, wersjonowane potwierdzenie ostrzeżeń, wynik w Avalonia, licencja i kontrolowane aktualizacje |
 | [ADR-026](docs/adr/ADR-026-ewib-i-normalizacja-rachunkow.md) | Normalizacja i dane banku EWIB | Wspólne separatory, wersja v3, odrębny adapter NBP, bezpieczne propozycje nazwy/BIC tylko do szkicu, bez nowych tabel |
 | [ADR-028](docs/adr/ADR-028-centralny-klucz-gus-i-produkcja.md) | Centralny klucz GUS i produkcyjne adaptery | Wspólny sekret instalacji chroniony DPAPI/Data Protection, centralna rola, zachowane firmy i niezależność rejestrów; publiczną konfigurację zastępuje ADR-029 |
 | [ADR-029](docs/adr/ADR-029-ustawienia-rejestrow-w-instalacji.md) | Publiczna konfiguracja rejestrów w instalacji | Ustawienia TEST/PRODUKCJA i URL GUS/MF/VIES w System i Avalonia, jawne potwierdzenie, scoped snapshot bez restartu, niezmienny atomowy audyt |

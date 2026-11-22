@@ -44,6 +44,13 @@ Licencja Apache-2.0 i informacja o autorze są kopiowane do build/publish progra
 przez Directory.Build.targets. Sprawdzono nuspec, archiwum i oficjalny tag 6.2.0:
 brak dodatkowego NOTICE. Nie zmieniamy licencji własnego kodu.
 
+Aktualizacja 2026-11-22: IbanNet 6.2.1 (PR Dependabota, wydanie z 2026-11-04,
+commit 845cf64e9280facceedd7ebd4be2640edf0e7d5d). Jedyna zmiana reguł: przywrócony
+identyfikator oddziału dla PT (regresja 6.2.0); struktura BBAN i sumy kontrolne
+bez zmian. Licencja Apache-2.0 i LICENSE.md bez zmian, brak NOTICE w paczce i tagu.
+Zmiana wersji/MVID biblioteki zmienia RuleVersion, więc niezapisane potwierdzenia
+ostrzeżeń sprzed aktualizacji wymagają ponownego potwierdzenia (zgodnie z decyzją).
+
 ## Kryteria akceptacji
 
 NRB/PL, DE/GB/FR, checksum, długość, kraj, znaki, non-IBAN i normalizacja;
