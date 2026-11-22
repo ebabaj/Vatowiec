@@ -99,5 +99,5 @@ public sealed partial class MainViewModel
         });
     }
     public void CloseGusSettings() { if (!busy) { ResetGusSettings(); ChangedAll(); _ = LoadContractors(); } }
-    private void ResetGusSettings() { ResetCompanyOperations(); gusSettings = false; gusConfiguration = null; confirmGusDelete = false; registryConfigurations = []; registrySettingsEditor = null; registryServiceIndex = 0; }
+    private void ResetGusSettings() { ResetCompanyOperations(); serverCertificate = null; gusSettings = false; gusConfiguration = null; confirmGusDelete = false; registryConfigurations = []; registrySettingsEditor = null; registryServiceIndex = 0; }
 }

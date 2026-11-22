@@ -32,9 +32,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
     }
 
     public MainViewModel(Func<string, IVatowiecApiClient>? connect = null, TimeProvider? clock = null,
-        ILoginPreferencesStore? preferencesStore = null, ILoginCredentialStore? credentialStore = null, string? apiAddressOverride = null)
+        ILoginPreferencesStore? preferencesStore = null, ILoginCredentialStore? credentialStore = null, string? apiAddressOverride = null,
+        IServerTrustStore? trustStore = null)
     {
-        this.connect = connect ?? VatowiecApiClient.Connect;
+        this.trustStore = trustStore ?? new MemoryServerTrustStore();
+        this.connect = connect ?? (address => VatowiecApiClient.Connect(address, FindTrust(address)));
         this.clock = clock ?? TimeProvider.System;
         this.preferencesStore = preferencesStore ?? new MemoryLoginPreferencesStore();
         this.credentialStore = credentialStore ?? new UnavailableLoginCredentialStore();
@@ -46,7 +48,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
     public bool IsBusy => busy;
     public bool CanInteract => !busy && personalFailure == null;
     public bool IsLogin => session is null;
-    public bool IsCompanySelection => session is not null && profile is null && !gusSettings && !usersSettings && !IsOwnPasswordChange && !passwordPolicyScreen && !companyOperationsScreen;
+    public bool IsCompanySelection => session is not null && profile is null && !gusSettings && !usersSettings && !IsOwnPasswordChange && !passwordPolicyScreen && !companyOperationsScreen && serverCertificate == null;
     public bool IsWorkspace => session is not null && profile is not null;
     public string CurrentUser => session?.UserName ?? "";
     public string CurrentCompany => profile?.Name ?? "";
@@ -260,7 +262,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
                 message = "Hasło wymaga zmiany. Ustaw własne hasło przed dalszą pracą.";
                 return;
             }
-            if (ex.StatusCode == 403 && (IsUsersSettings || IsPasswordPolicyScreen || IsCompanyOperationsScreen))
+            if (ex.StatusCode == 403 && (IsUsersSettings || IsPasswordPolicyScreen || IsCompanyOperationsScreen || IsServerCertificateScreen))
             {
                 ResetUsersSettings(); ResetGusSettings(); ResetPasswordPolicy();
                 if (session != null) session = session with { IsInstallationAdministrator = false };
@@ -285,8 +287,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
                 _ => "Nie można potwierdzić bezpiecznego kanału Windows do lokalnego API Personal. Zamknij program i uruchom ponownie. Zapisane dane pozostają zachowane."
             } : ex switch
             {
-                HttpRequestException { HttpRequestError: HttpRequestError.SecureConnectionError } =>
-                    "Nie można potwierdzić bezpiecznego połączenia HTTPS z API. Sprawdź certyfikat serwera: zaufanie, ważność i zgodność nazwy z adresem. Skontaktuj się z administratorem.",
+                HttpRequestException { HttpRequestError: HttpRequestError.SecureConnectionError } => SecureConnectionMessage(),
                 TaskCanceledException =>
                     "Przekroczono czas oczekiwania na API. Sprawdź adres serwera, połączenie LAN lub VPN i dostępność API. Spróbuj ponownie.",
                 JsonException =>

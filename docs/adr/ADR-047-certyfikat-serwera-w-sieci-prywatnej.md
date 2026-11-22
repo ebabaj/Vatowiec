@@ -1,7 +1,9 @@
 # ADR-047: certyfikat serwera API i zaufanie klientów w sieci prywatnej
 
-Data: 2026-11-22. **Status: PRZYJĘTY — akceptacja właściciela 2026-11-22**, łącznie
-z rozstrzygnięciem kwestii 1–3 zgodnie z propozycją (sekcja na końcu). ADR-047
+Data: 2026-11-22. **Status: PRZYJĘTY — akceptacja właściciela 2026-11-22; WDROŻONY 2026-11-22**
+(kroki 1–3 i 5; rotacja planowa poza pierwszym wydaniem zgodnie z decyzją 3; szczegóły
+i odstępstwa techniczne w sekcji „Wdrożenie”). Instrukcja: [docs/server-certificate.md](../server-certificate.md).
+Łącznie z rozstrzygnięciem kwestii 1–3 zgodnie z propozycją (sekcja na końcu). ADR-047
 uzupełnia ADR-016: klient stosuje standardową walidację certyfikatu systemu albo
 walidację z kotwicą CA instalacji według tego ADR, nigdy walidację z pominięciem.
 
@@ -65,9 +67,9 @@ wyłącznie kotwicą zaufania.
 
 - Usługa VATowiec Operations (ADR-044) tworzy jednorazowo **CA instalacji**:
   ECDSA P-256, ważność 10 lat, `BasicConstraints CA=true, pathLen=0`,
-  KeyUsage `keyCertSign, cRLSign`. Klucz prywatny jest nieeksportowalny (CNG,
-  `LocalMachine`) i dostępny wyłącznie dla konta usługi Operations. Konto API nie ma
-  do niego dostępu.
+  KeyUsage `keyCertSign, cRLSign`. Klucz prywatny jest dostępny wyłącznie dla konta
+  usługi Operations (we wdrożeniu: Data Protection + DPAPI konta usługi zamiast CNG
+  `LocalMachine`, sekcja „Wdrożenie”, pkt 2). Konto API nie ma do niego dostępu.
 - CA instalacji wystawia **certyfikat serwera API**: ECDSA P-256, ważność 1 rok,
   EKU Server Authentication. SAN zawiera skonfigurowane nazwy DNS (krótką i FQDN),
   adresy IP z adresów nasłuchu oraz `localhost`, `127.0.0.1` i `::1` (pierwsze
@@ -103,7 +105,7 @@ wyłącznie kotwicą zaufania.
   instalacji widzi kod i może zapisać plik w Avalonia (Ustawienia instalacji →
   Certyfikat serwera).
 - Serwer dołącza certyfikat CA do łańcucha wysyłanego w uzgadnianiu TLS, aby klient
-  z samym kodem mógł zbudować i sprawdzić łańcuch.
+  z samym kodem mógł zbudować i sprawdzić łańcuch (sposób: sekcja „Wdrożenie”, pkt 1).
 
 **Klient**
 
@@ -112,8 +114,8 @@ wyłącznie kotwicą zaufania.
   Nie jest stosowana dla żadnego innego adresu. Nic nie trafia do systemowego magazynu
   certyfikatów.
 - Walidacja dla originu z przypiętą kotwicą: łańcuch budowany przez
-  `X509ChainPolicy` z `TrustMode = CustomRootTrust` i `CustomTrustStore` zawierającym
-  wyłącznie CA instalacji; wymagane: zgodność nazwy hosta, terminy ważności, EKU
+  `X509ChainPolicy` z `TrustMode = CustomRootTrust` (we wdrożeniu: pusty magazyn
+  i kontrola przypiętego skrótu ostatniego elementu, sekcja „Wdrożenie”, pkt 1); wymagane: zgodność nazwy hosta, terminy ważności, EKU
   Server Authentication, poprawne podpisy; korzeń łańcucha musi mieć przypięty skrót.
   Błąd niezgodności nazwy (`RemoteCertificateNameMismatch`) zawsze odrzuca połączenie.
 - Jeśli łańcuch jest zaufany przez system (np. serwer przeszedł na tryb A z firmowym
@@ -228,6 +230,40 @@ Serwer:
 - zmiany wyłącznie przez administratora instalacji, z CSRF, wersją i audytem bez
   sekretów; lokalna komenda odzyskiwania przywraca tryb B;
 - klucze, hasła PFX i PEM kluczy nie pojawiają się w logach ani repozytorium.
+
+## Wdrożenie (2026-11-22)
+
+Zakres: wspólny kod i plik połączenia oraz walidator (`SharedContracts/ServerTls`), migracja
+System `ServerTlsCertificate`, usługa Operations (`src/Server/Operations/ServerTls`), dostawca
+certyfikatu i endpointy API, parowanie na ekranie logowania i ekran „Certyfikat serwera”
+w Avalonia, komenda `tls status | reset-mode-b`. Odstępstwa techniczne od tekstu decyzji,
+wynikające z prób na Windows (kierunek i gwarancje bez zmian):
+
+1. **Przekazanie CA stacji z samym kodem.** TLS (SChannel/.NET) nigdy nie wysyła certyfikatu
+   samopodpisanego korzenia łańcucha, a Windows CryptoAPI nie dekoduje OID z łukiem
+   128-bitowym (`2.25.<UUID>`), więc odpadło też niestandardowe rozszerzenie z kopią CA.
+   Certyfikat CA instalacji jest więc **podpisany jednorazowym kluczem startowym**,
+   niszczonym od razu po podpisie; serwer wysyła go jako certyfikat pośredni. Klient buduje
+   łańcuch z pustym własnym magazynem zaufania i `AllowUnknownCertificateAuthority`,
+   a następnie wymaga dokładnie dwóch elementów, CA (BasicConstraints) i przypiętego skrótu
+   klucza ostatniego elementu. Terminy, podpisy, nazwa hosta i EKU są sprawdzane zawsze
+   (testy negatywne w `ServerTlsTests`). Zaufanie wynika wyłącznie z przypiętego klucza CA.
+2. **Ochrona klucza CA.** Zamiast nieeksportowalnego klucza CNG w `LocalMachine` (wymaga
+   praw administratora, nieprzenośne) klucz CA jest zapisany jako PKCS#8 chroniony
+   Data Protection + DPAPI **konta usługi Operations** (osobny purpose związany
+   z identyfikatorem instalacji), w katalogu z chronionym ACL — ten sam wzorzec co klucz GUS.
+   Konto API nie odszyfruje klucza nawet przy błędnym ACL.
+3. **Zlecenia zmian.** Zamiast kolejki `ops` z nowym rodzajem operacji: administrator zapisuje
+   konfigurację docelową (`security.ServerTlsConfiguration`, rowversion, audyt), a Operations
+   doprowadza stan do konfiguracji (`security.ServerTlsState` zapisuje wyłącznie usługa;
+   sprawdzenie przy zmianie wersji konfiguracji i co 5 minut). Wymiana CA = zwiększenie
+   `CaGeneration`. API nadal nie ma dostępu do kluczy CA ani ACL.
+
+Dodatkowo: certyfikat zarządzany podają tylko endpointy Kestrela wymienione
+w `ServerTls:Endpoints` (pozostałe, np. localhost z certyfikatem deweloperskim, bez zmian);
+w trybie A źródłem jest wyłącznie `LocalMachine\My` (PFX dla serwera Linux — później);
+przy niedostępnej bazie API zachowuje ostatnio znany tryb i nadal wczytuje odnowiony plik;
+utrata plików znanego CA daje błąd `tls_ca_missing` zamiast cichego utworzenia nowego CA.
 
 ## Decyzje właściciela (2026-11-22)
 

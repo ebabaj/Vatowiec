@@ -1066,6 +1066,170 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                         });
                 });
 
+            modelBuilder.Entity("Vatowiec.Core.Domain.ServerTlsChange", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActorName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("AfterJson")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)");
+
+                    b.Property<DateTimeOffset>("AtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("BeforeJson")
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AtUtc");
+
+                    b.ToTable("ServerTlsChanges", "audit", t =>
+                        {
+                            t.HasTrigger("TR_ServerTlsChanges_Immutable");
+                        });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.ServerTlsConfiguration", b =>
+                {
+                    b.Property<byte>("SingletonKey")
+                        .HasColumnType("tinyint");
+
+                    b.Property<int>("CaGeneration")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DnsNames")
+                        .IsRequired()
+                        .HasMaxLength(6000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("IpAddresses")
+                        .IsRequired()
+                        .HasMaxLength(1200)
+                        .HasColumnType("nvarchar(1200)");
+
+                    b.Property<string>("IssuerThumbprint")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("SingletonKey");
+
+                    b.ToTable("ServerTlsConfiguration", "security", t =>
+                        {
+                            t.HasCheckConstraint("CK_ServerTlsConfiguration_Generation", "[CaGeneration] >= 1");
+
+                            t.HasCheckConstraint("CK_ServerTlsConfiguration_Mode", "[Mode] IN (N'InstallationCa', N'OwnCertificate')");
+
+                            t.HasCheckConstraint("CK_ServerTlsConfiguration_Singleton", "[SingletonKey] = 1");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            SingletonKey = (byte)1,
+                            CaGeneration = 1,
+                            DnsNames = "",
+                            IpAddresses = "",
+                            Mode = "InstallationCa"
+                        });
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.ServerTlsState", b =>
+                {
+                    b.Property<byte>("SingletonKey")
+                        .HasColumnType("tinyint");
+
+                    b.Property<byte[]>("CaCertificate")
+                        .HasMaxLength(8192)
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<int>("CaGeneration")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("CaNotAfter")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CaSpkiSha256")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("char(64)")
+                        .IsFixedLength();
+
+                    b.Property<string>("CaThumbprint")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTimeOffset?>("LastErrorAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("ServerCertificateNames")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("ServerCertificateNotAfter")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ServerCertificateThumbprint")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("SingletonKey");
+
+                    b.ToTable("ServerTlsState", "security", t =>
+                        {
+                            t.HasCheckConstraint("CK_ServerTlsState_Singleton", "[SingletonKey] = 1");
+                        });
+                });
+
             modelBuilder.Entity("Vatowiec.Core.Domain.TableView", b =>
                 {
                     b.Property<long>("Id")

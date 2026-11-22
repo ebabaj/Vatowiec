@@ -114,8 +114,8 @@ public sealed class CompanyModelTests
     {
         using var system = new SystemDbContextFactory().CreateDbContext([]);
         using var company = new CompanyDbContextFactory().CreateDbContext([]);
-        Assert.Equal(19, system.Database.GetMigrations().Count());
-        Assert.EndsWith("_CompanyRestore", system.Database.GetMigrations().Last());
+        Assert.Equal(20, system.Database.GetMigrations().Count());
+        Assert.EndsWith("_ServerTlsCertificate", system.Database.GetMigrations().Last());
         Assert.Equal(9, company.Database.GetMigrations().Count());
         Assert.EndsWith("_ContractorFinance", company.Database.GetMigrations().Last());
         Assert.False(system.Database.HasPendingModelChanges());
@@ -137,6 +137,10 @@ public sealed class CompanyModelTests
         Assert.Contains("TR_CompanyOperationEvents_Immutable", systemSql);
         Assert.Contains("[ops].[CompanyBackups]", systemSql);
         Assert.Contains("TR_BackupSettingChanges_Immutable", systemSql);
+        Assert.Contains("[security].[ServerTlsConfiguration]", systemSql);
+        Assert.Contains("[security].[ServerTlsState]", systemSql);
+        Assert.Contains("TR_ServerTlsChanges_Immutable", systemSql);
+        Assert.DoesNotContain("ServerTls", companySql);
         Assert.DoesNotContain("[ops].", companySql);
         Assert.DoesNotContain("[security].[PasswordPolicy]", companySql);
         Assert.DoesNotContain("[audit].[UserAdministrationChanges]", companySql);

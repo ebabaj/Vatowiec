@@ -22,6 +22,11 @@ internal static class ApiPipeline
         services.AddScoped<IdentifierChecks>();
         services.AddScoped<CompanyOperationRequests>();
         services.AddScoped<CompanyBackupService>();
+        services.AddScoped<Core.Infrastructure.ServerTls.ServerTlsService>();
+        services.AddSingleton<Core.Infrastructure.ServerTls.IServerCertificateSource, Core.Infrastructure.ServerTls.LocalMachineCertificateSource>();
+        services.AddSingleton(sp => Core.Infrastructure.ServerTls.ServerTlsPaths.From(sp.GetRequiredService<IConfiguration>()));
+        services.AddSingleton<ServerCertificateProvider>();
+        services.AddHostedService(sp => sp.GetRequiredService<ServerCertificateProvider>());
         Core.Infrastructure.Registries.RegistryRegistration.AddRegistryAdapters(services);
         return services;
     }

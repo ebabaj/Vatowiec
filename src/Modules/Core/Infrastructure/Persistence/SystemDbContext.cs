@@ -34,6 +34,9 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
     public DbSet<BackupReminderSnooze> BackupReminderSnoozes => Set<BackupReminderSnooze>();
     public DbSet<DeletedCompany> DeletedCompanies => Set<DeletedCompany>();
     public DbSet<RestoreImportFile> RestoreImportFiles => Set<RestoreImportFile>();
+    public DbSet<ServerTlsConfiguration> ServerTlsConfigurations => Set<ServerTlsConfiguration>();
+    public DbSet<ServerTlsState> ServerTlsStates => Set<ServerTlsState>();
+    public DbSet<ServerTlsChange> ServerTlsChanges => Set<ServerTlsChange>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -155,6 +158,9 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
         modelBuilder.ApplyConfiguration(new BackupReminderSnoozeConfiguration());
         modelBuilder.ApplyConfiguration(new DeletedCompanyConfiguration());
         modelBuilder.ApplyConfiguration(new RestoreImportFileConfiguration());
+        modelBuilder.ApplyConfiguration(new ServerTlsConfigurationMapping());
+        modelBuilder.ApplyConfiguration(new ServerTlsStateMapping());
+        modelBuilder.ApplyConfiguration(new ServerTlsChangeMapping());
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)

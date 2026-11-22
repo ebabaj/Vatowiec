@@ -10,6 +10,17 @@ public static class OperationsProgram
 {
     public static async Task Main(string[] args)
     {
+        if (ServerTls.ServerTlsCommand.Matches(args))
+        {
+            // ADR-047: lokalna komenda administracyjna zamiast uruchomienia usługi.
+            // Konfiguracja jak usługi: appsettings z katalogu programu, niezależnie od bieżącego katalogu konsoli.
+            var commandHost = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+            {
+                Args = [], ContentRootPath = AppContext.BaseDirectory, EnvironmentName = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
+            });
+            Environment.ExitCode = OperatingSystem.IsWindows() ? await ServerTls.ServerTlsCommand.Run(args, commandHost.Configuration) : 5;
+            return;
+        }
         var builder = Host.CreateApplicationBuilder(args);
         builder.Services.AddWindowsService(options => options.ServiceName = "VATowiec Operations");
 
@@ -27,6 +38,12 @@ public static class OperationsProgram
         builder.Services.AddScoped<BackupScheduler>();
         builder.Services.AddScoped<BackupImportScanner>();
         builder.Services.AddScoped<CompanyOperationExecutor>();
+        if (OperatingSystem.IsWindows())
+        {
+            builder.Services.AddSingleton(Vatowiec.Core.Infrastructure.ServerTls.ServerTlsPaths.From(builder.Configuration));
+            builder.Services.AddSingleton<ServerTls.ServerTlsStore>();
+            builder.Services.AddScoped<ServerTls.ServerTlsReconciler>();
+        }
         builder.Services.AddHostedService<OperationsWorker>();
 
         await builder.Build().RunAsync();

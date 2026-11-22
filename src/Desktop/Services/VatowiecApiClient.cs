@@ -83,6 +83,10 @@ public interface IVatowiecApiClient : IDisposable
     Task<CompanyOperationResponse> CancelCompanyOperation(Guid operationId, CompanyOperationRetryRequest value) => throw new NotSupportedException();
     Task<RestoreSourceResponse[]> RestoreSources() => throw new NotSupportedException();
     Task<CompanyOperationResponse> RestoreCompany(RestoreCompanyRequest value) => throw new NotSupportedException();
+    Task<SharedContracts.ServerTls.ServerTlsResponse> ServerCertificate() => throw new NotSupportedException();
+    Task<SharedContracts.ServerTls.ServerTlsResponse> SaveServerCertificate(SharedContracts.ServerTls.ServerTlsRequest value) => throw new NotSupportedException();
+    Task<SharedContracts.ServerTls.ServerTlsResponse> RequestCaReplacement(SharedContracts.ServerTls.ServerTlsCaReplacementRequest value) => throw new NotSupportedException();
+    Task<SharedContracts.ServerTls.ConnectionFileContent> ServerConnectionFile() => throw new NotSupportedException();
 }
 
 public sealed class ApiException(int statusCode, string message) : Exception(message)
@@ -110,16 +114,28 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         return uri;
     }
 
-    public static VatowiecApiClient Connect(string address)
+    public static VatowiecApiClient Connect(string address) => Connect(address, null);
+
+    // ADR-016/047: standardowa walidacja certyfikatu HTTPS; dla adresu z przypiętą kotwicą CA instalacji
+    // dodatkowo walidacja względem tej kotwicy (nazwa, terminy, podpisy i EKU zawsze wymagane). Cookie tylko w pamięci.
+    public static VatowiecApiClient Connect(string address, SharedContracts.ServerTls.InstallationTrustAnchor? anchor)
     {
         var uri = ValidateAddress(address);
-        // Standardowa walidacja certyfikatu HTTPS. Cookie tylko w pamięci procesu.
         var handler = new HttpClientHandler
         {
             CookieContainer = new CookieContainer(),
             UseCookies = true,
             AllowAutoRedirect = false
         };
+        if (anchor != null)
+        {
+            var host = uri.IdnHost;
+            handler.ServerCertificateCustomValidationCallback = (request, certificate, chain, errors) =>
+                request.RequestUri is { } target && string.Equals(target.IdnHost, host, StringComparison.OrdinalIgnoreCase) && target.Port == uri.Port &&
+                SharedContracts.ServerTls.InstallationCertificateValidation.Validate(certificate,
+                    chain?.ChainPolicy.ExtraStore.Cast<System.Security.Cryptography.X509Certificates.X509Certificate2>() ?? [],
+                    host, errors, anchor) != SharedContracts.ServerTls.InstallationTrustResult.Rejected;
+        }
         return new VatowiecApiClient(new HttpClient(handler)
         {
             BaseAddress = uri,
@@ -190,6 +206,13 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         Post<CompanyBackupStatusResponse>($"api/v1/companies/{companyId}/backups/reminder/snooze", new { });
     public Task<BackupPolicyResponse> BackupPolicy() => Get<BackupPolicyResponse>("api/v1/installation/backup-policy");
     public Task<BackupPolicyResponse> SaveBackupPolicy(BackupPolicyRequest value) => Write<BackupPolicyResponse>("api/v1/installation/backup-policy", value, true);
+    public Task<SharedContracts.ServerTls.ServerTlsResponse> ServerCertificate() => Get<SharedContracts.ServerTls.ServerTlsResponse>("api/v1/installation/server-certificate");
+    public Task<SharedContracts.ServerTls.ServerTlsResponse> SaveServerCertificate(SharedContracts.ServerTls.ServerTlsRequest value) =>
+        Write<SharedContracts.ServerTls.ServerTlsResponse>("api/v1/installation/server-certificate", value, true);
+    public Task<SharedContracts.ServerTls.ServerTlsResponse> RequestCaReplacement(SharedContracts.ServerTls.ServerTlsCaReplacementRequest value) =>
+        Post<SharedContracts.ServerTls.ServerTlsResponse>("api/v1/installation/server-certificate/ca-replacement", value);
+    public Task<SharedContracts.ServerTls.ConnectionFileContent> ServerConnectionFile() =>
+        Get<SharedContracts.ServerTls.ConnectionFileContent>("api/v1/installation/server-certificate/connection-file");
     public Task<InstallationCompanyResponse[]> InstallationCompanies() => Get<InstallationCompanyResponse[]>("api/v1/installation/companies");
     public Task<DeletedCompanyResponse[]> DeletedCompanies() => Get<DeletedCompanyResponse[]>("api/v1/installation/deleted-companies");
     public Task<CompanyOperationResponse> DeleteCompany(DeleteCompanyRequest value) =>

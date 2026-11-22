@@ -1,0 +1,53 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Vatowiec.Desktop.ViewModels"
+             x:Class="Vatowiec.Desktop.ServerCertificateView" x:DataType="vm:MainViewModel">
+  <ScrollViewer>
+    <StackPanel Spacing="12" MaxWidth="860" HorizontalAlignment="Left">
+      <TextBlock Text="Ustawienia instalacji → Bezpieczeństwo → Certyfikat serwera" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>
+      <TextBlock Text="Stacje łączą się z API wyłącznie przez HTTPS. Bez firmowego urzędu certyfikacji użyj CA instalacji VATowiec: każdą stację parujesz raz kodem albo plikiem połączenia. Firma z własnym CA (np. domena Windows) albo certyfikatem publicznym wybiera certyfikat własny."
+                 TextWrapping="Wrap"/>
+      <TextBlock IsVisible="{Binding !ServerCertificate.IsLoaded}" Text="Nie wczytano ustawień z bazy systemowej instalacji. Sprawdź komunikat i wybierz Odśwież." TextWrapping="Wrap" AutomationProperties.AutomationId="ServerCertificateNotLoaded"/>
+      <StackPanel DataContext="{Binding ServerCertificate}" x:DataType="vm:ServerCertificateViewModel" Spacing="10" IsVisible="{Binding IsLoaded}">
+        <Border BorderBrush="#2F6FB3" BorderThickness="1" CornerRadius="4" Padding="12">
+          <StackPanel Spacing="6">
+            <TextBlock Text="Kod połączenia (CA instalacji)" FontWeight="SemiBold"/>
+            <SelectableTextBlock Text="{Binding ConnectionCode}" FontFamily="Consolas,Cascadia Mono,monospace" FontSize="20" AutomationProperties.AutomationId="ServerConnectionCode"/>
+            <TextBlock Text="Kod nie jest tajny, ale przekaż go stacjom osobiście albo zaufanym kanałem (wydruk, pendrive). Na stacji: ekran logowania → Ustawienia połączenia → Kod połączenia. Program nigdy nie instaluje tego CA w magazynie certyfikatów Windows i nie dodawaj go tam ręcznie."
+                       TextWrapping="Wrap" Opacity="0.75"/>
+          </StackPanel>
+        </Border>
+        <TextBlock Text="{Binding InstallationCaSummary}" TextWrapping="Wrap" AutomationProperties.AutomationId="InstallationCaSummary"/>
+        <TextBlock Text="{Binding ServedSummary}" TextWrapping="Wrap" AutomationProperties.AutomationId="ServedCertificateSummary"/>
+        <ItemsControl ItemsSource="{Binding Warnings}" IsVisible="{Binding HasWarnings}" AutomationProperties.AutomationId="ServerCertificateWarnings">
+          <ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" Foreground="#9A6700" TextWrapping="Wrap"/></DataTemplate></ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Text="Tryb certyfikatu" FontWeight="SemiBold" Margin="0,6,0,0"/>
+        <RadioButton GroupName="ServerTlsMode" IsChecked="{Binding IsInstallationCa, Mode=TwoWay}" AutomationProperties.AutomationId="ServerTlsModeInstallationCa">
+          <TextBlock Text="CA instalacji VATowiec — certyfikat wystawia i odnawia usługa VATowiec Operations; stacje parowane kodem lub plikiem połączenia." TextWrapping="Wrap"/>
+        </RadioButton>
+        <RadioButton GroupName="ServerTlsMode" IsChecked="{Binding IsOwnCertificate, Mode=TwoWay}" AutomationProperties.AutomationId="ServerTlsModeOwn">
+          <TextBlock Text="Certyfikat własny — z magazynu „Lokalny komputer → Osobisty” (firmowe CA, certyfikat publiczny); stacje ufają mu przez Windows." TextWrapping="Wrap"/>
+        </RadioButton>
+        <TextBlock Text="Nazwy DNS serwera (po jednej w wierszu). W trybie CA instalacji puste pole oznacza nazwę komputera i jego FQDN; w trybie certyfikatu własnego certyfikat musi zawierać wszystkie podane nazwy." TextWrapping="Wrap"/>
+        <TextBox Text="{Binding DnsNames, Mode=TwoWay}" AcceptsReturn="True" MinHeight="72" AutomationProperties.AutomationId="ServerTlsDnsNames"/>
+        <TextBlock Text="Adresy IP serwera (po jednym w wierszu, opcjonalnie)" TextWrapping="Wrap"/>
+        <TextBox Text="{Binding IpAddresses, Mode=TwoWay}" AcceptsReturn="True" MinHeight="52" AutomationProperties.AutomationId="ServerTlsIpAddresses"/>
+        <TextBlock Text="Odcisk wystawcy (opcjonalnie: SHA-1 lub SHA-256 certyfikatu firmowego CA, które ma wystawić certyfikat serwera)" IsVisible="{Binding IsOwnCertificate}" TextWrapping="Wrap"/>
+        <TextBox Text="{Binding IssuerThumbprint, Mode=TwoWay}" IsVisible="{Binding IsOwnCertificate}" MaxLength="100" AutomationProperties.AutomationId="ServerTlsIssuer"/>
+      </StackPanel>
+      <WrapPanel>
+        <Button Content="Zapisz ustawienia" Click="SaveClick" IsEnabled="{Binding ServerCertificate.IsDirty}" AutomationProperties.AutomationId="SaveServerCertificate"/>
+        <Button Content="Zapisz plik połączenia…" Click="SaveConnectionFileClick" IsEnabled="{Binding ServerCertificate.HasConnectionCode}" AutomationProperties.AutomationId="SaveConnectionFile"/>
+        <Button Content="Wymień CA instalacji…" Click="ReplaceCaClick" IsEnabled="{Binding ServerCertificate.CanRequestCaReplacement}" AutomationProperties.AutomationId="ReplaceInstallationCa"/>
+        <Button Content="Odśwież" Click="RefreshClick" AutomationProperties.AutomationId="RefreshServerCertificate"/>
+        <Button Content="Wróć" Click="BackClick" AutomationProperties.AutomationId="CloseServerCertificate"/>
+      </WrapPanel>
+      <Expander Header="Historia zmian certyfikatu serwera" AutomationProperties.AutomationId="ServerCertificateHistory">
+        <ItemsControl ItemsSource="{Binding ServerCertificate.History}">
+          <ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" TextWrapping="Wrap"/></DataTemplate></ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </Expander>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

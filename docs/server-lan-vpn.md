@@ -3,6 +3,13 @@
 Rozwinięcie dla dodatkowego listenera w lokalnym Development, bez utraty
 dotychczasowego localhost: [dwa endpointy HTTPS, ACL PFX, zapora i ręczne odnowienie](windows-development-https.md).
 
+**Od ADR-047 (2026-11-22):** certyfikat serwera może wystawiać i odnawiać sam VATowiec
+(CA instalacji, stacje parowane kodem lub plikiem połączenia) albo może pochodzić
+z firmowego CA wskazanego regułą. Konfiguracja, parowanie stacji i odzyskiwanie:
+[docs/server-certificate.md](server-certificate.md). Punkt 2 poniżej dotyczy wyłącznie
+certyfikatu własnego (tryb A); w trybie CA instalacji nie dystrybuuje się certyfikatu
+CA do magazynów Windows.
+
 Ta instrukcja opisuje osobny etap wdrożenia administratora. Budowanie klienta
 nie wykonuje tych zmian, nie otwiera portów i nie migruje SQL. Nie należy
 udostępniać obecnego Development bezpośrednio w Internecie.

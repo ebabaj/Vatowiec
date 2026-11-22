@@ -14,7 +14,8 @@ public partial class MainWindow : Window
     private readonly MainViewModel model;
     private readonly DispatcherTimer expiryTimer = new() { Interval = TimeSpan.FromSeconds(1) };
 
-    public MainWindow() : this(new MainViewModel(preferencesStore: new FileLoginPreferencesStore(), credentialStore: new WindowsLoginCredentialStore())) { }
+    public MainWindow() : this(new MainViewModel(preferencesStore: new FileLoginPreferencesStore(), credentialStore: new WindowsLoginCredentialStore(),
+        trustStore: new FileServerTrustStore())) { }
 
     public MainWindow(MainViewModel model)
     {
@@ -119,6 +120,27 @@ public partial class MainWindow : Window
     private void BackupFromReminderClick(object? sender, RoutedEventArgs e) => Run(() => model.BackupFromReminder());
     private void SnoozeBackupReminderClick(object? sender, RoutedEventArgs e) => Run(() => model.SnoozeBackupReminder());
     private void PasswordPolicyClick(object? sender, RoutedEventArgs e) => Run(() => model.OpenPasswordPolicy());
+    // ADR-047: certyfikat serwera i parowanie stacji.
+    private void ServerCertificateClick(object? sender, RoutedEventArgs e) => Run(() => model.OpenServerCertificate());
+    private void ApplyConnectionCodeClick(object? sender, RoutedEventArgs e) => model.ApplyConnectionCode();
+    private void ForgetServerTrustClick(object? sender, RoutedEventArgs e) => model.ForgetServerTrust();
+    private void OpenConnectionFileClick(object? sender, RoutedEventArgs e) => Run(async () =>
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new Avalonia.Platform.Storage.FilePickerOpenOptions
+        {
+            Title = "Otwórz plik połączenia VATowiec",
+            AllowMultiple = false,
+            FileTypeFilter = [new Avalonia.Platform.Storage.FilePickerFileType("Plik połączenia VATowiec")
+                { Patterns = ["*" + SharedContracts.ServerTls.ConnectionFile.Extension] }]
+        });
+        if (files.Count != 1) return;
+        await using var stream = await files[0].OpenReadAsync();
+        var buffer = new byte[SharedContracts.ServerTls.ConnectionFile.MaxBytes + 1];
+        var length = 0;
+        int read;
+        while (length < buffer.Length && (read = await stream.ReadAsync(buffer.AsMemory(length))) > 0) length += read;
+        model.ImportConnectionFile(length > SharedContracts.ServerTls.ConnectionFile.MaxBytes ? "" : System.Text.Encoding.UTF8.GetString(buffer, 0, length));
+    });
     private async Task SavePasswordPolicy()
     {
         if (model.PasswordPolicyEditor == null) return;

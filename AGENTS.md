@@ -140,7 +140,8 @@ przez wspólne `EndpointResults`. W kliencie nie dodawaj `async void` — obsłu
 `MainViewModel`. Pamięć weryfikacji migracji bazy firmy (30 s) nie zastępuje kontroli praw
 i profilu firmy przy każdym żądaniu.
 
-**ADR-047 (przyjęty przez właściciela 2026-11-22, wdrożenie zlecone)** —
+**ADR-047 (przyjęty przez właściciela i wdrożony 2026-11-22,
+[docs/server-certificate.md](docs/server-certificate.md))** —
 [certyfikat serwera w sieci prywatnej](docs/adr/ADR-047-certyfikat-serwera-w-sieci-prywatnej.md):
 tryb A (certyfikat własny/firmowe CA, standardowa walidacja) i tryb B (CA instalacji
 w usłudze Operations, kod/plik połączenia, kotwica przypięta wyłącznie dla danego
@@ -148,7 +149,12 @@ adresu API). Klient: standardowa walidacja albo walidacja z kotwicą CA instalac
 nigdy z pominięciem. Nie instaluj CA w systemowym magazynie zaufania, nie dodawaj TOFU
 ani „akceptuj mimo to”. CA 10 lat, certyfikat serwera 1 rok (odnowienie 30 dni przed
 końcem); kod i plik połączenia równorzędne; rotacja planowa CA poza pierwszym wydaniem.
-Klucz CA dostępny wyłącznie dla usługi Operations, nigdy dla API.
+Klucz CA dostępny wyłącznie dla usługi Operations, nigdy dla API. CA instalacji jest podpisane
+jednorazowym kluczem startowym (wysyłane jako certyfikat pośredni); klient wymaga przypiętego
+skrótu klucza ostatniego elementu łańcucha — nie zastępuj tego pominięciem walidacji ani
+instalacją CA w magazynie Windows. Certyfikat zarządzany podają tylko endpointy z
+`ServerTls:Endpoints`; localhost Development zostaje przy dev-certs. Odzyskiwanie wyłącznie
+lokalnie: `Vatowiec.Operations tls reset-mode-b` (administrator Windows).
 
 **Jednorazowy wyjątek 2026-11-22:** właściciel jawnie zlecił agentowi commit i push
 zmian ADR-047/§3.3. Nie zmienia to zasady ogólnej: bez osobnego, jawnego polecenia

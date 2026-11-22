@@ -10,13 +10,16 @@ public sealed class OperationsWorker(IServiceScopeFactory scopes, IConfiguration
         var idle = TimeSpan.FromSeconds(Math.Clamp(configuration.GetValue("Operations:PollSeconds", 5), 1, 300));
         var scheduleEvery = TimeSpan.FromMinutes(Math.Clamp(configuration.GetValue("Operations:ScheduleMinutes", 5), 1, 60));
         var nextSchedule = DateTimeOffset.MinValue;
+        byte[]? tlsVersion = null;
         logger.LogInformation("VATowiec Operations Worker started");
         while (!stoppingToken.IsCancellationRequested)
         {
             var processed = false;
             try
             {
-                if (clock.GetUtcNow() >= nextSchedule)
+                var scheduleDue = clock.GetUtcNow() >= nextSchedule;
+                if (OperatingSystem.IsWindows()) tlsVersion = await ReconcileServerTls(tlsVersion, scheduleDue, stoppingToken);
+                if (scheduleDue)
                 {
                     await using var scheduleScope = scopes.CreateAsyncScope();
                     await scheduleScope.ServiceProvider.GetRequiredService<BackupScheduler>().EnqueueDue(stoppingToken);
@@ -38,6 +41,29 @@ public sealed class OperationsWorker(IServiceScopeFactory scopes, IConfiguration
                 try { await Task.Delay(idle, stoppingToken); }
                 catch (OperationCanceledException) { break; }
             }
+        }
+    }
+
+    // ADR-047: certyfikat serwera — przy zmianie konfiguracji (rowversion) i w rytmie harmonogramu (odnowienie).
+    // Osobna obsługa błędów: problem z certyfikatem lub brak migracji ADR-047 nie wstrzymuje zleceń firm.
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private async Task<byte[]?> ReconcileServerTls(byte[]? applied, bool scheduleDue, CancellationToken ct)
+    {
+        try
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            var system = scope.ServiceProvider.GetRequiredService<Vatowiec.Core.Infrastructure.Persistence.SystemDbContext>();
+            var version = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SingleOrDefaultAsync(
+                system.ServerTlsConfigurations.Select(x => x.RowVersion), ct);
+            if (version == null || (!scheduleDue && applied != null && version.AsSpan().SequenceEqual(applied))) return applied;
+            await scope.ServiceProvider.GetRequiredService<ServerTls.ServerTlsReconciler>().Run(ct);
+            return version;
+        }
+        catch (Exception error) when (error is Microsoft.Data.SqlClient.SqlException or InvalidOperationException
+            or Microsoft.EntityFrameworkCore.DbUpdateException)
+        {
+            logger.LogWarning("Server TLS reconciliation unavailable ({ErrorType}); retrying", error.GetType().Name);
+            return applied;
         }
     }
 }

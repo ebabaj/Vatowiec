@@ -68,7 +68,16 @@
             <StackPanel Spacing="6">
               <TextBlock Text="Adres serwera API (HTTPS)"/>
               <TextBox Text="{Binding ApiAddress, Mode=TwoWay}" IsVisible="{Binding IsConnectionSettingsExpanded}" AutomationProperties.AutomationId="ApiAddress"/>
-              <TextBlock Text="Podaj adres HTTPS serwera otrzymany od administratora. localhost oznacza ten komputer. Certyfikat musi być zaufany i zgodny z nazwą serwera." TextWrapping="Wrap" Opacity="0.7"/>
+              <TextBlock Text="Podaj adres HTTPS serwera otrzymany od administratora. localhost oznacza ten komputer. Certyfikat musi być zaufany przez Windows albo pochodzić z CA instalacji VATowiec sparowanego kodem lub plikiem połączenia; zawsze musi być zgodny z nazwą serwera." TextWrapping="Wrap" Opacity="0.7"/>
+              <TextBlock Text="{Binding ServerTrustStatus}" TextWrapping="Wrap" FontWeight="SemiBold" AutomationProperties.AutomationId="ServerTrustStatus"/>
+              <TextBlock Text="Kod połączenia (od administratora serwera z CA instalacji VATowiec)" TextWrapping="Wrap"/>
+              <TextBox Text="{Binding ConnectionCodeInput, Mode=TwoWay}" PlaceholderText="VTW1-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XX" MaxLength="128" AutomationProperties.AutomationId="ConnectionCode"/>
+              <WrapPanel>
+                <Button Content="Zapisz kod dla tego adresu" Click="ApplyConnectionCodeClick" AutomationProperties.AutomationId="ApplyConnectionCode"/>
+                <Button Content="Otwórz plik połączenia…" Click="OpenConnectionFileClick" AutomationProperties.AutomationId="OpenConnectionFile"/>
+                <Button Content="Usuń zaufanie dla adresu" Click="ForgetServerTrustClick" IsEnabled="{Binding HasServerTrust}" AutomationProperties.AutomationId="ForgetServerTrust"/>
+              </WrapPanel>
+              <TextBlock Text="Kod lub plik połączenia ma moc tylko dla wskazanego adresu. Nie są potrzebne prawa administratora ani zmiany w magazynie certyfikatów Windows." TextWrapping="Wrap" Opacity="0.7"/>
             </StackPanel>
           </Expander>
           <TextBlock Text="Zapamiętywanie hasła i autologowanie są przeznaczone wyłącznie dla zaufanego konta Windows. Hasło trafia tylko do Windows Credential Manager, sesja pozostaje w pamięci. Puste pole hasła pozwala użyć zapamiętanego poświadczenia dla tego adresu API i loginu. Wymagany jest zaufany certyfikat HTTPS serwera."
@@ -241,6 +250,7 @@
         <StackPanel Spacing="12" MaxWidth="740" HorizontalAlignment="Left">
           <Button Content="Użytkownicy i uprawnienia" Click="UsersSettingsClick" AutomationProperties.AutomationId="OpenUsers"/>
           <Button Content="Bezpieczeństwo → Polityka haseł" Click="PasswordPolicyClick" AutomationProperties.AutomationId="OpenPasswordPolicy"/>
+          <Button Content="Bezpieczeństwo → Certyfikat serwera" Click="ServerCertificateClick" AutomationProperties.AutomationId="OpenServerCertificate"/>
           <Button Content="Firmy → Tworzenie nowej firmy" Click="CompanyOperationsClick" AutomationProperties.AutomationId="OpenCompanyOperations"/>
           <TextBlock Text="Ustawienia instalacji → Integracje zewnętrzne" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>
           <ComboBox SelectedIndex="{Binding RegistryServiceIndex, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.AutomationId="RegistryService">
@@ -285,6 +295,7 @@
         </StackPanel>
       </ScrollViewer>
       <desktop:UserAdministrationView IsVisible="{Binding IsUsersSettings}"/>
+      <desktop:ServerCertificateView IsVisible="{Binding IsServerCertificateScreen}"/>
       <ScrollViewer IsVisible="{Binding IsCompanyOperationsScreen}">
         <StackPanel Spacing="12" MaxWidth="820" HorizontalAlignment="Left">
           <TextBlock Text="Ustawienia instalacji → Firmy" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>

@@ -26,6 +26,7 @@ else if (builder.Environment.IsEnvironment(PersonalDatabaseTarget.Edition))
 if (builder.Environment.IsEnvironment(PersonalPrototypeDatabase.Edition))
     PersonalPrototypeConfiguration.Configure(builder);
 
+if (personalWorker == null) ServerTlsHosting.ConfigureManagedEndpoints(builder);
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks();
@@ -62,6 +63,7 @@ app.MapCompanies();
 app.MapCompanyOperations();
 app.MapBackupPolicy();
 app.MapTableViews();
+if (personalWorker == null) app.MapServerTls();
 
 if (personalWorker != null && OperatingSystem.IsWindows()) personalWorker.Attach(app);
 await app.RunAsync();
