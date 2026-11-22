@@ -21,8 +21,9 @@ go wyłącznie w treści żądania HTTPS. Brak zapisu haseł, cookie i tokenów 
 Adres API pochodzi z VATOWIEC_API_URL (domyślnie https://localhost:7243) i można
 zmienić go na ekranie logowania. Akceptowany jest wyłącznie adres HTTPS origin,
 bez userinfo, query, fragmentu i ścieżki. HttpClientHandler zachowuje standardową
-walidację certyfikatów, ma własny CookieContainer w pamięci i nie śledzi
-przekierowań. Nowe logowanie tworzy nowy transport i magazyn cookie.
+walidację certyfikatów (uzupełnienie 2026-11-22: albo walidację z kotwicą CA
+instalacji przypiętą dla danego adresu według ADR-047, nigdy z pominięciem),
+ma własny CookieContainer w pamięci i nie śledzi przekierowań. Nowe logowanie tworzy nowy transport i magazyn cookie.
 
 Login i logout poprzedza pobranie tokenu CSRF z cookie. Logout otrzymuje nowy
 token dla aktualnej tożsamości. Nie zmieniamy HTTPS/HttpOnly/SameSite na serwerze,

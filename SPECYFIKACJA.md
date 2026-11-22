@@ -129,7 +129,7 @@ Nie kopiujemy oryginalnego kodu, binariów, zasobów graficznych, chronionych tr
 ### 2.1. Cele produktu
 
 1. **Prowadzenie jednej firmy bez abonamentu** i bez przymusowego przekazywania danych dostawcy aplikacji.
-2. **Wielostanowiskowa praca od początku**: dwie lub więcej osób może równolegle wystawiać dokumenty i prowadzić rozliczenia, również dla firmy jednoosobowej.
+2. **Wielostanowiskowa praca od początku**: dwie lub więcej osób może równolegle wystawiać dokumenty i prowadzić rozliczenia, również dla firmy jednoosobowej. Ta sama aplikacja obsługuje też pojedyncze stanowisko z LocalDB (wariant Personal, §3.3).
 3. **KPiR i ryczałt** z rzeczywistymi zapisami, korektami, rozliczeniem okresów, naliczaniem podatków i kontrolą zgodności.
 4. **VAT**: ewidencje sprzedaży i zakupów, klasyfikacja transakcji, odpowiednie deklaracje/JPK, korekty, wysyłka i UPO.
 5. **KSeF**: obsługa faktur ustrukturyzowanych i ich powiązania z dokumentem gospodarczym.
@@ -177,9 +177,11 @@ Wyłączenie oznacza brak w pierwszym wydaniu, nie zakaz dodania później.
 - Każda baza ma niezależną historię migracji, backup i odtworzenie/przeniesienie jednej firmy wraz z załącznikami i wymaganymi kluczami, bez przenoszenia innych firm.
 - Użytkownik może posiadać różne role w różnych firmach.
 
-### 3.3. Wielostanowiskowość — wymóg bezwarunkowy
+### 3.3. Wielostanowiskowość — wymóg wobec architektury, nie warunek instalacji
 
-- Minimum dwa komputery w sieci lokalnej i jednoczesna praca dwóch operatorów.
+- **[USTALONE 2026-11-22]** Architektura od początku musi umożliwiać pracę wielostanowiskową (wariant Network): minimum dwa komputery w sieci lokalnej i jednoczesna praca dwóch operatorów tej samej firmy. Jest to wymóg wobec projektu, a nie warunek uruchomienia programu.
+- Ta sama aplikacja działa także jednostanowiskowo (wariant Personal z LocalDB, ADR-037–041), np. w mikrofirmie wystawiającej kilka faktur miesięcznie, która sama rozlicza VAT i PIT. Personal korzysta z tego samego API, Identity, uprawnień, `rowversion` i numeracji; jedno stanowisko nie uzasadnia pomijania API ani upraszczania kontroli współbieżności. Kolejność prac nad wariantami określa AGENTS.md.
+- Poniższe wymagania dotyczą wariantu Network; w Personal transport określa ADR-039 (Named Pipe zamiast HTTPS).
 - Operatorzy tej samej firmy pracują równolegle na tej samej bazie firmowej i widzą wspólny stan dokumentów po odświeżeniu/zdarzeniu. Inne firmy mają inne fizyczne bazy.
 - Równoczesna edycja tego samego dokumentu nie może niezauważenie nadpisywać zmian: mechanizm `rowversion`/ETag i komunikat konfliktu.
 - Numeracja dokumentów musi być odporna na kolizje oraz wycofania transakcji.
@@ -1209,6 +1211,7 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | [ADR-043](docs/adr/ADR-043-numery-telefoniczne.md) | Numery telefoniczne | libphonenumber-csharp, E.164 w nowych zapisach API, uproszczone PL w Avalonia, ścisła walidacja i zachowanie niezmienionej historii bez migracji |
 | [ADR-045](docs/adr/ADR-045-nazwy-baz-i-usuwanie-firmy.md) | Nazwy baz firm i usuwanie firmy | Przyjęty 2026-11-22: baza `Vatowiec_` + oczyszczona nazwa firmy, „Nazwa zajęta…” bez sufiksów (wdrożone); usuwanie z kopią archiwalną, pełnym czyszczeniem danych i rejestrem usuniętych (wdrożone) |
 | [ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md) | Tworzenie firmy oraz backup/odtworzenie jednej firmy (M0) | **Przyjęty 2026-11-22, wdrażany krokami:** osobny Worker z tożsamością DDL/BACKUP, operacje `ops` w System z etapami, lease i audytem, odtworzenie do nowej bazy i kontrolowane przełączenie |
+| [ADR-047](docs/adr/ADR-047-certyfikat-serwera-w-sieci-prywatnej.md) | Certyfikat serwera API i zaufanie klientów w sieci prywatnej | **Przyjęty 2026-11-22:** tryb A — certyfikat własny/firmowe CA ze standardową walidacją; tryb B — CA instalacji w usłudze Operations, kod lub plik połączenia, kotwica przypięta per adres API, bez systemowego magazynu zaufania i bez „akceptuj mimo to” |
 | ADR-006 | Podpisywanie XML i przechowywanie certyfikatów | Przed implementacją wysyłek MF; nie przechowywać sekretów w zwykłej bazie |
 | ADR-007 | API pluginów: manifest, sandbox, granice dostępu | Przed pierwszą wykonywalną wtyczką |
 | ADR-008 | Pełny wykaz typów VAT i deklaracji na 1.0 | Przed M3; uzgodnić precyzyjne scenariusze |
