@@ -2,6 +2,8 @@
 
 Status: wdrożony i zweryfikowany w demonstratorze, 2026-10-23.
 Dotyczy DOC-006 i zmienia część ADR-023 dotyczącą klucza waluty.
+Klucz `Code char(3)` obowiązuje nadal, także we wspólnym słowniku System; tabela kursów
+przeszła do `Vatowiec_System` (`ref.ExchangeRates`, FK do `ref.Currencies` System) — ADR-048.
 
 `ref.Currencies.Code char(3)` jest jedynym PK waluty, zapisywanym wielkimi
 literami. Nie ma Id ani innego zastępczego identyfikatora. Kod jest niezmienny;

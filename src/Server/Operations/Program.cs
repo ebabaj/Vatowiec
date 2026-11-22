@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Vatowiec.Core.Application;
+using Vatowiec.Core.Infrastructure.ExchangeRates;
 using Vatowiec.Core.Infrastructure.Persistence;
+using Vatowiec.Core.Infrastructure.Registries;
 
 namespace Vatowiec.Operations;
 
@@ -40,6 +43,13 @@ public static class OperationsProgram
         builder.Services.AddScoped<BackupScheduler>();
         builder.Services.AddScoped<BackupImportScanner>();
         builder.Services.AddScoped<CompanyOperationExecutor>();
+        // ADR-048: codzienne pobieranie kursów NBP do wspólnej bazy System (czas polski).
+        builder.Services.AddNbpClient();
+        builder.Services.AddSingleton(new ExchangeRateScheduleOptions(
+            DailyHour: Math.Clamp(builder.Configuration.GetValue("Operations:ExchangeRates:DailyHour", 13), 0, 23),
+            LastHour: Math.Clamp(builder.Configuration.GetValue("Operations:ExchangeRates:LastHour", 16), 0, 23)));
+        builder.Services.AddScoped(provider => new ExchangeRateSyncService(provider.GetRequiredService<SystemDbContext>(),
+            provider.GetRequiredService<INbpClient>(), provider.GetRequiredService<TimeProvider>(), provider.GetRequiredService<ExchangeRateScheduleOptions>()));
         if (OperatingSystem.IsWindows())
         {
             builder.Services.AddSingleton(Vatowiec.Core.Infrastructure.ServerTls.ServerTlsPaths.From(builder.Configuration));

@@ -14,7 +14,6 @@ using Vatowiec.Core.Application;
 using Vatowiec.Core.Domain;
 using Vatowiec.Core.Infrastructure.Identity;
 using Vatowiec.Core.Infrastructure.Persistence;
-using Vatowiec.Core.Infrastructure.Registries;
 using Vatowiec.SharedContracts;
 
 namespace Vatowiec.Tests;
@@ -34,7 +33,7 @@ public sealed class CurrencyActivitySqlTests
         await using var central = await PreservedSystemTransaction.Open();
         await using var first = await PreservedSystemTransaction.Open("Vatowiec_Company_A_Dev");
         await using var second = await PreservedSystemTransaction.Open("Vatowiec_Company_B_Dev");
-        var failure = new FailSave(); var contexts = new Contexts(first, second, failure); var nbp = new NoNbp();
+        var failure = new FailSave(); var contexts = new Contexts(first, second, failure);
         using var app = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Development"); builder.ConfigureLogging(x => x.ClearProviders());
@@ -42,7 +41,6 @@ public sealed class CurrencyActivitySqlTests
             {
                 services.RemoveAll<SystemDbContext>(); services.AddScoped(_ => central.Context());
                 services.RemoveAll<ICompanyDatabaseContextFactory>(); services.AddSingleton<ICompanyDatabaseContextFactory>(contexts);
-                services.RemoveAll<INbpClient>(); services.AddSingleton<INbpClient>(nbp);
                 services.AddDataProtection().UseEphemeralDataProtectionProvider();
                 services.AddScoped(_ => ProductionRegistryTests.Settings("Mock"));
             });
@@ -59,10 +57,9 @@ public sealed class CurrencyActivitySqlTests
         await system.SaveChangesAsync();
         using var db = contexts.Create("", A); using var dbB = contexts.Create("", B);
         var bBefore = JsonSerializer.Serialize(await dbB.Currencies.AsNoTracking().OrderBy(x => x.Code).ToArrayAsync());
-        var ratesBefore = JsonSerializer.Serialize(await db.ExchangeRates.AsNoTracking().OrderBy(x => x.Id).ToArrayAsync());
         // A known baseline only inside the outer rollback; no seed, deletes or DDL.
         await db.Currencies.Where(x => x.Code == "EUR" || x.Code == "USD").ExecuteUpdateAsync(s => s
-            .SetProperty(x => x.IsActive, true).SetProperty(x => x.DownloadA, true).SetProperty(x => x.DownloadB, true).SetProperty(x => x.DownloadC, true));
+            .SetProperty(x => x.IsActive, true));
         var path = $"/api/v1/companies/{A}/currencies";
         using var admin = app.CreateClient(new() { BaseAddress = new("https://localhost"), AllowAutoRedirect = false });
         using var read = app.CreateClient(new() { BaseAddress = new("https://localhost"), AllowAutoRedirect = false });
@@ -95,17 +92,17 @@ public sealed class CurrencyActivitySqlTests
         Assert.Equal(JsonSerializer.Serialize(pair), JsonSerializer.Serialize((await Rows()).Where(x => x.Code is "EUR" or "USD").ToArray()));
         baselineAudits++;
         var changed = await Save(request); Assert.Equal(2, changed.Changed.Length); Assert.Empty(changed.Skipped);
-        Assert.All(changed.Changed, x => { Assert.False(x.IsActive); Assert.False(x.DownloadA || x.DownloadB || x.DownloadC); Assert.Equal(A, x.CompanyId); });
+        Assert.All(changed.Changed, x => { Assert.False(x.IsActive); Assert.Equal(A, x.CompanyId); });
         var replay = await Save(request); Assert.Equal(JsonSerializer.Serialize(changed), JsonSerializer.Serialize(replay));
         Assert.Equal(baselineAudits + 1, await db.CurrencyOperations.CountAsync());
         Assert.Equal(HttpStatusCode.Conflict, (await admin.PostAsJsonAsync(path + "/activity", request with { IsActive = true })).StatusCode);
         var audit = await db.CurrencyOperations.AsNoTracking().SingleAsync(x => x.OperationId == request.OperationId);
         Assert.Equal(owner.Id, audit.ActorId); Assert.NotEqual(Guid.Empty, audit.ActorIssuerId); Assert.Equal(owner.UserName, audit.ActorName);
-        var details = JsonSerializer.Deserialize<ExchangeRateService.ActivityAudit>(audit.DetailsJson, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
-        Assert.All(details.Changes, x => { Assert.True(x.Before.DownloadA && x.Before.DownloadB && x.Before.DownloadC); Assert.False(x.After.IsActive); });
+        var details = JsonSerializer.Deserialize<CurrencySettingsService.ActivityAudit>(audit.DetailsJson, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        Assert.All(details.Changes, x => { Assert.True(x.Before.IsActive); Assert.False(x.After.IsActive); });
         Assert.Equal("BulkActivity", audit.Kind);
         var active = await Save(Request(changed.Changed, true));
-        Assert.Equal(2, active.Changed.Length); Assert.All(active.Changed, x => { Assert.True(x.IsActive); Assert.False(x.DownloadA || x.DownloadB || x.DownloadC); });
+        Assert.Equal(2, active.Changed.Length); Assert.All(active.Changed, x => Assert.True(x.IsActive));
         var noOp = await Save(Request(active.Changed, true)); Assert.Empty(noOp.Changed); Assert.Equal(2, noOp.Skipped.Length);
         Assert.Equal(JsonSerializer.Serialize(active.Changed.OrderBy(x => x.Code)), JsonSerializer.Serialize((await Rows()).Where(x => x.Code is "EUR" or "USD").OrderBy(x => x.Code)));
 
@@ -127,24 +124,16 @@ public sealed class CurrencyActivitySqlTests
         var allOff = await Save(Request(rows, false, true));
         Assert.Contains("PLN", allOff.Skipped); Assert.DoesNotContain(allOff.Changed, x => x.Code == "PLN");
         rows = await Rows(); Assert.Equal(pln, rows.Single(x => x.Code == "PLN"));
-        Assert.All(rows.Where(x => x.Code != "PLN"), x => { Assert.False(x.IsActive); Assert.False(x.DownloadA || x.DownloadB || x.DownloadC); });
+        Assert.All(rows.Where(x => x.Code != "PLN"), x => Assert.False(x.IsActive));
         var allOn = await Save(Request(rows, true, true)); Assert.Equal(rows.Length - 1, allOn.Changed.Length);
-        Assert.All(await Rows(), x => { Assert.True(x.IsActive); Assert.False(x.DownloadA || x.DownloadB || x.DownloadC); });
-        Assert.Equal(ratesBefore, JsonSerializer.Serialize(await db.ExchangeRates.AsNoTracking().OrderBy(x => x.Id).ToArrayAsync()));
+        Assert.All(await Rows(), x => Assert.True(x.IsActive));
         Assert.Equal(bBefore, JsonSerializer.Serialize(await dbB.Currencies.AsNoTracking().OrderBy(x => x.Code).ToArrayAsync()));
-        Assert.Equal(0, nbp.Calls);
     }
 
     private sealed class Contexts(PreservedSystemTransaction a, PreservedSystemTransaction b, FailSave failure) : ICompanyDatabaseContextFactory
     {
         public CompanyDbContext Create(string connectionString, Guid companyId) => new(new DbContextOptionsBuilder<CompanyDbContext>((companyId == A ? a : b).CompanyOptions)
             .AddInterceptors(failure).Options, new CompanyContext(companyId));
-    }
-    private sealed class NoNbp : INbpClient
-    {
-        public int Calls { get; private set; }
-        public Task<NbpReply> Fetch(string table, DateOnly? from, DateOnly? to, CancellationToken ct)
-        { Calls++; throw new InvalidOperationException("Activity must never call NBP"); }
     }
     private sealed class FailSave : SaveChangesInterceptor
     {

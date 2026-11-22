@@ -73,7 +73,6 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
                 services.AddSingleton<Vatowiec.Core.Infrastructure.Registries.IDataPortKeyProtector>(
                     new Vatowiec.Core.Infrastructure.Registries.DataPortKeyProtector(new EphemeralDataProtectionProvider()));
                 services.AddScoped<Vatowiec.Core.Infrastructure.Registries.IDataPortClient>(_ => new MockDataPort(dataPortRequests));
-                services.AddSingleton<Vatowiec.Core.Infrastructure.Registries.INbpClient>(nbpFixture);
                 services.AddSingleton<IBankAccountValidator>(bankValidator);
                 services.AddHttpClient("ewib").ConfigurePrimaryHttpMessageHandler(() => new EwibStub(ewib));
             });
@@ -117,6 +116,24 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
         using (var scope = application.Services.CreateScope())
         {
             var system = scope.ServiceProvider.GetRequiredService<SystemDbContext>();
+            // ADR-048: wspólne kursy NBP testowej bazy System (historia niezmienna — trigger wyłączany tylko w fixture).
+            await system.Database.ExecuteSqlRawAsync("""
+                BEGIN TRANSACTION;
+                BEGIN TRY
+                    DELETE FROM ops.ExchangeRateConflicts;
+                    DELETE FROM ref.ExchangeRates;
+                    DISABLE TRIGGER audit.TR_ExchangeRateOperations_Immutable ON audit.ExchangeRateOperations;
+                    DELETE FROM audit.ExchangeRateOperations;
+                    ENABLE TRIGGER audit.TR_ExchangeRateOperations_Immutable ON audit.ExchangeRateOperations;
+                    UPDATE ops.ExchangeRateSync SET HistoryStartDate=NULL, CheckedThroughA=NULL, CheckedThroughB=NULL, CheckedThroughC=NULL,
+                        RunRequestedAtUtc=NULL, LastAttemptUtc=NULL, LastSuccessUtc=NULL, LastErrorCode=NULL;
+                    COMMIT;
+                END TRY
+                BEGIN CATCH
+                    IF @@TRANCOUNT>0 ROLLBACK;
+                    THROW;
+                END CATCH;
+                """);
             await system.UserSessions.ExecuteDeleteAsync();
             await system.CompanyAccesses.ExecuteDeleteAsync();
             await system.Users.ExecuteDeleteAsync();
@@ -135,8 +152,7 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
                     DISABLE TRIGGER audit.TR_CurrencyOperations_Immutable ON audit.CurrencyOperations;
                     DELETE FROM audit.CurrencyOperations;
                     ENABLE TRIGGER audit.TR_CurrencyOperations_Immutable ON audit.CurrencyOperations;
-                    DELETE FROM core.ExchangeRates;
-                    UPDATE ref.Currencies SET IsActive=1, DownloadA=CASE WHEN Code IN ('EUR','USD','GBP','CHF') THEN 1 ELSE 0 END, DownloadB=0, DownloadC=0;
+                    UPDATE ref.Currencies SET IsActive=CASE WHEN Code IN ('PLN','EUR','USD','GBP','CHF') THEN 1 ELSE 0 END;
                     ENABLE TRIGGER audit.TR_ExternalVerifications_Immutable ON audit.ExternalVerifications;
                     COMMIT;
                 END TRY

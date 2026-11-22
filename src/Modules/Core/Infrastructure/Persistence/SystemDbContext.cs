@@ -37,6 +37,12 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
     public DbSet<ServerTlsConfiguration> ServerTlsConfigurations => Set<ServerTlsConfiguration>();
     public DbSet<ServerTlsState> ServerTlsStates => Set<ServerTlsState>();
     public DbSet<ServerTlsChange> ServerTlsChanges => Set<ServerTlsChange>();
+    // ADR-048: wspólne dane referencyjne (kursy NBP) instalacji.
+    public DbSet<ReferenceCurrency> Currencies => Set<ReferenceCurrency>();
+    public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
+    public DbSet<ExchangeRateSync> ExchangeRateSyncs => Set<ExchangeRateSync>();
+    public DbSet<ExchangeRateConflict> ExchangeRateConflicts => Set<ExchangeRateConflict>();
+    public DbSet<ExchangeRateOperation> ExchangeRateOperations => Set<ExchangeRateOperation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -161,6 +167,11 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
         modelBuilder.ApplyConfiguration(new ServerTlsConfigurationMapping());
         modelBuilder.ApplyConfiguration(new ServerTlsStateMapping());
         modelBuilder.ApplyConfiguration(new ServerTlsChangeMapping());
+        modelBuilder.ApplyConfiguration(new ReferenceCurrencyMapping());
+        modelBuilder.ApplyConfiguration(new ExchangeRateMapping());
+        modelBuilder.ApplyConfiguration(new ExchangeRateSyncMapping());
+        modelBuilder.ApplyConfiguration(new ExchangeRateConflictMapping());
+        modelBuilder.ApplyConfiguration(new ExchangeRateOperationMapping());
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -191,5 +202,9 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
             throw new InvalidOperationException("Historia operacji technicznych firm jest niezmienna.");
         if (ChangeTracker.Entries<BackupSettingChange>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("Historia ustawień kopii zapasowych jest niezmienna.");
+        if (ChangeTracker.Entries<ExchangeRateOperation>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Historia pobierania kursów NBP jest niezmienna.");
+        if (ChangeTracker.Entries().Any(x => x.State == EntityState.Deleted && x.Entity is ExchangeRate or ReferenceCurrency or ExchangeRateConflict or ExchangeRateSync))
+            throw new InvalidOperationException("Nie usuwamy fizycznie kursów, walut ani konfliktów NBP.");
     }
 }

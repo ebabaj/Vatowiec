@@ -36,7 +36,7 @@ public sealed class SqlServerPersistenceTests
         await b.Seed(idB);
         await using var first = a.Company(idA);
         await using var second = b.Company(idB);
-        Assert.EndsWith("_ContractorFinance", (await first.Database.GetAppliedMigrationsAsync()).Last());
+        Assert.EndsWith("_CurrenciesBgnAng", (await first.Database.GetAppliedMigrationsAsync()).Last());
         Assert.Empty(await first.Database.GetPendingMigrationsAsync());
         Assert.Equal("KLIENT", (await first.Contractors.SingleAsync()).Code);
         Assert.Equal("KLIENT", (await second.Contractors.SingleAsync()).Code);

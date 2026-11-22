@@ -290,16 +290,23 @@ public static class RegistryRegistration
         services.AddHttpClient("dataport", http => { http.Timeout = TimeSpan.FromSeconds(12); http.MaxResponseContentBufferSize = 2_000_000; })
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })
             .RemoveAllLoggers();
-        services.AddScoped<INbpClient, NbpClient>();
-        services.AddHttpClient("nbp", http => { http.Timeout = TimeSpan.FromSeconds(12); http.MaxResponseContentBufferSize = 8_000_000; })
-            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })
-            .RemoveAllLoggers();
+        // ADR-048: klienta NBP (kursy) rejestruje wyłącznie usługa Operations — AddNbpClient; API nie łączy się z api.nbp.pl.
         services.AddScoped(provider => RegistrySettings.ReadDatabase(provider.GetRequiredService<SystemDbContext>()));
         services.AddSingleton<RegistryThrottle>();
         services.AddScoped<IRegistryAdapters, RegistryAdapters>();
         services.AddHttpClient("registries", http => { http.Timeout = TimeSpan.FromSeconds(12); http.MaxResponseContentBufferSize = 2_000_000; })
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })
             .RemoveAllLoggers(); // Nie logujemy kluczy, SID ani identyfikatorów w URL.
+        return services;
+    }
+
+    // ADR-048: wyłącznie dla usługi VATowiec Operations (pobieranie kursów NBP).
+    public static IServiceCollection AddNbpClient(this IServiceCollection services)
+    {
+        services.AddScoped<INbpClient, NbpClient>();
+        services.AddHttpClient("nbp", http => { http.Timeout = TimeSpan.FromSeconds(12); http.MaxResponseContentBufferSize = 8_000_000; })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })
+            .RemoveAllLoggers();
         return services;
     }
 }

@@ -9,7 +9,7 @@ public static class CompanyPermissionCatalog
     {
         CompanyPermission.EditContractors or CompanyPermission.AcceptWarnings or CompanyPermission.VerifyRegistries or
             CompanyPermission.ManageContractorPesel => CompanyPermission.ViewProfile | CompanyPermission.ViewContractors,
-        CompanyPermission.ManageCurrencies or CompanyPermission.ImportExchangeRates => CompanyPermission.ViewProfile | CompanyPermission.ViewExchangeRates,
+        CompanyPermission.ManageCurrencies => CompanyPermission.ViewProfile | CompanyPermission.ViewExchangeRates,
         CompanyPermission.ViewProfile => CompanyPermission.None,
         _ => CompanyPermission.ViewProfile
     };
@@ -28,9 +28,8 @@ public static class CompanyPermissionCatalog
         CompanyPermission.AcceptWarnings => ("Akceptacja ostrzeżeń", "Świadomy zapis mimo ostrzeżenia; nie zastępuje prawa edycji."),
         CompanyPermission.VerifyRegistries => ("Sprawdzanie rejestrów", "Ręczne sprawdzenia MF, GUS, VIES i DataPort."),
         CompanyPermission.ManageCompanyIntegrations => ("Konfiguracja integracji firmy", "Zarządzanie kluczem DataPort; bez administracji instalacją."),
-        CompanyPermission.ViewExchangeRates => ("Odczyt walut i kursów", "Przeglądanie słownika, kursów i historii."),
-        CompanyPermission.ManageCurrencies => ("Zarządzanie walutami", "Zmiana aktywności i ustawień walut; wymaga odczytu kursów."),
-        CompanyPermission.ImportExchangeRates => ("Import kursów NBP", "Ręczne pobieranie i import; wymaga odczytu kursów."),
+        CompanyPermission.ViewExchangeRates => ("Odczyt walut i kursów", "Przeglądanie walut firmy i wspólnych kursów NBP instalacji."),
+        CompanyPermission.ManageCurrencies => ("Zarządzanie walutami", "Zmiana aktywności walut firmy; wymaga odczytu kursów."),
         CompanyPermission.ManageContractorPesel => ("Odczyt i edycja PESEL", "Dane chronione; zapis wymaga także edycji kontrahentów."),
         CompanyPermission.ManageCompanyBackups => ("Harmonogram kopii firmy", "Częstotliwość i tryb kopii zapasowych tej firmy; zlecić kopię może każdy użytkownik firmy, o ile pozwala na to instalacja."),
         _ => (permission.ToString(), "Uprawnienie firmy z aktualnej wersji serwera.")

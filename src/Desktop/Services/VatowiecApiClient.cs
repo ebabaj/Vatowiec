@@ -61,8 +61,6 @@ public interface IVatowiecApiClient : IDisposable
     Task<CurrencyResponse> SaveCurrency(Guid companyId, string currencyCode, CurrencyWriteRequest value) => throw new NotSupportedException();
     Task<CurrencyActivityResponse> ChangeCurrencyActivity(Guid companyId, CurrencyActivityRequest value) => throw new NotSupportedException();
     Task<RatePage> Rates(Guid companyId, string? code, string? table, DateOnly? from, DateOnly? to, int offset, bool descending) => throw new NotSupportedException();
-    Task<RateImportResponse> ImportRates(Guid companyId, RateImportRequest value) => throw new NotSupportedException();
-    Task<CurrencyHistoryResponse> ResolveRate(Guid companyId, long auditId, RateResolutionRequest value) => throw new NotSupportedException();
     Task<CurrencyHistoryResponse[]> CurrencyHistory(Guid companyId, int offset) => throw new NotSupportedException();
     Task<DataPortConfigurationResponse> DataPortConfiguration(Guid companyId) => throw new NotSupportedException();
     Task<DataPortConfigurationResponse> SaveDataPortKey(Guid companyId, SaveDataPortKeyRequest value) => throw new NotSupportedException();
@@ -87,6 +85,11 @@ public interface IVatowiecApiClient : IDisposable
     Task<SharedContracts.ServerTls.ServerTlsResponse> SaveServerCertificate(SharedContracts.ServerTls.ServerTlsRequest value) => throw new NotSupportedException();
     Task<SharedContracts.ServerTls.ServerTlsResponse> RequestCaReplacement(SharedContracts.ServerTls.ServerTlsCaReplacementRequest value) => throw new NotSupportedException();
     Task<SharedContracts.ServerTls.ConnectionFileContent> ServerConnectionFile() => throw new NotSupportedException();
+    Task<ExchangeRateAdministrationResponse> ExchangeRateAdministration() => throw new NotSupportedException();
+    Task<ExchangeRateAdministrationResponse> RequestExchangeRateRun() => throw new NotSupportedException();
+    Task<ExchangeRateAdministrationResponse> SaveExchangeRateHistoryStart(ExchangeRateHistoryStartRequest value) => throw new NotSupportedException();
+    Task<ExchangeRateAdministrationResponse> ResolveExchangeRateConflict(long conflictId, ExchangeRateConflictResolution value) => throw new NotSupportedException();
+    Task<ExchangeRateOperationResponse[]> ExchangeRateHistory(int offset) => throw new NotSupportedException();
 }
 
 public sealed class ApiException(int statusCode, string message) : Exception(message)
@@ -213,6 +216,12 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         Post<SharedContracts.ServerTls.ServerTlsResponse>("api/v1/installation/server-certificate/ca-replacement", value);
     public Task<SharedContracts.ServerTls.ConnectionFileContent> ServerConnectionFile() =>
         Get<SharedContracts.ServerTls.ConnectionFileContent>("api/v1/installation/server-certificate/connection-file");
+    // ADR-048: Ustawienia instalacji → Kursy NBP.
+    public Task<ExchangeRateAdministrationResponse> ExchangeRateAdministration() => Get<ExchangeRateAdministrationResponse>("api/v1/installation/exchange-rates");
+    public Task<ExchangeRateAdministrationResponse> RequestExchangeRateRun() => Post<ExchangeRateAdministrationResponse>("api/v1/installation/exchange-rates/run", new { });
+    public Task<ExchangeRateAdministrationResponse> SaveExchangeRateHistoryStart(ExchangeRateHistoryStartRequest value) => Write<ExchangeRateAdministrationResponse>("api/v1/installation/exchange-rates/history-start", value, true);
+    public Task<ExchangeRateAdministrationResponse> ResolveExchangeRateConflict(long conflictId, ExchangeRateConflictResolution value) => Post<ExchangeRateAdministrationResponse>($"api/v1/installation/exchange-rates/conflicts/{conflictId}/resolve", value);
+    public Task<ExchangeRateOperationResponse[]> ExchangeRateHistory(int offset) => Get<ExchangeRateOperationResponse[]>($"api/v1/installation/exchange-rates/history?offset={offset}");
     public Task<InstallationCompanyResponse[]> InstallationCompanies() => Get<InstallationCompanyResponse[]>("api/v1/installation/companies");
     public Task<DeletedCompanyResponse[]> DeletedCompanies() => Get<DeletedCompanyResponse[]>("api/v1/installation/deleted-companies");
     public Task<CompanyOperationResponse> DeleteCompany(DeleteCompanyRequest value) =>
@@ -247,8 +256,6 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         if (to != null) query += "&to=" + to.Value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
         return Get<RatePage>($"api/v1/companies/{companyId}/exchange-rates?{query}");
     }
-    public Task<RateImportResponse> ImportRates(Guid companyId, RateImportRequest value) => Post<RateImportResponse>($"api/v1/companies/{companyId}/exchange-rates/imports", value);
-    public Task<CurrencyHistoryResponse> ResolveRate(Guid companyId, long auditId, RateResolutionRequest value) => Post<CurrencyHistoryResponse>($"api/v1/companies/{companyId}/exchange-rates/imports/{auditId}/resolve", value);
     public Task<CurrencyHistoryResponse[]> CurrencyHistory(Guid companyId, int offset) => Get<CurrencyHistoryResponse[]>($"api/v1/companies/{companyId}/exchange-rates/history?offset={offset}");
     public Task<DataPortConfigurationResponse> DataPortConfiguration(Guid companyId) => Get<DataPortConfigurationResponse>($"api/v1/companies/{companyId}/integrations/dataport");
     public Task<DataPortConfigurationResponse> SaveDataPortKey(Guid companyId, SaveDataPortKeyRequest value) => DataPortWrite(companyId, value, HttpMethod.Put);

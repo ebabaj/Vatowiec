@@ -59,7 +59,7 @@ public sealed class CompanyBackupTests
         Assert.Throws<ArgumentException>(() => schedule.Change(BackupFrequencies.Daily, "Silent", 1));
         Assert.Throws<ArgumentException>(() => schedule.Change(BackupFrequencies.Daily, BackupModes.Reminder, 24));
         Assert.Equal((BackupFrequencies.Every30Days, BackupModes.Reminder), (CompanyBackupSchedule.DefaultFrequency, CompanyBackupSchedule.DefaultMode));
-        Assert.Equal(2047, (int)CompanyPermissionCatalog.All);
+        Assert.Equal(2047 & ~256, (int)CompanyPermissionCatalog.All); // 256 (ImportExchangeRates) wycofane w ADR-048.
         Assert.Equal(CompanyPermission.ViewProfile, CompanyPermissionCatalog.Required(CompanyPermission.ManageCompanyBackups));
         Assert.Equal("Harmonogram kopii firmy", CompanyPermissionCatalog.Describe(CompanyPermission.ManageCompanyBackups).Name);
     }

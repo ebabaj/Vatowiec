@@ -286,7 +286,8 @@ internal static class LocalDatabases
     {
         await using var system = SystemContext(TestDatabases[0]);
         if (await system.Companies.AnyAsync() || await system.CompanyDatabases.AnyAsync() ||
-            await system.CompanyAccesses.AnyAsync() || await system.UserSessions.AnyAsync())
+            await system.CompanyAccesses.AnyAsync() || await system.UserSessions.AnyAsync() ||
+            await system.ExchangeRates.AnyAsync() || await system.ExchangeRateOperations.AnyAsync())
             throw new InvalidOperationException("Testy pozostawiły firmy lub sesje w testowej bazie systemowej.");
         if (!(await system.Database.GetAppliedMigrationsAsync()).SequenceEqual(system.Database.GetMigrations()))
             throw new InvalidOperationException("Testy zmieniły historię testowej bazy systemowej.");
@@ -298,7 +299,6 @@ internal static class LocalDatabases
                 await company.ContractorChanges.IgnoreQueryFilters().AnyAsync() ||
                 await company.ExternalVerifications.IgnoreQueryFilters().AnyAsync() ||
                 await company.DataPortConfigurations.IgnoreQueryFilters().AnyAsync() ||
-                await company.ExchangeRates.IgnoreQueryFilters().AnyAsync() ||
                 await company.CurrencyOperations.IgnoreQueryFilters().AnyAsync() ||
                 !(await company.Database.GetAppliedMigrationsAsync()).SequenceEqual(company.Database.GetMigrations()))
                 throw new InvalidOperationException($"Testy nie wycofały danych lub historii w {database}.");
@@ -332,7 +332,7 @@ internal static class LocalDatabases
         await using var system = SystemContext(SystemDatabase);
         await ShowSchema(system, SystemDatabase, ["core.Companies", "core.CompanyDatabases", "dbo.__EFMigrationsHistory",
             "security.Users", "security.Roles", "security.UserRoles", "security.UserClaims", "security.UserLogins",
-            "security.UserTokens", "security.RoleClaims", "security.CompanyAccess", "security.UserSessions", "security.Installation", "security.GusConfiguration", "security.RegistryConfigurations", "audit.RegistryConfigurationChanges", "audit.UserAdministrationChanges", "security.PasswordPolicy", "audit.PasswordPolicyChanges", "security.UserPasswordHistory", "ref.TaxIdentifierSchemes", "security.TableViews", "audit.TableViewChanges", "ops.CompanyOperations", "ops.CompanyOperationEvents", "ops.CompanyBackups", "ops.BackupPolicy", "ops.CompanyBackupSchedules", "ops.BackupSettingChanges", "ops.BackupReminderSnoozes", "ops.DeletedCompanies", "ops.RestoreImportFiles", "security.ServerTlsConfiguration", "security.ServerTlsState", "audit.ServerTlsChanges"], "_ServerTlsCertificate");
+            "security.UserTokens", "security.RoleClaims", "security.CompanyAccess", "security.UserSessions", "security.Installation", "security.GusConfiguration", "security.RegistryConfigurations", "audit.RegistryConfigurationChanges", "audit.UserAdministrationChanges", "security.PasswordPolicy", "audit.PasswordPolicyChanges", "security.UserPasswordHistory", "ref.TaxIdentifierSchemes", "security.TableViews", "audit.TableViewChanges", "ops.CompanyOperations", "ops.CompanyOperationEvents", "ops.CompanyBackups", "ops.BackupPolicy", "ops.CompanyBackupSchedules", "ops.BackupSettingChanges", "ops.BackupReminderSnoozes", "ops.DeletedCompanies", "ops.RestoreImportFiles", "security.ServerTlsConfiguration", "security.ServerTlsState", "audit.ServerTlsChanges", "ref.Currencies", "ref.ExchangeRates", "ops.ExchangeRateSync", "ops.ExchangeRateConflicts", "audit.ExchangeRateOperations"], "_ReferenceCurrenciesBgnAng");
         if (await system.InstallationIdentities.CountAsync() != 1 || (await system.InstallationIdentities.SingleAsync()).Id == Guid.Empty)
             throw new InvalidOperationException("Brak trwałej identyfikacji instalacji.");
         // Firmy demonstracyjne A/B muszą istnieć; firmy utworzone z aplikacji (ADR-044) są dozwolone obok nich.
@@ -350,7 +350,7 @@ internal static class LocalDatabases
             if (registration.ServerName != Server || registration.DatabaseName != database)
                 throw new InvalidOperationException("Błędna lokalizacja firmy.");
             await using var company = CompanyContext(database, id);
-            await ShowSchema(company, database, ["core.CompanyProfile", "core.Contractors", "core.ContractorTradeTerms", "core.ContractorCreditLimits", "ref.PaymentMethods", "core.ContractorAddresses", "core.ContractorContacts", "core.ContractorBankAccounts", "core.ContractorCreateOperations", "ref.AddressTypes", "audit.ContractorChanges", "audit.ExternalVerifications", "security.DataPortConfiguration", "ref.Currencies", "core.ExchangeRates", "audit.CurrencyOperations", "dbo.__EFMigrationsHistory"], "_ContractorFinance");
+            await ShowSchema(company, database, ["core.CompanyProfile", "core.Contractors", "core.ContractorTradeTerms", "core.ContractorCreditLimits", "ref.PaymentMethods", "core.ContractorAddresses", "core.ContractorContacts", "core.ContractorBankAccounts", "core.ContractorCreateOperations", "ref.AddressTypes", "audit.ContractorChanges", "audit.ExternalVerifications", "security.DataPortConfiguration", "ref.Currencies", "audit.CurrencyOperations", "dbo.__EFMigrationsHistory"], "_CurrenciesBgnAng");
             var profile = await company.CompanyProfiles.IgnoreQueryFilters().SingleAsync();
             if (profile.CompanyId != id)
                 throw new InvalidOperationException("Niezgodna tożsamość danych firmy.");
@@ -385,7 +385,7 @@ internal static class LocalDatabases
             var read = CompanyPermission.ViewProfile | CompanyPermission.ViewExchangeRates;
             var operatorA = read | CompanyPermission.ViewContractors | CompanyPermission.EditContractors |
                 CompanyPermission.AcceptWarnings | CompanyPermission.VerifyRegistries | CompanyPermission.ManageCompanyIntegrations |
-                CompanyPermission.ManageCurrencies | CompanyPermission.ImportExchangeRates;
+                CompanyPermission.ManageCurrencies;
             var access = role == "Operator"
                 ? new Dictionary<Guid, CompanyPermission>
                 {

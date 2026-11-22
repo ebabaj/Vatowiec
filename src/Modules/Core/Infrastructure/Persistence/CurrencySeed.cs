@@ -2,16 +2,25 @@ using Vatowiec.Core.Domain;
 
 namespace Vatowiec.Core.Infrastructure.Persistence;
 
-// Names/codes only, no rates. NBP A/B reference lists, 2026-10-22 (ADR-023).
+// Names/codes only, no rates. NBP A/B reference lists, 2026-10-22 (ADR-023), plus codes present
+// in NBP history since 2025-01-01: BGN (A until 2025) and ANG (B), added 2026-11-22 (ADR-048).
 // ISO codes are the sole currency keys. Missing publications do not mean inactivity.
+// ADR-048: ta sama lista seeduje wspólny słownik System (ref.Currencies) i słownik bazy firmy;
+// w firmie domyślnie aktywne są PLN, EUR, USD, GBP i CHF.
 public static class CurrencySeed
 {
-    public static Currency[] Rows() => Data.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    public static readonly string[] DefaultActive = ["PLN", "EUR", "USD", "GBP", "CHF"];
+
+    public static Currency[] Rows() => Entries().Select(x => new Currency { Code = x.Code, Name = x.Name, IsActive = DefaultActive.Contains(x.Code) }).ToArray();
+
+    public static ReferenceCurrency[] ReferenceRows() => Entries().Select(x => new ReferenceCurrency { Code = x.Code, Name = x.Name }).ToArray();
+
+    private static IEnumerable<(string Code, string Name)> Entries() => Data.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         .Select(line =>
         {
             var parts = line.Split('|');
-            return new Currency { Code = parts[0], Name = parts[1], DownloadA = parts[0] is "EUR" or "USD" or "GBP" or "CHF" };
-        }).ToArray();
+            return (parts[0], parts[1]);
+        });
     private const string Data = """
         PLN|złoty polski
         THB|bat tajlandzki
@@ -161,6 +170,8 @@ public static class CurrencySeed
         MNT|tugrik mongolski
         VUV|vatu Vanuatu
         BAM|marka zamienna Bośni i Hercegowiny
+        BGN|lew bułgarski
+        ANG|gulden Antyli Holenderskich
         ZWG|złoto Zimbabwe
         """;
 }

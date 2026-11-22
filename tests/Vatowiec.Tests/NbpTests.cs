@@ -40,17 +40,22 @@ public sealed class NbpTests
         else { Assert.Null(table.TradingDate); Assert.Equal(4.123456789012m, table.Rates[0].Mid); Assert.Null(table.Rates[0].Ask); }
         Assert.Equal(1, calls);
     }
+    // Odpowiedzi NBP sprawdzone 2026-11-22: brak danych to tekst API, a chwilowa awaria — strona HTML 404 serwera WWW.
+    internal const string NoData = "404 NotFound - Not Found - Brak danych";
+    private const string HtmlNotFound = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\"><html><head><title>404 - File or directory not found.</title></head><body></body></html>";
     [Theory]
-    [InlineData(404, false)]
-    [InlineData(400, true)]
-    [InlineData(429, true)]
-    [InlineData(500, true)]
-    [InlineData(302, true)]
-    public async Task HttpStatus_NoPublicationIsDistinctFromFailureAndNoRetry(int status, bool error)
+    [InlineData(404, NoData, false, false)]
+    [InlineData(404, HtmlNotFound, true, true)]
+    [InlineData(404, "", true, true)]
+    [InlineData(400, "", true, false)]
+    [InlineData(429, "", true, true)]
+    [InlineData(500, "", true, true)]
+    [InlineData(302, "", true, false)]
+    public async Task HttpStatus_NoPublicationIsDistinctFromFailureAndNoRetry(int status, string body, bool error, bool transient)
     {
-        var count = 0; using var handler = new DataPortTests.Stub(_ => { count++; return new((HttpStatusCode)status); });
+        var count = 0; using var handler = new DataPortTests.Stub(_ => { count++; return new((HttpStatusCode)status) { Content = new StringContent(body) }; });
         var result = await new NbpClient(new DataPortTests.FreshFactory(handler)).Fetch("B", new(2026, 10, 18), new(2026, 10, 18), default);
-        Assert.Equal(error, result.Error != null); Assert.Empty(result.Tables); Assert.Equal(1, count);
+        Assert.Equal(error, result.Error != null); Assert.Equal(transient, result.Transient); Assert.Empty(result.Tables); Assert.Equal(1, count);
     }
     [Theory]
     [InlineData("[]")]
@@ -86,7 +91,8 @@ public sealed class NbpTests
     public async Task TimeoutAndConnectionFailuresAreExplicit(bool timeout)
     {
         using var handler = new DataPortTests.Stub(_ => throw (timeout ? new TaskCanceledException() : new HttpRequestException()));
-        Assert.NotNull((await new NbpClient(new DataPortTests.FreshFactory(handler)).Fetch("C", null, null, default)).Error);
+        var reply = await new NbpClient(new DataPortTests.FreshFactory(handler)).Fetch("C", null, null, default);
+        Assert.NotNull(reply.Error); Assert.True(reply.Transient);
     }
     [Fact]
     public void DateRanges_AreInclusiveNonOverlappingAndNeverExceed93Days()
@@ -100,12 +106,12 @@ public sealed class NbpTests
         Assert.Throws<ArgumentException>(() => NbpDates.Split(to, from).ToArray());
     }
     [Fact]
-    public void OfflineDictionary_IsBroadUniqueAndDefaultsNeverRequestPln()
+    public void OfflineDictionary_IsBroadUniqueSharedWithSystemAndActivatesFiveByDefault()
     {
         var rows = CurrencySeed.Rows(); Assert.True(rows.Length >= 140); Assert.Equal(rows.Length, rows.Select(x => x.Code).Distinct().Count());
-        Assert.Equal(new[] { "CHF", "EUR", "GBP", "USD" }, rows.Where(x => x.Downloads("A")).Select(x => x.Code).Order());
-        Assert.All(rows, x => { Assert.False(x.DownloadB); Assert.False(x.DownloadC); });
-        var pln = rows.Single(x => x.Code == "PLN"); Assert.True(pln.IsActive); Assert.False(pln.Downloads("A"));
+        Assert.Equal(new[] { "CHF", "EUR", "GBP", "PLN", "USD" }, rows.Where(x => x.IsActive).Select(x => x.Code).Order());
+        Assert.Equal(rows.Select(x => (x.Code, x.Name)), CurrencySeed.ReferenceRows().Select(x => (x.Code, x.Name)));
         Assert.Contains(rows, x => x.Code == "XCG"); Assert.Contains(rows, x => x.Code == "AFN");
+        Assert.Contains(rows, x => x.Code == "BGN" && !x.IsActive); Assert.Contains(rows, x => x.Code == "ANG" && !x.IsActive); // kody z historii NBP od 2025 (ADR-048)
     }
 }

@@ -63,6 +63,7 @@ app.MapCompanies();
 app.MapCompanyOperations();
 app.MapBackupPolicy();
 app.MapTableViews();
+app.MapExchangeRateAdministration();
 if (personalWorker == null) app.MapServerTls();
 
 if (personalWorker != null && OperatingSystem.IsWindows()) personalWorker.Attach(app);

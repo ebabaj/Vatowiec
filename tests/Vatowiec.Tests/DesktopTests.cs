@@ -264,7 +264,6 @@ public sealed partial class DesktopTests
         public Task<BankAccountValidationResponse> ValidateBankAccount(Guid companyId, int contractorId, string number) =>
             PendingBankCheck ?? Task.FromResult(BankCheck!);
         public List<CurrencyWriteRequest> CurrencyWrites { get; } = [];
-        public int NbpImports { get; private set; }
         public CurrencyHistoryResponse[] CurrencyHistoryData { get; set; } = [];
         public CurrencyResponse[]? CurrencyData { get; set; }
         public CurrencyResponse[] CurrenciesWithRatesData { get; set; } = [];
@@ -274,10 +273,10 @@ public sealed partial class DesktopTests
         public RateResponse[] StoredRates { get; set; } = [];
         public (string? Code, string? Table, DateOnly? From, DateOnly? To, int Offset, bool Descending) LastRateQuery { get; private set; }
         public Task<CurrencyResponse[]> Currencies(Guid companyId) => Task.FromResult<CurrencyResponse[]>(CurrencyData ?? [
-            new(companyId, "PLN", "złoty", true, false, false, false, "AAAAAAAAAAE="),
-            new(companyId, "EUR", "euro", true, true, false, false, "AAAAAAAAAAE=")]);
+            new(companyId, "PLN", "złoty", true, "AAAAAAAAAAE="),
+            new(companyId, "EUR", "euro", true, "AAAAAAAAAAE=")]);
         public Task<CurrencyResponse> SaveCurrency(Guid companyId, string currencyCode, CurrencyWriteRequest value)
-        { CurrencyWrites.Add(value); return Task.FromResult(new CurrencyResponse(companyId, currencyCode, "euro", value.IsActive, value.DownloadA, value.DownloadB, value.DownloadC, "AAAAAAAAAAI=")); }
+        { CurrencyWrites.Add(value); return Task.FromResult(new CurrencyResponse(companyId, currencyCode, "euro", value.IsActive, "AAAAAAAAAAI=")); }
         public List<CurrencyActivityRequest> ActivityWrites { get; } = [];
         public Exception? ActivityError { get; set; }
         public Task<CurrencyActivityResponse> ChangeCurrencyActivity(Guid companyId, CurrencyActivityRequest value)
@@ -286,7 +285,7 @@ public sealed partial class DesktopTests
             if (ActivityError != null) throw ActivityError;
             var rows = CurrencyData!;
             var changed = rows.Where(x => value.Currencies.Any(v => v.Code == x.Code) && x.IsActive != value.IsActive && (value.IsActive || x.Code != "PLN"))
-                .Select(x => x with { IsActive = value.IsActive, DownloadA = value.IsActive && x.DownloadA, DownloadB = value.IsActive && x.DownloadB, DownloadC = value.IsActive && x.DownloadC, RowVersion = "AAAAAAAAAAI=" }).ToArray();
+                .Select(x => x with { IsActive = value.IsActive, RowVersion = "AAAAAAAAAAI=" }).ToArray();
             CurrencyData = rows.Select(x => changed.FirstOrDefault(c => c.Code == x.Code) ?? x).ToArray();
             return Task.FromResult(new CurrencyActivityResponse(companyId, value.IsActive, changed, value.Currencies.Where(x => changed.All(c => c.Code != x.Code)).Select(x => x.Code).ToArray()));
         }
@@ -296,8 +295,6 @@ public sealed partial class DesktopTests
             return Task.FromResult(new RatePage(companyId, StoredRates.Where(x => (code == null || x.CurrencyCode == code) &&
                 (table == null || x.TableType == table) && (from == null || x.EffectiveDate >= from) && (to == null || x.EffectiveDate <= to)).Skip(offset).Take(51).ToArray(), null, null, null));
         }
-        public Task<RateImportResponse> ImportRates(Guid companyId, RateImportRequest value)
-        { NbpImports++; return Task.FromResult(new RateImportResponse(1, companyId, 0, 0, 0, [], [], [], value.From, value.To, null, null, null)); }
         public Task<CurrencyHistoryResponse[]> CurrencyHistory(Guid companyId, int offset) => Task.FromResult(CurrencyHistoryData);
         private bool keyConfigured;
         private int keyVersion;

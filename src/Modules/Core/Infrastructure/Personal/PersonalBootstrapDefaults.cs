@@ -94,15 +94,14 @@ public static class PersonalBootstrapDefaults
         }
         var currencies = await company.Currencies.IgnoreQueryFilters().OrderBy(x => x.Code).ToArrayAsync();
         var seed = CurrencySeed.Rows().OrderBy(x => x.Code).ToArray();
-        if (await company.Contractors.IgnoreQueryFilters().AnyAsync() || await company.ExchangeRates.IgnoreQueryFilters().AnyAsync() ||
+        if (await company.Contractors.IgnoreQueryFilters().AnyAsync() ||
             await company.CurrencyOperations.IgnoreQueryFilters().AnyAsync() || currencies.Length != seed.Length ||
-            currencies.Where((row, i) => row.Code != seed[i].Code || row.Name != seed[i].Name || row.IsActive != seed[i].IsActive ||
-                row.DownloadA != seed[i].DownloadA || row.DownloadB != seed[i].DownloadB || row.DownloadC != seed[i].DownloadC).Any())
+            currencies.Where((row, i) => row.Code != seed[i].Code || row.Name != seed[i].Name || row.IsActive != seed[i].IsActive).Any())
             throw new PersonalSetupException("Baza ma już indywidualne dane lub ustawienia walut. Nie zastąpiono ich wartościami początkowymi.");
         if (profile == null) company.CompanyProfiles.Add(new(companyId, name, nip));
         foreach (var row in currencies)
-        { row.IsActive = row.Code == "PLN"; row.DownloadA = row.DownloadB = row.DownloadC = false; }
-        var details = JsonSerializer.Serialize(new { Operation = "PersonalCompanyInitialized", Active = new[] { "PLN" }, ForeignInactive = currencies.Length - 1, DownloadA = false, DownloadB = false, DownloadC = false });
+            row.IsActive = row.Code == "PLN";
+        var details = JsonSerializer.Serialize(new { Operation = "PersonalCompanyInitialized", Active = new[] { "PLN" }, ForeignInactive = currencies.Length - 1 });
         company.CurrencyOperations.Add(new()
         {
             OperationId = Guid.NewGuid(),

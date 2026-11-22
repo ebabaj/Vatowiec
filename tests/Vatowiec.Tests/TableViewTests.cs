@@ -141,7 +141,7 @@ internal sealed class WorkspaceTestApi : IVatowiecApiClient
     public static readonly Guid B = Guid.Parse("cccccccc-0000-4000-8000-000000000002");
     public bool Editable = true;
     public string[] AdditionalPermissions = [];
-    public CurrencyResponse[] CurrencyData = [new(A, "EUR", "Waluta testowa", true, true, false, false, "AAAAAAAAAAE=")];
+    public CurrencyResponse[] CurrencyData = [new(A, "EUR", "Waluta testowa", true, "AAAAAAAAAAE=")];
     public Func<CurrencyActivityRequest, CurrencyActivityResponse>? CurrencyActivity;
     public int Writes, SearchCalls;
     public ContractorSearchRequest? LastSearch;

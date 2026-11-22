@@ -123,6 +123,7 @@ public partial class MainWindow : Window
     private void PasswordPolicyClick(object? sender, RoutedEventArgs e) => Run(() => model.OpenPasswordPolicy());
     // ADR-047: certyfikat serwera i parowanie stacji.
     private void ServerCertificateClick(object? sender, RoutedEventArgs e) => Run(() => model.OpenServerCertificate());
+    private void ExchangeRateAdministrationClick(object? sender, RoutedEventArgs e) => Run(() => model.OpenExchangeRateAdministration());
     private void ApplyConnectionCodeClick(object? sender, RoutedEventArgs e) => model.ApplyConnectionCode();
     private void ForgetServerTrustClick(object? sender, RoutedEventArgs e) => model.ForgetServerTrust();
     private void OpenConnectionFileClick(object? sender, RoutedEventArgs e) => Run(async () =>
@@ -282,13 +283,10 @@ public partial class MainWindow : Window
     private void SaveCurrencyClick(object? sender, RoutedEventArgs e) => Run(() => model.SaveCurrencySettings());
     private void RefreshCurrenciesClick(object? sender, RoutedEventArgs e) => Run(() => model.RefreshCurrencies());
     private void CancelCurrencyClick(object? sender, RoutedEventArgs e) => model.CancelCurrencyChanges();
-    private void ImportNbpClick(object? sender, RoutedEventArgs e) => Run(() => model.ImportNbpRates());
     private void FilterRatesClick(object? sender, RoutedEventArgs e) => Run(() => model.LoadRates());
     private void PreviousRatesClick(object? sender, RoutedEventArgs e) => Run(() => model.PreviousRates());
     private void NextRatesClick(object? sender, RoutedEventArgs e) => Run(() => model.NextRates());
     private void ClearRateFiltersClick(object? sender, RoutedEventArgs e) => Run(async () => { model.ClearRateFilters(); await model.LoadRates(); });
-    private void KeepRateClick(object? sender, RoutedEventArgs e) => Run(() => model.ResolveNbpConflict(false));
-    private void AcceptRateClick(object? sender, RoutedEventArgs e) => Run(() => model.ResolveNbpConflict(true));
     private void CurrencyHistoryClick(object? sender, RoutedEventArgs e) => Run(() => model.LoadCurrencyHistory());
     private void PreviousCurrencyHistoryClick(object? sender, RoutedEventArgs e) => Run(() => model.PreviousCurrencyHistory());
     private void NextCurrencyHistoryClick(object? sender, RoutedEventArgs e) => Run(() => model.NextCurrencyHistory());

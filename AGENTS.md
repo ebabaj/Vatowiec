@@ -156,6 +156,28 @@ instalacją CA w magazynie Windows. Certyfikat zarządzany podają tylko endpoin
 `ServerTls:Endpoints`; localhost Development zostaje przy dev-certs. Odzyskiwanie wyłącznie
 lokalnie: `Vatowiec.Operations tls reset-mode-b` (administrator Windows).
 
+**ADR-048 (przyjęty przez właściciela i wdrożony 2026-11-22,
+[docs/currencies-and-nbp.md](docs/currencies-and-nbp.md))** —
+[publiczne dane referencyjne w bazie systemowej](docs/adr/ADR-048-publiczne-dane-referencyjne-w-bazie-systemowej.md):
+- Reguła podziału: publiczne dane referencyjne, takie same dla wszystkich firm i tylko
+  odczytywane przez firmę (kursy NBP; w przyszłości np. kody pocztowe/TERYT, kody urzędów
+  skarbowych, kalendarz dni wolnych, PKD) trzymamy w `Vatowiec_System`; w bazie firmy —
+  dane, ustawienia i decyzje firmy oraz dowody księgowe. Dokument zapisuje kopię
+  zastosowanego kursu, nigdy FK do kursów System. Bez zapytań łączących System z bazą
+  firmy (JOIN/FK/synonimy/widoki) — dwa osobne odczyty.
+- Kursy pobiera **wyłącznie usługa Operations** (`AddNbpClient` tylko tam; API nie łączy
+  się z api.nbp.pl): zawsze wszystkie waluty tabel A, B i C, codziennie od 13:00 czasu
+  polskiego (Europe/Warsaw), ponowienia co 60 min do 16:00, bez kalendarza świąt; awarie przejściowe
+  NBP (np. fałszywe 404 HTML) — do 3 prób odcinka co 5 s w przebiegu; za brak publikacji
+  uznajemy wyłącznie tekst „Brak danych”;
+  zaległości po przerwie od razu, od punktu kontrolnego (odcinki ≤ 93 dni, zakładka 7 dni).
+  Pierwsze uruchomienie od 1 stycznia poprzedniego roku. Decyzje właściciela 2026-11-22.
+- Kursu nie nadpisujemy automatycznie: konflikt w `ops.ExchangeRateConflicts`, rozstrzyga
+  administrator instalacji (CSRF, wersje, niezmienna `audit.ExchangeRateOperations`).
+- Aktywność (widoczność) walut zostaje w bazie firmy — decyzja właściciela.
+- Migracja dodająca kody do wspólnego słownika walut zeruje punkty kontrolne
+  `ops.ExchangeRateSync`, żeby usługa dociągnęła historię nowych kodów (BGN i ANG, 2026-11-22).
+
 **Jednorazowy wyjątek 2026-11-22:** właściciel jawnie zlecił agentowi commit i push
 zmian ADR-047/§3.3. Nie zmienia to zasady ogólnej: bez osobnego, jawnego polecenia
 agent nie wykonuje Commit ani Push.
@@ -310,14 +332,16 @@ i firmy, w tym konta właściciela i firmy utworzone z aplikacji; nie przywracaj
 Zgoda właściciela na reset baz developerskich nadal obowiązuje, ale testy jej nie
 potrzebują. Nowe cele izolowane twórz tylko wtedy, gdy wymaga ich konkretny test.
 Nie rozszerza to zgody na inne aplikacje, bazy SQL systemowe ani zdalne serwery.
-Pozostałe zasady ADR-023 obowiązują.
-Domyślnie EUR/USD/GBP/CHF z A; PLN bez pobierania. ViewExchangeRates=64,
-ManageCurrencies=128, ImportExchangeRates=256; B tylko odczyt. NBP to publiczne
-HTTPS/JSON bez klucza; pobieranie wyłącznie ręczne, zakresy po 93 dni włącznie.
+Pozostałe zasady ADR-023 obowiązują w zakresie niezmienionym przez ADR-048 (niżej).
+**ADR-048 (2026-11-22) zastępuje miejsce i pobieranie kursów:** kursy NBP są w
+`Vatowiec_System` (`ref.ExchangeRates`, słownik `ref.Currencies` System), w bazie
+firmy zostaje `ref.Currencies` z aktywnością (domyślnie PLN/EUR/USD/GBP/CHF), bez
+A/B/C i bez `core.ExchangeRates`. ViewExchangeRates=64, ManageCurrencies=128;
+ImportExchangeRates=256 wycofane (bit zarezerwowany, nie używaj ponownie). NBP to
+publiczne HTTPS/JSON bez klucza; zakresy po 93 dni włącznie.
 Nie generuj dat/kursów ani nie nadpisuj konfliktu po cichu. Mid/Bid/Ask decimal(24,12),
 opcjonalne TradingDate C; świadome rozstrzygnięcie wymaga zgodnej wersji i audytu.
-Nie dodawaj harmonogramu ani reguł doboru kursu dla faktury. Automatyczne testy
-NBP używają atrap. Pełny runner chroni zastany szyfrogram DataPort zweryfikowanymi
+Nie dodawaj reguł doboru kursu dla faktury. Automatyczne testy NBP używają atrap. Pełny runner chroni zastany szyfrogram DataPort zweryfikowanymi
 kopiami i przywraca go do zgodnego profilu po testach, bez odczytu sekretu.
 Szczegóły: docs/currencies-and-nbp.md. Nie wykonuj Commit ani Push.
 

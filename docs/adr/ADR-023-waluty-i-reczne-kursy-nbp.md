@@ -4,6 +4,10 @@ Status: wdrożony w demonstratorze 2026-10-23; decyzja na zlecenie użytkownika 
 Decyzja o numerycznym kluczu waluty została zastąpiona przez
 [ADR-024](ADR-024-kod-iso-jako-klucz-waluty.md). Poniższy opis i wyniki zachowują
 stan historycznego wdrożenia; aktualny PK waluty to Code, FK kursu CurrencyCode.
+**ADR-048 (2026-11-22)** zastępuje miejsce przechowywania i sposób pobierania kursów: kursy NBP są
+wspólne dla instalacji w `Vatowiec_System`, pobiera je codziennie usługa Operations, a w bazie
+firmy zostaje słownik ISO z aktywnością (bez flag A/B/C i bez `core.ExchangeRates`). Prawo
+`ImportExchangeRates` (256) wycofano; konflikty rozstrzyga administrator instalacji.
 Wymaganie DOC-006, SPECYFIKACJA §5.3, database-per-company ADR-014.
 
 ## Rozwiązanie i akceptacja

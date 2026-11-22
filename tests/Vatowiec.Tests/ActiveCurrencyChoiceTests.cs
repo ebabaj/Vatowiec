@@ -93,7 +93,7 @@ public sealed partial class DesktopTests
 
     private static FakeApi ActiveRateApi()
     {
-        var api = BulkApi(); api.CurrencyData = api.CurrencyData!.Select(x => x with { IsActive = x.Code is "PLN" or "EUR", DownloadB = false }).ToArray();
+        var api = BulkApi(); api.CurrencyData = api.CurrencyData!.Select(x => x with { IsActive = x.Code is "PLN" or "EUR" }).ToArray();
         api.CurrenciesWithRatesData = api.CurrencyData.Where(x => x.Code == "USD").ToArray();
         api.StoredRates = [new(1, A, "USD", "NBP", "A", "001/A/NBP/2026", new(2026, 1, 2), null, 4.1m, null, null, DateTimeOffset.UtcNow, "AAAAAAAAAAE=")];
         return api;
@@ -120,7 +120,7 @@ public sealed partial class DesktopTests
         Assert.Null(api.LastRateQuery.Code); Assert.Single(model.RateRows);
         Assert.Equal(new[] { "", "EUR" }, model.RateCurrencyChoices.Select(x => x.Code));
         model.ShowCurrencySettings(true); Assert.Equal(4, model.CurrencyRows.Length); Assert.Contains(model.CurrencyRows, x => x.Code == "USD" && !x.IsActive);
-        Assert.Equal(0, api.NbpImports); Assert.Empty(api.ActivityWrites);
+        Assert.Empty(api.ActivityWrites);
     }
 
     [Fact]
@@ -134,22 +134,11 @@ public sealed partial class DesktopTests
         {
             if (e.PropertyName == nameof(model.RateCurrencyChoices)) { model.SelectedRateCurrency = model.RateCurrencyChoices[0]; model.RateCurrencyFilter = null; }
         };
-        api.CurrencyData = api.CurrencyData!.Select(x => x.Code == "EUR" ? x with { IsActive = false, DownloadA = false } : x).ToArray();
+        api.CurrencyData = api.CurrencyData!.Select(x => x.Code == "EUR" ? x with { IsActive = false } : x).ToArray();
         await model.RefreshCurrencies();
         Assert.Equal("EUR", model.SelectedRateCurrency!.Code); Assert.False(model.SelectedRateCurrency.IsActive);
         Assert.Equal("EUR", model.RateCurrencyFilter!.Code); Assert.Equal(3, model.RateTableFilter);
         Assert.Equal(date, model.RateFromFilter); Assert.Equal(date, model.RateToFilter); Assert.False(model.RateDescending);
-        Assert.Equal(0, api.NbpImports); Assert.False(model.HasUnsavedChanges);
-    }
-
-    [Theory]
-    [InlineData(true, "PLN", true, false)]
-    [InlineData(false, "USD", true, false)]
-    [InlineData(true, "EUR", false, false)]
-    [InlineData(true, "EUR", true, true)]
-    public void NbpSelection_RequiresActiveForeignCurrencyAndExplicitDownloadFlag(bool active, string code, bool download, bool expected)
-    {
-        var row = new Currency { Code = code, IsActive = active, DownloadA = download, DownloadB = download, DownloadC = download };
-        foreach (var table in new[] { "A", "B", "C" }) Assert.Equal(expected, row.Downloads(table));
+        Assert.False(model.HasUnsavedChanges);
     }
 }

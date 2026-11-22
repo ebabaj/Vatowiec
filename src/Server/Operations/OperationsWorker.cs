@@ -25,6 +25,7 @@ public sealed class OperationsWorker(IServiceScopeFactory scopes, IConfiguration
                     await scheduleScope.ServiceProvider.GetRequiredService<BackupScheduler>().EnqueueDue(stoppingToken);
                     await scheduleScope.ServiceProvider.GetRequiredService<BackupImportScanner>().Scan(stoppingToken);
                     nextSchedule = clock.GetUtcNow() + scheduleEvery;
+                    await SyncExchangeRates(stoppingToken);
                 }
                 await using var scope = scopes.CreateAsyncScope();
                 processed = await scope.ServiceProvider.GetRequiredService<CompanyOperationExecutor>().RunNext(stoppingToken);
@@ -41,6 +42,25 @@ public sealed class OperationsWorker(IServiceScopeFactory scopes, IConfiguration
                 try { await Task.Delay(idle, stoppingToken); }
                 catch (OperationCanceledException) { break; }
             }
+        }
+    }
+
+    // ADR-048: kursy NBP w rytmie harmonogramu. Osobna obsługa błędów: awaria NBP lub brak migracji
+    // nie wstrzymuje zleceń firm. Bez treści błędów (mogą zawierać szczegóły serwera).
+    private async Task SyncExchangeRates(CancellationToken ct)
+    {
+        try
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            var result = await scope.ServiceProvider.GetRequiredService<Vatowiec.Core.Infrastructure.ExchangeRates.ExchangeRateSyncService>().RunIfDue(ct);
+            if (result.Ran)
+                logger.LogInformation("NBP exchange rates: {Added} added, {Skipped} unchanged, {Conflicts} conflicts, error {ErrorCode}",
+                    result.Added, result.Skipped, result.Conflicts, result.ErrorCode ?? "none");
+        }
+        catch (Exception error) when (error is Microsoft.Data.SqlClient.SqlException or InvalidOperationException
+            or Microsoft.EntityFrameworkCore.DbUpdateException)
+        {
+            logger.LogWarning("NBP exchange rate sync unavailable ({ErrorType}); retrying", error.GetType().Name);
         }
     }
 

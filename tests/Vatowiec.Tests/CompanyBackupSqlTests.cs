@@ -175,7 +175,7 @@ public sealed class CompanyBackupSqlTests
                     Assert.Equal(CompanyOperationExecutor.ManifestFormat, manifest.GetProperty("format").GetString());
                     Assert.Equal((A, installation, kept.OperationId), (manifest.GetProperty("companyId").GetGuid(), manifest.GetProperty("installationId").GetGuid(), manifest.GetProperty("operationId").GetGuid()));
                     Assert.Equal(kept.Sha256, manifest.GetProperty("sha256").GetString());
-                    Assert.Contains(manifest.GetProperty("migrations").EnumerateArray(), x => x.GetString()!.EndsWith("_ContractorFinance", StringComparison.Ordinal));
+                    Assert.Contains(manifest.GetProperty("migrations").EnumerateArray(), x => x.GetString()!.EndsWith("_CurrenciesBgnAng", StringComparison.Ordinal));
                 }
                 Assert.True(File.Exists(foreign)); // Rotacja nie dotyka plików spoza rejestru kopii.
                 var status = await new CompanyBackupService(db, clock).Status(admin.Id, A, default);

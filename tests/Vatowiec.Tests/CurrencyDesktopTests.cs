@@ -43,10 +43,10 @@ public sealed partial class DesktopTests
     private static FakeApi BulkApi(bool manage = true) => new()
     {
         Permissions = manage ? ["ViewProfile", "ViewExchangeRates", "ManageCurrencies"] : ["ViewProfile", "ViewExchangeRates"],
-        CurrencyData = [new(A, "PLN", "złoty", true, false, false, false, "AAAAAAAAAAE="),
-            new(A, "EUR", "euro", true, true, false, true, "AAAAAAAAAAE="),
-            new(A, "USD", "dolar", true, false, true, false, "AAAAAAAAAAE="),
-            new(A, "JPY", "jen", false, false, false, false, "AAAAAAAAAAE=")]
+        CurrencyData = [new(A, "PLN", "złoty", true, "AAAAAAAAAAE="),
+            new(A, "EUR", "euro", true, "AAAAAAAAAAE="),
+            new(A, "USD", "dolar", true, "AAAAAAAAAAE="),
+            new(A, "JPY", "jen", false, "AAAAAAAAAAE=")]
     };
 
     [Fact]
@@ -65,13 +65,12 @@ public sealed partial class DesktopTests
         Assert.Equal(4, Assert.Single(api.ActivityWrites).Currencies.Length);
         Assert.Equal("USD", model.CurrencySearch); Assert.Single(model.VisibleCurrencyRows);
         Assert.True(model.CurrencyRows.Single(x => x.Code == "PLN").IsActive);
-        Assert.All(model.CurrencyRows.Where(x => x.Code != "PLN"), x => { Assert.False(x.IsActive); Assert.False(x.DownloadA || x.DownloadB || x.DownloadC); });
+        Assert.All(model.CurrencyRows.Where(x => x.Code != "PLN"), x => Assert.False(x.IsActive));
         model.ClearCurrencySelection(); Assert.Contains("0 z 4", model.CurrencySelectionCount);
         model.BeginCurrencyActivity(true, true); await model.ConfirmCurrencyActivity();
         Assert.True(api.ActivityWrites.Last().All); Assert.Equal(4, api.ActivityWrites.Last().Currencies.Length);
-        Assert.All(model.CurrencyRows, x => { Assert.True(x.IsActive); Assert.False(x.DownloadA || x.DownloadB || x.DownloadC); });
+        Assert.All(model.CurrencyRows, x => Assert.True(x.IsActive));
         model.BeginCurrencyActivity(false, true); Assert.Contains("PLN zostanie pominięty", model.CurrencyActivityConfirmation);
-        Assert.Equal(0, api.NbpImports);
     }
 
     [Theory]
@@ -86,14 +85,13 @@ public sealed partial class DesktopTests
         Assert.True(model.CurrencyActivityPrompt); Assert.All(model.CurrencyRows, x => Assert.Equal(x.Code != "JPY", x.IsActive));
         api.ActivityError = null; await model.ConfirmCurrencyActivity();
         Assert.Equal(api.ActivityWrites[0], api.ActivityWrites[1]); Assert.False(model.CurrencyActivityPrompt);
-        Assert.Equal(0, api.NbpImports);
     }
 
     [Fact]
     public async Task BulkCurrencies_DirtyEditorReadOnlyAndExpiryPreventWrites()
     {
         var api = BulkApi(); using var model = await Open(api); await model.OpenCurrencies(true);
-        model.CurrencyEditor!.DownloadB = true; model.BeginCurrencyActivity(false, true);
+        model.CurrencyEditor!.IsActive = !model.CurrencyEditor.IsActive; model.BeginCurrencyActivity(false, true);
         Assert.False(model.CurrencyActivityPrompt); Assert.Contains("Najpierw", model.Message);
         model.CancelCurrencyChanges(); model.BeginCurrencyActivity(false, true);
         await model.Logout(); await model.ConfirmCurrencyActivity(); Assert.Empty(api.ActivityWrites);
@@ -126,7 +124,7 @@ public sealed partial class DesktopTests
         using var model = await Open(api); await model.OpenCurrencies(true);
         var rows = model.VisibleCurrencyRows;
         var selected = model.SelectedCurrency;
-        model.CurrencyEditor!.DownloadC = true;
+        model.CurrencyEditor!.IsActive = !model.CurrencyEditor.IsActive;
         Assert.Same(rows, model.VisibleCurrencyRows);
         Assert.Same(selected, model.SelectedCurrency);
         model.SelectedCurrency = null;
@@ -146,27 +144,30 @@ public sealed partial class DesktopTests
     }
 
     [Fact]
-    public async Task CurrencyViews_DoNotImportAutomaticallyAndUnsavedSettingsRequireDecision()
+    public async Task CurrencyViews_UnsavedActivityRequiresDecisionAndCompanyScreenHasNoImport()
     {
-        var api = new FakeApi { Permissions = ["ViewProfile", "ViewContractors", "EditContractors", "ViewExchangeRates", "ManageCurrencies", "ImportExchangeRates"] };
+        var api = new FakeApi { Permissions = ["ViewProfile", "ViewContractors", "EditContractors", "ViewExchangeRates", "ManageCurrencies"] };
         using var model = await Open(api); await model.OpenCurrencies(true);
-        Assert.True(model.IsCurrencySettings); Assert.False(model.IsBrowsingWorkspace); Assert.Equal(0, api.NbpImports);
-        model.CurrencyEditor!.DownloadC = true; Assert.True(model.HasUnsavedChanges);
-        await model.ImportNbpRates(); Assert.Equal(0, api.NbpImports); Assert.Contains("ustawienia", model.Message);
+        Assert.True(model.IsCurrencySettings); Assert.False(model.IsBrowsingWorkspace);
+        model.CurrencyEditor!.IsActive = !model.CurrencyEditor.IsActive; Assert.True(model.HasUnsavedChanges);
         model.CloseCurrencies(); Assert.True(model.DiscardPrompt); model.KeepEditing();
-        await model.SaveCurrencySettings(); Assert.Single(api.CurrencyWrites); Assert.Equal(0, api.NbpImports);
-        model.ShowCurrencySettings(false); await model.ImportNbpRates(); Assert.Equal(1, api.NbpImports); Assert.Contains("Brak nowych kursów", model.RateImportSummary);
+        await model.SaveCurrencySettings(); Assert.Single(api.CurrencyWrites); Assert.False(model.HasUnsavedChanges);
+        model.ShowCurrencySettings(false); await model.LoadRates();
+        Assert.Contains("VATowiec Operations", model.StoredRateDates);
         model.NewContractor(); Assert.False(model.IsEditing);
         model.CloseCurrencies(); Assert.False(model.IsCurrencyScreen); Assert.Empty(model.CurrencyRows);
+        Assert.DoesNotContain(typeof(MainViewModel).GetMethods(), x => x.Name.Contains("Import", StringComparison.Ordinal) && x.Name.Contains("Nbp", StringComparison.Ordinal));
     }
     [Fact]
     public async Task CurrencyReadOnlyUser_CannotTriggerWritesEvenByCallingCommands()
     {
         var api = new FakeApi { Permissions = ["ViewProfile", "ViewExchangeRates"] };
         using var model = await Open(api); await model.OpenCurrencies(true);
-        Assert.False(model.CanConfigureCurrencies); Assert.False(model.CanImportRates);
-        await model.SaveCurrencySettings(); await model.ImportNbpRates();
-        Assert.Empty(api.CurrencyWrites); Assert.Equal(0, api.NbpImports);
+        Assert.False(model.CanConfigureCurrencies);
+        await model.SaveCurrencySettings();
+        Assert.Empty(api.CurrencyWrites);
+        Assert.False(model.IsInstallationAdministrator); await model.OpenExchangeRateAdministration();
+        Assert.False(model.IsExchangeRateAdministrationScreen); Assert.Equal(0, api.ExchangeRateAdministrationReads);
     }
     [Fact]
     public async Task CurrencyState_IsRemovedOnSessionExpiry()
@@ -178,14 +179,52 @@ public sealed partial class DesktopTests
         Assert.True(model.IsLogin); Assert.Empty(model.CurrencyRows); Assert.Empty(model.RateRows); Assert.Empty(model.CurrencyHistoryRows); Assert.False(model.IsCurrencyScreen);
     }
     [Fact]
-    public async Task CurrencyHistory_RestoresConflictProposalWithoutAnotherExternalRequest()
+    public async Task ExchangeRateAdministration_ShowsStatusResolvesWithConfirmationAndGuardsUnsavedStart()
     {
-        var rate = new RateValue("001/A/NBP/2026", new(2026, 10, 21), null, 4.1m, null, null);
-        var result = new RateImportResponse(0, A, 1, 0, 0, [new(1, "EUR", "A", "AAAAAAAAAAE=", rate, rate with { Mid = 4.2m })], [], [], null, null, rate.EffectiveDate, null, null);
-        var row = new CurrencyHistoryResponse(7, A, "Import", DateTimeOffset.UtcNow, "operator", JsonSerializer.Serialize(result, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
-        var api = new FakeApi { Permissions = ["ViewProfile", "ViewExchangeRates"], CurrencyHistoryData = [row] };
-        using var model = await Open(api); await model.OpenCurrencies(); model.SelectedCurrencyHistory = model.CurrencyHistoryRows[0];
-        Assert.Single(model.RateConflicts); Assert.Equal(0, api.NbpImports); Assert.Contains("historyczne", model.RateImportSummary);
-        Assert.False(model.CanResolveRates);
+        var api = new FakeApi { InstallationAdmin = true, Permissions = ["ViewProfile"] };
+        using var model = new MainViewModel(_ => api) { UserName = "admin" };
+        await model.Login("temporary"); Assert.True(model.IsInstallationAdministrator);
+        await model.OpenExchangeRateAdministration();
+        var screen = model.ExchangeRateAdministration!;
+        Assert.True(model.IsExchangeRateAdministrationScreen); Assert.True(screen.IsLoaded); Assert.False(model.IsCompanySelection);
+        Assert.Contains("18.11.2026", screen.StatusSummary); Assert.Single(screen.History);
+        Assert.True(screen.HasConflicts); Assert.False(screen.CanResolve);
+        screen.SelectedConflict = screen.Conflicts[0]; Assert.Contains("NBP opublikował", screen.ConflictComparison);
+        await model.ResolveExchangeRateConflict(true); Assert.Empty(api.ExchangeRateResolutions);
+        screen.ConfirmResolution = true; await model.ResolveExchangeRateConflict(true);
+        var resolution = Assert.Single(api.ExchangeRateResolutions);
+        Assert.True(resolution.Value.AcceptIncoming); Assert.True(resolution.Value.Confirm); Assert.Equal("AAAAAAAAAAE=", resolution.Value.RateRowVersion);
+        Assert.False(screen.HasConflicts);
+        await model.RequestExchangeRateRun(); Assert.Equal(1, api.ExchangeRateRuns); Assert.Contains("Zlecono", model.Message);
+        screen.HistoryStart = new DateTimeOffset(new DateTime(2024, 12, 1)); Assert.True(model.HasUnsavedChanges);
+        model.CloseExchangeRateAdministration(); Assert.True(model.DiscardPrompt); model.KeepEditing();
+        await model.SaveExchangeRateHistoryStart();
+        Assert.Equal(new DateOnly(2024, 12, 1), Assert.Single(api.HistoryStartWrites).HistoryStartDate);
+        Assert.False(model.HasUnsavedChanges);
+        model.CloseExchangeRateAdministration(); Assert.False(model.IsExchangeRateAdministrationScreen); Assert.True(model.IsGusSettings);
+    }
+
+    private sealed partial class FakeApi
+    {
+        public int ExchangeRateAdministrationReads { get; private set; }
+        public int ExchangeRateRuns { get; private set; }
+        public List<(long Id, ExchangeRateConflictResolution Value)> ExchangeRateResolutions { get; } = [];
+        public List<ExchangeRateHistoryStartRequest> HistoryStartWrites { get; } = [];
+        private DateOnly rateHistoryStart = new(2025, 1, 1);
+        private bool rateConflictOpen = true;
+        private ExchangeRateAdministrationResponse RateAdministration() => new(rateHistoryStart, false,
+            new(DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, new(2026, 11, 18), new(2026, 11, 18), new(2026, 11, 18), ExchangeRateRuns > 0),
+            rateConflictOpen ? [new(5, "EUR", "A", new("222/A/NBP/2026", new(2026, 11, 18), null, 4.1m, null, null),
+                new("222/A/NBP/2026", new(2026, 11, 18), null, 4.2m, null, null), DateTimeOffset.UtcNow, "AAAAAAAAAAI=", "AAAAAAAAAAE=")] : [],
+            "AAAAAAAAAAM=");
+        public Task<ExchangeRateAdministrationResponse> ExchangeRateAdministration() { ExchangeRateAdministrationReads++; return Task.FromResult(RateAdministration()); }
+        public Task<ExchangeRateAdministrationResponse> RequestExchangeRateRun() { ExchangeRateRuns++; return Task.FromResult(RateAdministration()); }
+        public Task<ExchangeRateAdministrationResponse> SaveExchangeRateHistoryStart(ExchangeRateHistoryStartRequest value)
+        { HistoryStartWrites.Add(value); rateHistoryStart = value.HistoryStartDate; return Task.FromResult(RateAdministration()); }
+        public Task<ExchangeRateAdministrationResponse> ResolveExchangeRateConflict(long conflictId, ExchangeRateConflictResolution value)
+        { ExchangeRateResolutions.Add((conflictId, value)); rateConflictOpen = false; return Task.FromResult(RateAdministration()); }
+        public Task<ExchangeRateOperationResponse[]> ExchangeRateHistory(int offset) =>
+            Task.FromResult<ExchangeRateOperationResponse[]>([new(1, "Download", DateTimeOffset.UtcNow, "VATowiec Operations (kursy NBP)",
+                """{"table":"A","from":"2026-11-11","to":"2026-11-18","tables":6,"added":4,"skipped":20,"conflicts":0,"unknownCodes":[]}""")]);
     }
 }

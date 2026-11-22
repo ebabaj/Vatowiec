@@ -32,8 +32,7 @@ public sealed class PersonalDefaultsTests
         Assert.False(InstallationPasswordValidator.Validate(new PasswordPolicy(), password).Succeeded);
         Assert.Throws<PersonalSetupException>(() => PersonalInstallation.ValidateInput(PersonalSetupTests.Input("")));
         Assert.True(new PasswordPolicy().IsEnabled); Assert.Equal(12, new PasswordPolicy().MinimumLength);
-        Assert.All(CurrencySeed.Rows(), row => Assert.True(row.IsActive));
-        Assert.Equal(new[] { "CHF", "EUR", "GBP", "USD" }, CurrencySeed.Rows().Where(x => x.DownloadA).Select(x => x.Code).Order());
+        Assert.Equal(CurrencySeed.DefaultActive.Order(), CurrencySeed.Rows().Where(x => x.IsActive).Select(x => x.Code).Order());
     }
 
     [PersonalLocalDbFact]
@@ -63,8 +62,8 @@ public sealed class PersonalDefaultsTests
                 Assert.All(changes, c => { Assert.Contains("\"Test\"", c.BeforeJson); Assert.Contains("\"Production\"", c.AfterJson); });
             }
             var euro = Assert.Single(currencies, c => c.Code == "EUR");
-            editedEuro = await api.SaveCurrency(company, "EUR", new(Guid.NewGuid(), euro.RowVersion, true, false, false, false));
-            Assert.True(editedEuro.IsActive); Assert.False(editedEuro.DownloadA || editedEuro.DownloadB || editedEuro.DownloadC);
+            editedEuro = await api.SaveCurrency(company, "EUR", new(Guid.NewGuid(), euro.RowVersion, true));
+            Assert.True(editedEuro.IsActive);
             editedPolicy = await api.SavePasswordPolicy(new(true, 3, false, true, false, false, policy.RowVersion, false,
                 PreventPasswordReuse: true, PreviousPasswordCount: 2, EnforcePasswordExpiration: true, PasswordValidityDays: 365));
             Assert.True(editedPolicy.IsEnabled && editedPolicy.PreventPasswordReuse && editedPolicy.EnforcePasswordExpiration);
@@ -107,7 +106,7 @@ public sealed class PersonalDefaultsTests
         var state = JsonSerializer.Deserialize<PersonalInstallationState>(await File.ReadAllTextAsync(Path.Combine(root, "installation.json")))!;
         var target = new PersonalDatabaseTarget(state.InstallationId);
         await using (var db = System(target)) { Assert.True((await db.PasswordPolicies.SingleAsync()).IsEnabled); Assert.False(await db.Users.AnyAsync()); }
-        await using (var db = Company(target, state.CompanyId)) { Assert.Equal(149, await db.Currencies.CountAsync()); Assert.True((await db.Currencies.SingleAsync(x => x.Code == "EUR")).DownloadA); }
+        await using (var db = Company(target, state.CompanyId)) { Assert.Equal(CurrencySeed.Rows().Length, await db.Currencies.CountAsync()); Assert.True((await db.Currencies.SingleAsync(x => x.Code == "EUR")).IsActive); }
         await using (var failed = new SystemDbContext(new DbContextOptionsBuilder<SystemDbContext>().UseSqlServer(target.Connection(target.System)).AddInterceptors(new FailBootstrapAudit()).Options))
         {
             await using var tx = await failed.Database.BeginTransactionAsync();
@@ -156,9 +155,9 @@ public sealed class PersonalDefaultsTests
             var before = (await db.Currencies.IgnoreQueryFilters().SingleAsync(x => x.Code == "PLN")).RowVersion.ToArray();
             using var httpProbe = new BootstrapHttpProbe();
             await PersonalBootstrapDefaults.InitializeCompany(db, state.InstallationId, Guid.NewGuid(), "Kolejna fikcyjna firma Personal", null);
-            AssertCompanyDefaults((await db.Currencies.ToArrayAsync()).Select(c => new CurrencyResponse(nextCompany, c.Code, c.Name, c.IsActive, c.DownloadA, c.DownloadB, c.DownloadC, Convert.ToBase64String(c.RowVersion))).ToArray());
+            AssertCompanyDefaults((await db.Currencies.ToArrayAsync()).Select(c => new CurrencyResponse(nextCompany, c.Code, c.Name, c.IsActive, Convert.ToBase64String(c.RowVersion))).ToArray());
             Assert.Equal(before, (await db.Currencies.SingleAsync(x => x.Code == "PLN")).RowVersion);
-            Assert.Single(await db.CurrencyOperations.ToArrayAsync()); Assert.Empty(await db.ExchangeRates.ToArrayAsync());
+            Assert.Single(await db.CurrencyOperations.ToArrayAsync());
             Assert.Equal(0, httpProbe.Calls);
         }
         await PersonalInstallation.LocalDb("stop", target.Instance);
@@ -167,7 +166,7 @@ public sealed class PersonalDefaultsTests
     private static void AssertDefaultPolicy(PasswordPolicyResponse p)
     { Assert.False(p.IsEnabled || p.RequireUppercase || p.RequireLowercase || p.RequireDigit || p.RequireSpecialCharacter || p.PreventPasswordReuse || p.EnforcePasswordExpiration); Assert.Equal(1, p.MinimumLength); }
     private static void AssertCompanyDefaults(CurrencyResponse[] rows)
-    { Assert.Equal(149, rows.Length); Assert.Equal("PLN", Assert.Single(rows, c => c.IsActive).Code); Assert.All(rows, c => Assert.False(c.DownloadA || c.DownloadB || c.DownloadC)); }
+    { Assert.Equal(CurrencySeed.Rows().Length, rows.Length); Assert.Equal("PLN", Assert.Single(rows, c => c.IsActive).Code); }
     private static void AssertRegistryDefaults(RegistryConfigurationResponse[] rows)
     {
         Assert.Equal(3, rows.Length);

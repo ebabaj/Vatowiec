@@ -12,7 +12,7 @@ public enum CompanyPermission
     ManageCompanyIntegrations = 32,
     ViewExchangeRates = 64,
     ManageCurrencies = 128,
-    ImportExchangeRates = 256,
+    // 256 — dawne ImportExchangeRates, wycofane w ADR-048 (kursy pobiera usługa Operations). Bit zarezerwowany.
     ManageContractorPesel = 512,
     ManageCompanyBackups = 1024
 }

@@ -8,7 +8,8 @@ namespace Vatowiec.Core.Infrastructure.Registries;
 
 public sealed record NbpRate(string Code, decimal? Mid, decimal? Bid, decimal? Ask);
 public sealed record NbpTable(string Type, string Number, DateOnly EffectiveDate, DateOnly? TradingDate, NbpRate[] Rates);
-public sealed record NbpReply(NbpTable[] Tables, string? Error);
+// Transient: awaria przejściowa (fałszywe 404, 429, 5xx, timeout, błąd połączenia) — usługa może ponowić odcinek (ADR-048).
+public sealed record NbpReply(NbpTable[] Tables, string? Error, bool Transient = false);
 public interface INbpClient
 {
     Task<NbpReply> Fetch(string table, DateOnly? from, DateOnly? to, CancellationToken cancellationToken);
@@ -29,8 +30,18 @@ public sealed class NbpClient(IHttpClientFactory clients) : INbpClient
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken); timeout.CancelAfter(TimeSpan.FromSeconds(12));
             using var response = await http.SendAsync(request, timeout.Token);
-            if (response.StatusCode == HttpStatusCode.NotFound) return new([], null);
-            if (!response.IsSuccessStatusCode) return new([], "NBP " + table + ": HTTP " + (int)response.StatusCode + ". Nie pobrano wiarygodnej tabeli.");
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                // Brak publikacji to wyłącznie tekstowa odpowiedź API „404 NotFound - Not Found - Brak danych”.
+                // NBP zwraca też chwilowo stronę HTML 404 serwera WWW dla istniejących danych (sprawdzone
+                // 2026-11-22) — to awaria, nie brak publikacji; nie wolno przesuwać punktu kontrolnego.
+                var body = await response.Content.ReadAsStringAsync(timeout.Token);
+                return body.Contains("Brak danych", StringComparison.Ordinal) && !body.TrimStart().StartsWith('<')
+                    ? new([], null)
+                    : new([], "NBP " + table + ": HTTP 404 bez komunikatu „Brak danych” (chwilowa awaria serwera NBP); nie jest to brak publikacji.", true);
+            }
+            if (!response.IsSuccessStatusCode) return new([], "NBP " + table + ": HTTP " + (int)response.StatusCode + ". Nie pobrano wiarygodnej tabeli.",
+                response.StatusCode == HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500);
             using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(timeout.Token));
             var result = new List<NbpTable>();
             foreach (var element in json.RootElement.EnumerateArray())
@@ -72,8 +83,8 @@ public sealed class NbpClient(IHttpClientFactory clients) : INbpClient
             if (from == null && result.Count != 1) throw new InvalidDataException();
             return new(result.ToArray(), null);
         }
-        catch (OperationCanceledException) { return new([], "NBP " + table + ": przekroczono czas oczekiwania; nie jest to brak publikacji."); }
-        catch (HttpRequestException) { return new([], "NBP " + table + ": błąd połączenia; nie jest to brak publikacji."); }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { return new([], "NBP " + table + ": przekroczono czas oczekiwania; nie jest to brak publikacji.", true); }
+        catch (HttpRequestException) { return new([], "NBP " + table + ": błąd połączenia; nie jest to brak publikacji.", true); }
         catch (Exception e) when (e is JsonException or InvalidOperationException or FormatException or OverflowException or KeyNotFoundException or InvalidDataException)
         { return new([], "NBP " + table + ": niepoprawna odpowiedź; nie zapisano tej partii."); }
     }

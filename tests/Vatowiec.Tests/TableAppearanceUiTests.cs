@@ -35,15 +35,15 @@ public sealed class TableAppearanceUiTests
                     var api = new WorkspaceTestApi
                     {
                         AdditionalPermissions = ["ManageCurrencies"],
-                        CurrencyData = [new(WorkspaceTestApi.A, "EUR", "euro", true, true, false, false, "AAAAAAAAAAE="),
-                            new(WorkspaceTestApi.A, "USD", "dolar", false, false, false, false, "AAAAAAAAAAE="),
-                            new(WorkspaceTestApi.A, "PLN", "złoty", true, false, false, false, "AAAAAAAAAAE=")]
+                        CurrencyData = [new(WorkspaceTestApi.A, "EUR", "euro", true, "AAAAAAAAAAE="),
+                            new(WorkspaceTestApi.A, "USD", "dolar", false, "AAAAAAAAAAE="),
+                            new(WorkspaceTestApi.A, "PLN", "złoty", true, "AAAAAAAAAAE=")]
                     };
                     var writes = new List<CurrencyActivityRequest>();
                     api.CurrencyActivity = value =>
                     {
                         writes.Add(value);
-                        api.CurrencyData = [api.CurrencyData[0] with { IsActive = value.IsActive, DownloadA = false },
+                        api.CurrencyData = [api.CurrencyData[0] with { IsActive = value.IsActive },
                             api.CurrencyData[1] with { IsActive = value.IsActive }, api.CurrencyData[2]];
                         return new(WorkspaceTestApi.A, value.IsActive, api.CurrencyData[..2], ["PLN"]);
                     };

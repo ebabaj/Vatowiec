@@ -1,10 +1,83 @@
-# Waluty i ręczne kursy NBP
+# Waluty i kursy NBP
 
-Wdrożenie DOC-006 w zakresie słownika i kursów, zgodnie z ADR-023 i ADR-024.
-Bez faktur, automatycznego doboru podatkowego kursu, różnic kursowych i harmonogramu.
-[Oficjalny kontrakt NBP](https://api.nbp.pl/) sprawdzono 2026-10-22.
+Wdrożenie DOC-006 w zakresie słownika i kursów, zgodnie z ADR-023, ADR-024 i
+[ADR-048](adr/ADR-048-publiczne-dane-referencyjne-w-bazie-systemowej.md).
+Bez faktur, automatycznego doboru podatkowego kursu i różnic kursowych.
+[Oficjalny kontrakt NBP](https://api.nbp.pl/) i
+[terminy publikacji](https://nbp.pl/statystyka-i-sprawozdawczosc/kursy/informacja-o-terminach-publikacji-kursow-walut/)
+sprawdzono 2026-11-22.
 
-## Obsługa programu
+## Kursy wspólne dla instalacji (ADR-048, od 2026-11-22)
+
+**Gdzie są dane.** Kursy NBP są jedną, wspólną kopią dla wszystkich firm instalacji:
+`Vatowiec_System.ref.ExchangeRates` (FK do wspólnego słownika ISO `ref.Currencies`).
+Baza firmy ma wyłącznie słownik walut z aktywnością (`ref.Currencies`, cel FK kartoteki)
+i historię zmian aktywności (`audit.CurrencyOperations`). Przyszły dokument zapisze kopię
+zastosowanego kursu, dlatego kopia zapasowa firmy nie potrzebuje kursów.
+
+**Kto i kiedy pobiera.** Wyłącznie usługa VATowiec Operations (API nie łączy się z NBP).
+Zawsze wszystkie waluty tabel A, B i C. NBP publikuje A w dni robocze 11:45–12:15,
+B w środy (dzień wcześniej, gdy środa jest wolna) 11:45–12:15, C w dni robocze 7:45–8:15.
+
+| Sytuacja | Zachowanie usługi (czas polski, Europe/Warsaw) |
+|---|---|
+| Przebieg dzienny | od 13:00 (`Operations:ExchangeRates:DailyHour`), dopóki brak dzisiejszej tabeli A |
+| Brak dzisiejszej tabeli A | ponowienie co 60 min, ostatnie w godzinie 16:00 (`Operations:ExchangeRates:LastHour`); weekend/święto kończy się bez kalendarza |
+| Usługa wystartowała po 16:00 | jedna próba, jeśli dziś w oknie nie było próby |
+| Usługa nie działała kilka dni | punkt kontrolny starszy niż przedwczoraj → przebieg od razu, o dowolnej godzinie, od punktu kontrolnego |
+| Awaria przejściowa NBP (fałszywe 404 HTML, 429, 5xx, timeout, sieć) | do 3 prób odcinka co 5 s w tym samym przebiegu; jeśli wszystkie zawiodą — jak błąd poniżej |
+| Błąd NBP (400, zły JSON albo wyczerpane próby) | przerwanie tabeli bez przesunięcia punktu kontrolnego; kolejna próba po 60 min |
+| `404 NotFound - Not Found - Brak danych` | poprawny wynik: brak publikacji w zakresie (weekend, święto, środa dla B) |
+| „Pobierz teraz” (administrator) | przy najbliższym sprawdzeniu harmonogramu (do 5 min) |
+
+Zakres zapytania tabeli: od punktu kontrolnego minus 7 dni (zakładka wychwytuje
+spóźnione publikacje i korekty) do dziś, odcinki po najwyżej 93 dni, najwyżej 40
+odcinków na tabelę w przebiegu. Punkt kontrolny przesuwa się po każdym zapisanym
+odcinku, nigdy dalej niż wczoraj. Pierwsze uruchomienie pobiera historię od 1 stycznia
+poprzedniego roku; wcześniejszą datę ustawia administrator (archiwum NBP od 02.01.2002).
+Kody spoza słownika System są pomijane i odnotowane w historii. Słownik uzupełnia migracja
+(np. BGN i ANG, 2026-11-22), która zeruje punkty kontrolne — usługa dociąga wtedy historię nowych kodów.
+
+**Konflikty.** Inna wartość dla zapisanego kursu (waluta, tabela, data publikacji) nie
+nadpisuje go. Trafia do `ops.ExchangeRateConflicts` (ta sama propozycja tylko raz).
+Rozstrzyga administrator instalacji: „Zachowaj zapisany kurs” albo „Przyjmij dane NBP”,
+po zaznaczeniu potwierdzenia; serwer sprawdza wersję konfliktu i kursu.
+
+### Obsługa — użytkownik firmy
+
+1. **Słowniki → Kursy walut** (prawo „Odczyt walut i kursów”): stronicowana lista
+   wspólnych kursów z filtrami waluty, tabeli i dat; pod listą stan pobierania — daty
+   ostatnich tabel A/B/C, ostatnie udane pobranie i ewentualny błąd. Nie ma przycisku
+   pobierania.
+2. **Słowniki → Waluty** / **Ustawienia firmy → Waluty** (prawo „Zarządzanie walutami”):
+   aktywność waluty w tej firmie, pojedynczo lub zbiorczo. Aktywność decyduje tylko
+   o widoczności na listach wyboru; kursy wszystkich walut są dostępne niezależnie od niej.
+
+### Obsługa — administrator instalacji
+
+**Ustawienia instalacji → Dane referencyjne → Kursy NBP**: stan pobierania, data
+początkowa historii (wcześniejsza data powoduje dociągnięcie brakującej historii,
+późniejsza nie usuwa kursów), „Pobierz teraz”, konflikty do rozstrzygnięcia i historia
+pobierania i decyzji. Usługa VATowiec Operations musi mieć wychodzący HTTPS do
+`api.nbp.pl` (zapora/serwer proxy).
+
+### API (ADR-048)
+
+| Metoda i ścieżka | Prawo | Uwagi |
+|---|---|---|
+| GET `/api/v1/companies/{id}/exchange-rates` | ViewExchangeRates | kursy z System + `sync` (stan pobierania) |
+| GET `/api/v1/companies/{id}/exchange-rates/lookup` | ViewExchangeRates | publikacja z dnia lub ostatnia przed datą |
+| GET/PUT/POST `/api/v1/companies/{id}/currencies…` | View / ManageCurrencies | aktywność walut firmy, CSRF przy zapisie |
+| GET `/api/v1/installation/exchange-rates` (+ `/history`) | administrator instalacji | stan, data początkowa, otwarte konflikty |
+| POST `/api/v1/installation/exchange-rates/run` | administrator instalacji | zlecenie dla usługi Operations, CSRF |
+| PUT `/api/v1/installation/exchange-rates/history-start` | administrator instalacji | CSRF + RowVersion |
+| POST `/api/v1/installation/exchange-rates/conflicts/{id}/resolve` | administrator instalacji | CSRF, wersja konfliktu i kursu, potwierdzenie |
+
+Ręczny import w firmie (`/exchange-rates/imports`) i prawo `ImportExchangeRates` (256)
+usunięto. Opis poniżej dotyczy poprzednich etapów (ADR-023/024) i zostaje jako historia.
+
+
+## Obsługa programu — stan przed ADR-048 (historia)
 
 1. Uruchom API i Avalonia według [instrukcji](desktop.md). Zaloguj się jako
    `operator.m0` swoim lokalnie skonfigurowanym hasłem i otwórz firmę A.

@@ -491,48 +491,48 @@ wyłącznie do szkicu; zwykły zapis zachowuje ostrzeżenia, prawa, rowversion i
 Limit dzienny należy do konta, także kilku kluczy; reset 00:00 UTC, brak fikcyjnego
 salda. Niedostępność nie jest wynikiem negatywnym. [Konfiguracja i próby](docs/dataport.md).
 
-### 3.12. Waluty i ręczne kursy NBP (ADR-023)
+### 3.12. Waluty i kursy NBP (ADR-023, ADR-024, ADR-048)
 
-Podstawa DOC-006: lokalny słownik 149 pozycji, ustawienia aktywności/pobierania
-A/B/C i stronicowana kartoteka kursów w każdej bazie firmy. Domyślnie EUR/USD/GBP/CHF
-z A; PLN jako waluta podstawowa bez kursu NBP. Trzy nowe tabele ref.Currencies,
-core.ExchangeRates i audit.CurrencyOperations, bez powielonego CompanyId i GUID PK.
-ADR-024 zastępuje numeryczny klucz waluty: ref.Currencies ma wyłącznie
-niezmienne Code char(3) jako PRIMARY KEY, wielkie litery, bez Id. Kursy wskazują
-CurrencyCode char(3) przez lokalny FK; ich własne bigint IDENTITY pozostaje.
-Ustawienia, API i klient używają kodu. Nie mapujemy starych CurrencyId:
-demonstracyjne trzy tabele walutowe są jawnie odtwarzane z seedem, bez zmian
-pozostałych danych firm i konfiguracji integracji. Historyczne ADR/migracje
-pozostają zapisem poprzedniego modelu.
-Wartości decimal(24,12), Mid dla A/B, Bid/Ask dla C, daty publikacji i opcjonalnego
-notowania, oryginalny numer tabeli i UTC pobrania. Odczyt/zarządzanie/import mają
-osobne prawa firmowe 64/128/256 oraz CSRF dla mutacji; B pozostaje tylko do odczytu.
+**Podział danych (ADR-048, 2026-11-22).** Publiczne dane referencyjne, takie same dla
+wszystkich firm i tylko odczytywane przez firmę (kursy NBP; w przyszłości np. kody
+pocztowe/TERYT, kody urzędów skarbowych, kalendarz dni wolnych, PKD), są w
+`Vatowiec_System`. W bazie firmy są dane, ustawienia i decyzje firmy oraz dowody
+księgowe. Dokument (DOC-006) zapisuje kopię zastosowanego kursu (waluta, wartość, typ
+i numer tabeli, data publikacji, źródło), a nie FK do kursów System — backup firmy
+pozostaje samowystarczalny, a księgowanie nie obejmuje transakcją bazy System.
+Zakazane są zapytania łączące System z bazą firmy (JOIN, FK, synonimy, widoki).
 
-Ustawienia Avalonia pozwalają zaznaczać waluty niezależnie od pozycji edytowanej:
-widoczne według filtra, cały słownik lub wyczyścić zaznaczenie. Aktywacja/dezaktywacja
-zaznaczonych i szybkie akcje dla wszystkich wymagają potwierdzenia liczby zmian
-i pominięć. Jedno POST /currencies/activity sprawdza wersje i zapisuje całą partię
-z trwałą idempotencją oraz atomowym audit.CurrencyOperations; konflikt wycofuje
-wszystkie zmiany. PLN jest pomijany przy dezaktywacji. Identyczny stan nie zmienia
-RowVersion; dezaktywacja wyłącza A/B/C bez usuwania kursów, aktywacja zachowuje
-flagi pobierania. Operacja nie odpytuje NBP i odświeża słownik z zachowaniem filtra.
-Bez nowych tabel i migracji.
+Kursy: `Vatowiec_System.ref.ExchangeRates` (decimal(24,12), Mid dla A/B, Bid/Ask dla C,
+data publikacji i opcjonalnego notowania, oryginalny numer tabeli, UTC pobrania),
+FK do wspólnego słownika ISO `ref.Currencies` (Code char(3) PK, ADR-024). Pobiera je
+wyłącznie usługa VATowiec Operations: zawsze wszystkie waluty tabel A, B i C,
+codziennie od 13:00 czasu polskiego (NBP publikuje A w dni robocze 11:45–12:15,
+B w środy, C w dni robocze 7:45–8:15), z ponowieniami co 60 minut do 16:00, bez
+kalendarza świąt. Zaległości po przerwie w pracy usługi są pobierane od razu, od
+ostatniego punktu kontrolnego (odcinki ≤ 93 dni, siedmiodniowa zakładka). Pierwsze
+uruchomienie: od 1 stycznia poprzedniego roku; administrator może przesunąć datę
+wstecz (archiwum NBP od 02.01.2002). Zapisany kurs nigdy nie jest nadpisywany
+automatycznie — rozbieżność trafia do `ops.ExchangeRateConflicts`, rozstrzyga ją
+administrator instalacji (Ustawienia instalacji → Kursy NBP) z CSRF, wersjami
+i niezmienną historią `audit.ExchangeRateOperations`. Zwykłe API nie łączy się z NBP;
+„Pobierz teraz” zapisuje zlecenie dla usługi.
 
-Filtr kursów zapisanych domyślnie oferuje aktywne waluty bez PLN i opcję wszystkich
-kursów z bieżącego zakresu. „Pokaż nieaktywne (archiwum)” udostępnia dodatkowo
-nieaktywne waluty mające zapisane kursy, przez opcjonalny odczyt słownika
-withRatesOnly=true z dotychczasowym DTO. Zmiana aktywności zachowuje wybrany kod
-filtra, daty, tabelę i sortowanie; istniejący filtr nieaktywnej waluty pozostaje
-widoczny do świadomej zmiany. Ustawienia słownika nadal pokazują wszystkie waluty.
-Filtry kursów nie sterują pobieraniem NBP i nie ograniczają archiwalnego odczytu API.
+Baza firmy: `ref.Currencies` (151 kodów, cel FK kartoteki) z firmową aktywnością —
+widocznością waluty na listach wyboru; domyślnie aktywne PLN, EUR, USD, GBP, CHF;
+PLN zawsze aktywny. Aktywność zmienia prawo `ManageCurrencies` (128), pojedynczo lub
+zbiorczo (POST /currencies/activity, potwierdzenie liczby zmian, trwała idempotencja,
+atomowy `audit.CurrencyOperations`, konflikt wersji wycofuje całą partię). Odczyt
+kursów wymaga `ViewExchangeRates` (64) w danej firmie; wszystkie firmy widzą te same
+kursy. Prawo `ImportExchangeRates` (256) wycofano — bit zarezerwowany.
 
-Publiczny NBP HTTPS/JSON jest pobierany wyłącznie ręcznie: najnowsze publikacje
-lub zakres dzielony po 93 dni włącznie. Nie ma automatyzacji, uzupełniania dni bez
-publikacji ani fikcyjnych kursów brakującej waluty. Ponowienia deduplikują dane,
-a rozbieżności wymagają jawnej decyzji z wersją kursu i atomowym audytem przed/po.
-Historia importu zachowuje propozycje bez ponownego HTTP. Application.IExchangeRateReader
-udostępnia dokładną publikację lub ostatnią ściśle przed datą, z numerem/źródłem.
-Bez faktur, reguł podatkowych i różnic kursowych. [Obsługa i struktura](docs/currencies-and-nbp.md).
+Filtr kursów domyślnie oferuje aktywne waluty firmy bez PLN i opcję wszystkich kursów
+z bieżącego zakresu; „Pokaż nieaktywne (archiwum)” dodaje nieaktywne waluty mające
+kursy (withRatesOnly=true). Zmiana aktywności zachowuje filtry. Ekran pokazuje stan
+ostatniego pobrania (daty ostatnich tabel A/B/C, ostatnie udane pobranie, błąd).
+Application.IExchangeRateReader udostępnia dokładną publikację lub ostatnią ściśle
+przed datą, z numerem/źródłem. Bez faktur, reguł podatkowych i różnic kursowych.
+[Obsługa i struktura](docs/currencies-and-nbp.md).
+
 
 ## 4. Decyzje technologiczne
 
@@ -1195,7 +1195,7 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | [ADR-035](docs/adr/ADR-035-historia-hasel-i-archiwizacja-tozsamosci.md) | Historia/ważność haseł i archiwizacja tożsamości | Hash history Identity, ograniczone sesje po terminie, logiczne usunięcie, odrębne przywrócenie tej samej i nowej osoby, preferencje związane z UserId |
 | [ADR-017](docs/adr/ADR-017-kartoteka-kontrahentow-i-audyt.md) | Edycja kontrahentów, filtry, rowversion i atomowy audyt | Wdrożony formularz, serwerowe filtrowanie/strony i autoryzowany zapis; jawne migracje systemowa i firmowa |
 | [ADR-022](docs/adr/ADR-022-dataport-i-sekrety-firmy.md) | DataPort i ustawienia firmy | Osobny adapter pośrednika, szyfrowany lokalny klucz, kontrola uprawnień i selektywny import do szkicu; bez zmiany oficjalnych adapterów TEST |
-| [ADR-023](docs/adr/ADR-023-waluty-i-reczne-kursy-nbp.md) | Waluty i ręczne kursy NBP | Lokalny słownik/ustawienia A/B/C, kursy decimal, jawne konflikty i audyt, stronicowany ekran Avalonia; bez harmonogramu i reguł faktur |
+| [ADR-023](docs/adr/ADR-023-waluty-i-reczne-kursy-nbp.md) | Waluty i ręczne kursy NBP | Miejsce i pobieranie kursów zastąpione przez ADR-048. Lokalny słownik/ustawienia A/B/C, kursy decimal, jawne konflikty i audyt, stronicowany ekran Avalonia; bez harmonogramu i reguł faktur |
 | [ADR-024](docs/adr/ADR-024-kod-iso-jako-klucz-waluty.md) | ISO 4217 jako jedyny identyfikator waluty | Code char(3) PK, CurrencyCode FK, brak numerycznego Id waluty; odtworzenie wyłącznie demonstracyjnego modułu walut i kursów |
 | [ADR-025](docs/adr/ADR-025-walidacja-rachunkow-ibannet.md) | Walidacja rachunków | IbanNet (obecnie 6.2.1) za interfejsem Application, NRB/IBAN, wersjonowane potwierdzenie ostrzeżeń, wynik w Avalonia, licencja i kontrolowane aktualizacje |
 | [ADR-026](docs/adr/ADR-026-ewib-i-normalizacja-rachunkow.md) | Normalizacja i dane banku EWIB | Wspólne separatory, wersja v3, odrębny adapter NBP, bezpieczne propozycje nazwy/BIC tylko do szkicu, bez nowych tabel |
@@ -1212,6 +1212,7 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | [ADR-045](docs/adr/ADR-045-nazwy-baz-i-usuwanie-firmy.md) | Nazwy baz firm i usuwanie firmy | Przyjęty 2026-11-22: baza `Vatowiec_` + oczyszczona nazwa firmy, „Nazwa zajęta…” bez sufiksów (wdrożone); usuwanie z kopią archiwalną, pełnym czyszczeniem danych i rejestrem usuniętych (wdrożone) |
 | [ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md) | Tworzenie firmy oraz backup/odtworzenie jednej firmy (M0) | **Przyjęty 2026-11-22, wdrażany krokami:** osobny Worker z tożsamością DDL/BACKUP, operacje `ops` w System z etapami, lease i audytem, odtworzenie do nowej bazy i kontrolowane przełączenie |
 | [ADR-047](docs/adr/ADR-047-certyfikat-serwera-w-sieci-prywatnej.md) | Certyfikat serwera API i zaufanie klientów w sieci prywatnej | **Przyjęty i wdrożony 2026-11-22** ([instrukcja](docs/server-certificate.md)): tryb A — certyfikat własny/firmowe CA ze standardową walidacją; tryb B — CA instalacji w usłudze Operations, kod lub plik połączenia, kotwica przypięta per adres API, bez systemowego magazynu zaufania i bez „akceptuj mimo to” |
+| [ADR-048](docs/adr/ADR-048-publiczne-dane-referencyjne-w-bazie-systemowej.md) | Publiczne dane referencyjne w bazie systemowej (kursy NBP) | **Przyjęty i wdrożony 2026-11-22** ([instrukcja](docs/currencies-and-nbp.md)): kursy NBP wspólne dla instalacji w `Vatowiec_System`, codzienne pobieranie A/B/C przez usługę Operations od 13:00 z nadrabianiem zaległości, konflikty rozstrzyga administrator instalacji; w bazie firmy tylko aktywność walut; dokument zapisuje kopię kursu |
 | ADR-006 | Podpisywanie XML i przechowywanie certyfikatów | Przed implementacją wysyłek MF; nie przechowywać sekretów w zwykłej bazie |
 | ADR-007 | API pluginów: manifest, sandbox, granice dostępu | Przed pierwszą wykonywalną wtyczką |
 | ADR-008 | Pełny wykaz typów VAT i deklaracji na 1.0 | Przed M3; uzgodnić precyzyjne scenariusze |

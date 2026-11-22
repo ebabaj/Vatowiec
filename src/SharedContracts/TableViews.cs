@@ -38,10 +38,7 @@ public static class TableCatalog
         new("UpdatedAtUtc", "Zaktualizowano (UTC)", "DateTime", 23, Format: "yyyy-MM-dd HH:mm 'UTC'")]);
     public static readonly TableDefinition Currencies = new("Currencies", "ViewExchangeRates", [
         new("Code", "Kod", "Text", 0, true), new("Name", "Nazwa", "Text", 1, true),
-        new("IsActive", "Status", "Boolean", 2, true, Format: "Activity"),
-        new("DownloadA", "Tabela A", "Boolean", 3, true, Format: "YesNo"),
-        new("DownloadB", "Tabela B", "Boolean", 4, true, Format: "YesNo"),
-        new("DownloadC", "Tabela C", "Boolean", 5, true, Format: "YesNo")]);
+        new("IsActive", "Status", "Boolean", 2, true, Format: "Activity")]);
     public static readonly TableDefinition CurrencyRates = new("CurrencyRates", "ViewExchangeRates", [
         new("CurrencyCode", "Waluta", "Text", 0, true), new("Table", "Tabela", "Text", 1, true),
         new("TableNumber", "Numer tabeli", "Text", 2, true),

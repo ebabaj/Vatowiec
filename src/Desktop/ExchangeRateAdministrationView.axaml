@@ -1,0 +1,47 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Vatowiec.Desktop.ViewModels"
+             x:Class="Vatowiec.Desktop.ExchangeRateAdministrationView" x:DataType="vm:MainViewModel">
+  <ScrollViewer>
+    <StackPanel Spacing="12" MaxWidth="860" HorizontalAlignment="Left">
+      <TextBlock Text="Ustawienia instalacji → Kursy NBP" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>
+      <TextBlock Text="Kursy NBP są wspólne dla wszystkich firm tej instalacji. Usługa VATowiec Operations pobiera codziennie około 13:00 wszystkie waluty z tabel A, B i C (NBP publikuje A w dni robocze, B w środy, C rano). Jeśli serwer nie działał, zaległe dni są pobierane po jego uruchomieniu. Zapisany kurs nigdy nie jest nadpisywany automatycznie — różnicę rozstrzyga administrator."
+                 TextWrapping="Wrap"/>
+      <TextBlock IsVisible="{Binding !ExchangeRateAdministration.IsLoaded}" Text="Nie wczytano ustawień z bazy systemowej instalacji. Sprawdź komunikat i wybierz Odśwież." TextWrapping="Wrap" AutomationProperties.AutomationId="ExchangeRatesNotLoaded"/>
+      <StackPanel DataContext="{Binding ExchangeRateAdministration}" x:DataType="vm:ExchangeRateAdministrationViewModel" Spacing="10" IsVisible="{Binding IsLoaded}">
+        <TextBlock Text="{Binding StatusSummary}" TextWrapping="Wrap" AutomationProperties.AutomationId="ExchangeRateStatus"/>
+        <TextBlock Text="Data początkowa historii" FontWeight="SemiBold" Margin="0,6,0,0"/>
+        <TextBlock Text="{Binding HistoryStartInfo}" TextWrapping="Wrap" Opacity="0.75"/>
+        <TextBlock Text="Wcześniejsza data powoduje dociągnięcie brakującej historii (archiwum NBP od 02.01.2002). Późniejsza nie usuwa zapisanych kursów." TextWrapping="Wrap" Opacity="0.75"/>
+        <DatePicker SelectedDate="{Binding HistoryStart, Mode=TwoWay}" AutomationProperties.AutomationId="ExchangeRateHistoryStart"/>
+        <TextBlock Text="{Binding ConflictsHeader}" FontWeight="SemiBold" Margin="0,6,0,0" AutomationProperties.AutomationId="ExchangeRateConflictsHeader"/>
+        <StackPanel IsVisible="{Binding HasConflicts}" Spacing="6">
+          <ListBox ItemsSource="{Binding Conflicts}" SelectedItem="{Binding SelectedConflict, Mode=TwoWay}" MaxHeight="160" AutomationProperties.AutomationId="ExchangeRateConflicts"/>
+          <TextBlock Text="{Binding ConflictComparison}" TextWrapping="Wrap"/>
+          <CheckBox Content="Świadomie potwierdzam wybrany sposób rozstrzygnięcia" IsChecked="{Binding ConfirmResolution, Mode=TwoWay}" AutomationProperties.AutomationId="ConfirmExchangeRateResolution"/>
+        </StackPanel>
+      </StackPanel>
+      <WrapPanel IsVisible="{Binding ExchangeRateAdministration.HasConflicts}">
+        <Button Content="Zachowaj zapisany kurs" Click="KeepClick" IsEnabled="{Binding ExchangeRateAdministration.CanResolve}" AutomationProperties.AutomationId="KeepExchangeRate"/>
+        <Button Content="Przyjmij dane NBP" Click="AcceptClick" IsEnabled="{Binding ExchangeRateAdministration.CanResolve}" AutomationProperties.AutomationId="AcceptExchangeRate"/>
+      </WrapPanel>
+      <WrapPanel>
+        <Button Content="Zapisz datę początkową" Click="SaveClick" IsEnabled="{Binding ExchangeRateAdministration.IsDirty}" AutomationProperties.AutomationId="SaveExchangeRateHistoryStart"/>
+        <Button Content="Pobierz teraz" Click="RunClick" IsEnabled="{Binding ExchangeRateAdministration.IsLoaded}" AutomationProperties.AutomationId="RunExchangeRates"/>
+        <Button Content="Odśwież" Click="RefreshClick" AutomationProperties.AutomationId="RefreshExchangeRates"/>
+        <Button Content="Wróć" Click="BackClick" AutomationProperties.AutomationId="CloseExchangeRates"/>
+      </WrapPanel>
+      <Expander Header="Historia pobierania i decyzji" AutomationProperties.AutomationId="ExchangeRateHistory">
+        <StackPanel Spacing="6">
+          <WrapPanel>
+            <Button Content="Poprzednie" Click="PreviousHistoryClick" IsEnabled="{Binding ExchangeRateAdministration.HasPreviousHistory}"/>
+            <Button Content="Następne" Click="NextHistoryClick" IsEnabled="{Binding ExchangeRateAdministration.HasNextHistory}"/>
+          </WrapPanel>
+          <ItemsControl ItemsSource="{Binding ExchangeRateAdministration.History}">
+            <ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,6"/></DataTemplate></ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Expander>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

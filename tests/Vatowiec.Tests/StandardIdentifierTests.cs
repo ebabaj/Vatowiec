@@ -75,10 +75,11 @@ public sealed class StandardIdentifierTests
         var sql = company.GetService<IMigrator>().GenerateScript(names[migrationIndex - 1], names[migrationIndex]);
         foreach (var field in new[] { "Regon", "Krs", "Bdo", "Pesel" }) Assert.Contains($"ADD [{field}] nvarchar(100) NULL", sql);
         Assert.DoesNotContain("DROP", sql); Assert.DoesNotContain("UPDATE", sql); Assert.DoesNotContain("ParentId", sql);
-        var old = new CompanyAccess(Guid.NewGuid(), Guid.NewGuid(), (CompanyPermission)511);
+        var old = new CompanyAccess(Guid.NewGuid(), Guid.NewGuid(), (CompanyPermission)255);
         Assert.Equal(0, (int)(old.Permissions & CompanyPermission.ManageContractorPesel));
         old.ChangePermissions(old.Permissions | CompanyPermission.ManageContractorPesel);
-        Assert.Equal(1023, (int)old.Permissions);
+        Assert.Equal(767, (int)old.Permissions);
+        Assert.Throws<ArgumentException>(() => old.ChangePermissions((CompanyPermission)256)); // Wycofane ImportExchangeRates (ADR-048).
         Assert.Throws<ArgumentException>(() => old.ChangePermissions((CompanyPermission)2048)); // Pierwsza nieznana flaga (1024 = ManageCompanyBackups, ADR-044).
     }
 }

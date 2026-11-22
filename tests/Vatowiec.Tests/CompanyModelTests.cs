@@ -43,7 +43,7 @@ public sealed class CompanyModelTests
         Assert.Null(system.Model.FindEntityType(typeof(ExternalVerification)));
         Assert.Null(company.Model.FindEntityType(typeof(TaxIdentifierScheme)));
         Assert.Equal(new[] { typeof(AddressType), typeof(CompanyProfile), typeof(Contractor), typeof(ContractorAddress),
-                typeof(ContractorBankAccount), typeof(ContractorChange), typeof(ContractorContact), typeof(ContractorCreateOperation), typeof(ContractorCreditLimit), typeof(ContractorTradeTerms), typeof(Currency), typeof(CurrencyOperation), typeof(DataPortConfiguration), typeof(ExchangeRate), typeof(ExternalVerification), typeof(PaymentMethod) },
+                typeof(ContractorBankAccount), typeof(ContractorChange), typeof(ContractorContact), typeof(ContractorCreateOperation), typeof(ContractorCreditLimit), typeof(ContractorTradeTerms), typeof(Currency), typeof(CurrencyOperation), typeof(DataPortConfiguration), typeof(ExternalVerification), typeof(PaymentMethod) },
             company.Model.GetEntityTypes().Select(x => x.ClrType).OrderBy(x => x.Name));
         var contractor = company.Model.FindEntityType(typeof(Contractor))!;
         Assert.Equal(typeof(Contractor), Assert.Single(contractor.GetForeignKeys()).PrincipalEntityType.ClrType);
@@ -99,11 +99,18 @@ public sealed class CompanyModelTests
         Assert.Null(currency.FindProperty("Id"));
         Assert.Equal("char(3)", currency.FindProperty("Code")!.GetColumnType());
         Assert.Equal(Microsoft.EntityFrameworkCore.Metadata.ValueGenerated.Never, currency.FindProperty("Code")!.ValueGenerated);
-        var rate = company.Model.FindEntityType(typeof(ExchangeRate))!;
+        // ADR-048: kursy są wspólne dla instalacji — wyłącznie w modelu System, FK do słownika ISO System.
+        using var system = new SystemDbContextFactory().CreateDbContext([]);
+        Assert.Null(company.Model.FindEntityType(typeof(ExchangeRate)));
+        Assert.Null(currency.FindProperty("DownloadA"));
+        var reference = system.Model.FindEntityType(typeof(ReferenceCurrency))!;
+        Assert.Equal("Code", Assert.Single(reference.FindPrimaryKey()!.Properties).Name);
+        Assert.Null(system.Model.FindEntityType(typeof(Currency)));
+        var rate = system.Model.FindEntityType(typeof(ExchangeRate))!;
         Assert.Null(rate.FindProperty("CurrencyId"));
         Assert.Equal("Id", Assert.Single(rate.FindPrimaryKey()!.Properties).Name);
         Assert.Equal(typeof(long), rate.FindProperty("Id")!.ClrType);
-        var foreignKey = rate.GetForeignKeys().Single(x => x.PrincipalEntityType == currency);
+        var foreignKey = rate.GetForeignKeys().Single(x => x.PrincipalEntityType == reference);
         Assert.Equal("CurrencyCode", Assert.Single(foreignKey.Properties).Name);
         Assert.Equal("Code", Assert.Single(foreignKey.PrincipalKey.Properties).Name);
         Assert.Null(typeof(Vatowiec.SharedContracts.CurrencyResponse).GetProperty("Id"));
@@ -114,10 +121,10 @@ public sealed class CompanyModelTests
     {
         using var system = new SystemDbContextFactory().CreateDbContext([]);
         using var company = new CompanyDbContextFactory().CreateDbContext([]);
-        Assert.Equal(20, system.Database.GetMigrations().Count());
-        Assert.EndsWith("_ServerTlsCertificate", system.Database.GetMigrations().Last());
-        Assert.Equal(9, company.Database.GetMigrations().Count());
-        Assert.EndsWith("_ContractorFinance", company.Database.GetMigrations().Last());
+        Assert.Equal(22, system.Database.GetMigrations().Count());
+        Assert.EndsWith("_ReferenceCurrenciesBgnAng", system.Database.GetMigrations().Last());
+        Assert.Equal(11, company.Database.GetMigrations().Count());
+        Assert.EndsWith("_CurrenciesBgnAng", company.Database.GetMigrations().Last());
         Assert.False(system.Database.HasPendingModelChanges());
         Assert.False(company.Database.HasPendingModelChanges());
         Assert.NotEqual(system.GetService<IMigrationsAssembly>().ModelSnapshot!.GetType(),
@@ -140,6 +147,10 @@ public sealed class CompanyModelTests
         Assert.Contains("[security].[ServerTlsConfiguration]", systemSql);
         Assert.Contains("[security].[ServerTlsState]", systemSql);
         Assert.Contains("TR_ServerTlsChanges_Immutable", systemSql);
+        Assert.Contains("[ref].[ExchangeRates]", systemSql);
+        Assert.Contains("[ops].[ExchangeRateSync]", systemSql);
+        Assert.Contains("TR_ExchangeRateOperations_Immutable", systemSql);
+        Assert.DoesNotContain("ExchangeRateOperations", companySql);
         Assert.DoesNotContain("ServerTls", companySql);
         Assert.DoesNotContain("[ops].", companySql);
         Assert.DoesNotContain("[security].[PasswordPolicy]", companySql);

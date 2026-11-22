@@ -52,10 +52,10 @@ public sealed class StandardIdentifierSqlTests
         var owner = new ApplicationUser { Id = Guid.NewGuid(), UserName = "fixture-identifiers-owner-" + Guid.NewGuid().ToString("N") };
         var ordinary = new ApplicationUser { Id = Guid.NewGuid(), UserName = "fixture-identifiers-editor-" + Guid.NewGuid().ToString("N") };
         Assert.True((await users.CreateAsync(owner, password)).Succeeded); Assert.True((await users.CreateAsync(ordinary, password)).Succeeded);
-        var protectedAccess = new CompanyAccess(owner.Id, A, (CompanyPermission)1023);
+        var protectedAccess = new CompanyAccess(owner.Id, A, (CompanyPermission)767);
         system.CompanyAccesses.Add(protectedAccess);
-        system.CompanyAccesses.Add(new(owner.Id, B, (CompanyPermission)1023));
-        var access = new CompanyAccess(ordinary.Id, A, (CompanyPermission)511); system.CompanyAccesses.Add(access);
+        system.CompanyAccesses.Add(new(owner.Id, B, (CompanyPermission)767));
+        var access = new CompanyAccess(ordinary.Id, A, (CompanyPermission)255); system.CompanyAccesses.Add(access);
         await system.SaveChangesAsync();
         using var admin = app.CreateClient(new() { BaseAddress = new("https://localhost"), AllowAutoRedirect = false });
         using var editor = app.CreateClient(new() { BaseAddress = new("https://localhost"), AllowAutoRedirect = false });
@@ -75,10 +75,10 @@ public sealed class StandardIdentifierSqlTests
         Assert.Equal("000000023", row.Regon); Assert.Equal(draft.Krs, row.Krs); Assert.Equal(Pesel, row.Pesel); Assert.True(row.Id > 0);
         using var db = contexts.Create("", A);
         Assert.Equal(1, await db.ContractorChanges.CountAsync(x => x.ContractorId == row.Id));
-        protectedAccess.ChangePermissions((CompanyPermission)511); await system.SaveChangesAsync();
+        protectedAccess.ChangePermissions((CompanyPermission)255); await system.SaveChangesAsync();
         using (var revokedReplay = await admin.PostAsJsonAsync(route, draft))
         { Assert.Equal(HttpStatusCode.Forbidden, revokedReplay.StatusCode); Assert.DoesNotContain(Pesel, await revokedReplay.Content.ReadAsStringAsync()); }
-        protectedAccess.ChangePermissions((CompanyPermission)1023); await system.SaveChangesAsync();
+        protectedAccess.ChangePermissions((CompanyPermission)767); await system.SaveChangesAsync();
         var audit = await db.ContractorChanges.SingleAsync(x => x.ContractorId == row.Id);
         Assert.Equal(Pesel, JsonDocument.Parse(audit.AfterJson).RootElement.GetProperty("Pesel").GetString());
         Assert.Equal(owner.Id, audit.ActorId); Assert.NotEqual(Guid.Empty, audit.ActorIssuerId); Assert.Equal(owner.UserName, audit.ActorName);
@@ -113,7 +113,7 @@ public sealed class StandardIdentifierSqlTests
         Assert.Equal((HttpStatusCode)422, (await editor.PostAsJsonAsync(route, invalid with { AcceptWarning = true, WarningHash = "stale-rule-version" })).StatusCode);
         access.ChangePermissions(CompanyPermission.ViewContractors | CompanyPermission.EditContractors); await system.SaveChangesAsync();
         Assert.Equal(HttpStatusCode.Forbidden, (await editor.PostAsJsonAsync(route, invalid with { AcceptWarning = true, WarningHash = assessment.WarningHash })).StatusCode);
-        access.ChangePermissions((CompanyPermission)511); await system.SaveChangesAsync();
+        access.ChangePermissions((CompanyPermission)255); await system.SaveChangesAsync();
         using var accepted = await editor.PostAsJsonAsync(route, invalid with { AcceptWarning = true, WarningHash = assessment.WarningHash });
         Assert.Equal(HttpStatusCode.Created, accepted.StatusCode);
         var acceptedRow = (await accepted.Content.ReadFromJsonAsync<ContractorResponse>())!;

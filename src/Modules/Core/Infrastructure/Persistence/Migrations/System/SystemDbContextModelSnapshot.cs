@@ -752,6 +752,244 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                         });
                 });
 
+            modelBuilder.Entity("Vatowiec.Core.Domain.ExchangeRate", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal?>("Ask")
+                        .HasPrecision(24, 12)
+                        .HasColumnType("decimal(24,12)");
+
+                    b.Property<decimal?>("Bid")
+                        .HasPrecision(24, 12)
+                        .HasColumnType("decimal(24,12)");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasColumnType("char(3)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<DateOnly>("EffectiveDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal?>("Mid")
+                        .HasPrecision(24, 12)
+                        .HasColumnType("decimal(24,12)");
+
+                    b.Property<DateTimeOffset>("RetrievedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(8)");
+
+                    b.Property<string>("TableNumber")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("TableType")
+                        .IsRequired()
+                        .HasColumnType("char(1)");
+
+                    b.Property<DateOnly?>("TradingDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EffectiveDate");
+
+                    b.HasIndex("TableType", "EffectiveDate");
+
+                    b.HasIndex("CurrencyCode", "Source", "TableType", "EffectiveDate")
+                        .IsUnique();
+
+                    b.ToTable("ExchangeRates", "ref", t =>
+                        {
+                            t.HasCheckConstraint("CK_ExchangeRates_Values", "[Source]='NBP' AND (([TableType] IN ('A','B') AND [Mid]>0 AND [Mid] IS NOT NULL AND [Bid] IS NULL AND [Ask] IS NULL AND [TradingDate] IS NULL) OR ([TableType]='C' AND [Mid] IS NULL AND [Bid]>0 AND [Ask]>0 AND [Bid] IS NOT NULL AND [Ask] IS NOT NULL AND [Bid]<=[Ask] AND ([TradingDate] IS NULL OR [TradingDate]<=[EffectiveDate])))");
+                        });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.ExchangeRateConflict", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Decision")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<DateTimeOffset>("DetectedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<decimal?>("IncomingAsk")
+                        .HasPrecision(24, 12)
+                        .HasColumnType("decimal(24,12)");
+
+                    b.Property<decimal?>("IncomingBid")
+                        .HasPrecision(24, 12)
+                        .HasColumnType("decimal(24,12)");
+
+                    b.Property<string>("IncomingHash")
+                        .IsRequired()
+                        .IsUnicode(false)
+                        .HasColumnType("char(64)");
+
+                    b.Property<decimal?>("IncomingMid")
+                        .HasPrecision(24, 12)
+                        .HasColumnType("decimal(24,12)");
+
+                    b.Property<string>("IncomingTableNumber")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateOnly?>("IncomingTradingDate")
+                        .HasColumnType("date");
+
+                    b.Property<long>("RateId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("ResolvedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ResolvedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ResolvedByName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResolvedAtUtc");
+
+                    b.HasIndex("RateId", "IncomingHash")
+                        .IsUnique();
+
+                    b.ToTable("ExchangeRateConflicts", "ops", t =>
+                        {
+                            t.HasCheckConstraint("CK_ExchangeRateConflicts_Decision", "([ResolvedAtUtc] IS NULL AND [Decision] IS NULL) OR ([ResolvedAtUtc] IS NOT NULL AND [Decision] IN (N'AcceptIncoming', N'KeepExisting'))");
+                        });
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.ExchangeRateOperation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActorName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("AtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DetailsJson")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AtUtc");
+
+                    b.ToTable("ExchangeRateOperations", "audit", t =>
+                        {
+                            t.HasTrigger("TR_ExchangeRateOperations_Immutable");
+                        });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.ExchangeRateSync", b =>
+                {
+                    b.Property<byte>("SingletonKey")
+                        .HasColumnType("tinyint");
+
+                    b.Property<DateOnly?>("CheckedThroughA")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("CheckedThroughB")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("CheckedThroughC")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("HistoryStartDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset?>("LastAttemptUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTimeOffset?>("LastSuccessUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTimeOffset?>("RunRequestedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("SingletonKey");
+
+                    b.ToTable("ExchangeRateSync", "ops", t =>
+                        {
+                            t.HasCheckConstraint("CK_ExchangeRateSync_HistoryStart", "[HistoryStartDate] IS NULL OR [HistoryStartDate] >= '2002-01-02'");
+
+                            t.HasCheckConstraint("CK_ExchangeRateSync_Singleton", "[SingletonKey] = 1");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            SingletonKey = (byte)1
+                        });
+                });
+
             modelBuilder.Entity("Vatowiec.Core.Domain.GusConfiguration", b =>
                 {
                     b.Property<int>("SingletonKey")
@@ -904,6 +1142,784 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                         });
 
                     b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.ReferenceCurrency", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasColumnType("char(3)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.HasKey("Code");
+
+                    b.ToTable("Currencies", "ref", t =>
+                        {
+                            t.HasCheckConstraint("CK_Currencies_Code", "[Code] COLLATE Latin1_General_100_BIN2 NOT LIKE '%[^A-Z]%' AND LEN([Code])=3");
+                        });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
+
+                    b.HasData(
+                        new
+                        {
+                            Code = "PLN",
+                            Name = "złoty polski"
+                        },
+                        new
+                        {
+                            Code = "THB",
+                            Name = "bat tajlandzki"
+                        },
+                        new
+                        {
+                            Code = "USD",
+                            Name = "dolar amerykański"
+                        },
+                        new
+                        {
+                            Code = "AUD",
+                            Name = "dolar australijski"
+                        },
+                        new
+                        {
+                            Code = "HKD",
+                            Name = "dolar Hongkongu"
+                        },
+                        new
+                        {
+                            Code = "CAD",
+                            Name = "dolar kanadyjski"
+                        },
+                        new
+                        {
+                            Code = "NZD",
+                            Name = "dolar nowozelandzki"
+                        },
+                        new
+                        {
+                            Code = "SGD",
+                            Name = "dolar singapurski"
+                        },
+                        new
+                        {
+                            Code = "EUR",
+                            Name = "euro"
+                        },
+                        new
+                        {
+                            Code = "HUF",
+                            Name = "forint węgierski"
+                        },
+                        new
+                        {
+                            Code = "CHF",
+                            Name = "frank szwajcarski"
+                        },
+                        new
+                        {
+                            Code = "GBP",
+                            Name = "funt szterling"
+                        },
+                        new
+                        {
+                            Code = "UAH",
+                            Name = "hrywna ukraińska"
+                        },
+                        new
+                        {
+                            Code = "JPY",
+                            Name = "jen japoński"
+                        },
+                        new
+                        {
+                            Code = "CZK",
+                            Name = "korona czeska"
+                        },
+                        new
+                        {
+                            Code = "DKK",
+                            Name = "korona duńska"
+                        },
+                        new
+                        {
+                            Code = "ISK",
+                            Name = "korona islandzka"
+                        },
+                        new
+                        {
+                            Code = "NOK",
+                            Name = "korona norweska"
+                        },
+                        new
+                        {
+                            Code = "SEK",
+                            Name = "korona szwedzka"
+                        },
+                        new
+                        {
+                            Code = "RON",
+                            Name = "lej rumuński"
+                        },
+                        new
+                        {
+                            Code = "TRY",
+                            Name = "lira turecka"
+                        },
+                        new
+                        {
+                            Code = "ILS",
+                            Name = "szekel izraelski"
+                        },
+                        new
+                        {
+                            Code = "CLP",
+                            Name = "peso chilijskie"
+                        },
+                        new
+                        {
+                            Code = "PHP",
+                            Name = "peso filipińskie"
+                        },
+                        new
+                        {
+                            Code = "MXN",
+                            Name = "peso meksykańskie"
+                        },
+                        new
+                        {
+                            Code = "ZAR",
+                            Name = "rand południowoafrykański"
+                        },
+                        new
+                        {
+                            Code = "BRL",
+                            Name = "real brazylijski"
+                        },
+                        new
+                        {
+                            Code = "MYR",
+                            Name = "ringgit malezyjski"
+                        },
+                        new
+                        {
+                            Code = "IDR",
+                            Name = "rupia indonezyjska"
+                        },
+                        new
+                        {
+                            Code = "INR",
+                            Name = "rupia indyjska"
+                        },
+                        new
+                        {
+                            Code = "KRW",
+                            Name = "won południowokoreański"
+                        },
+                        new
+                        {
+                            Code = "CNY",
+                            Name = "juan chiński"
+                        },
+                        new
+                        {
+                            Code = "XDR",
+                            Name = "SDR — jednostka rozrachunkowa MFW"
+                        },
+                        new
+                        {
+                            Code = "AFN",
+                            Name = "afgani afgańskie"
+                        },
+                        new
+                        {
+                            Code = "MGA",
+                            Name = "ariary malgaski"
+                        },
+                        new
+                        {
+                            Code = "PAB",
+                            Name = "balboa panamska"
+                        },
+                        new
+                        {
+                            Code = "ETB",
+                            Name = "birr etiopski"
+                        },
+                        new
+                        {
+                            Code = "VES",
+                            Name = "boliwar wenezuelski"
+                        },
+                        new
+                        {
+                            Code = "BOB",
+                            Name = "boliwiano boliwijskie"
+                        },
+                        new
+                        {
+                            Code = "CRC",
+                            Name = "colon kostarykański"
+                        },
+                        new
+                        {
+                            Code = "SVC",
+                            Name = "colon salwadorski"
+                        },
+                        new
+                        {
+                            Code = "NIO",
+                            Name = "cordoba nikaraguańska"
+                        },
+                        new
+                        {
+                            Code = "GMD",
+                            Name = "dalasi gambijskie"
+                        },
+                        new
+                        {
+                            Code = "MKD",
+                            Name = "denar macedoński"
+                        },
+                        new
+                        {
+                            Code = "DZD",
+                            Name = "dinar algierski"
+                        },
+                        new
+                        {
+                            Code = "BHD",
+                            Name = "dinar bahrajski"
+                        },
+                        new
+                        {
+                            Code = "IQD",
+                            Name = "dinar iracki"
+                        },
+                        new
+                        {
+                            Code = "JOD",
+                            Name = "dinar jordański"
+                        },
+                        new
+                        {
+                            Code = "KWD",
+                            Name = "dinar kuwejcki"
+                        },
+                        new
+                        {
+                            Code = "LYD",
+                            Name = "dinar libijski"
+                        },
+                        new
+                        {
+                            Code = "RSD",
+                            Name = "dinar serbski"
+                        },
+                        new
+                        {
+                            Code = "TND",
+                            Name = "dinar tunezyjski"
+                        },
+                        new
+                        {
+                            Code = "MAD",
+                            Name = "dirham marokański"
+                        },
+                        new
+                        {
+                            Code = "AED",
+                            Name = "dirham Zjednoczonych Emiratów Arabskich"
+                        },
+                        new
+                        {
+                            Code = "STN",
+                            Name = "dobra Wysp Świętego Tomasza i Książęcej"
+                        },
+                        new
+                        {
+                            Code = "BSD",
+                            Name = "dolar bahamski"
+                        },
+                        new
+                        {
+                            Code = "BBD",
+                            Name = "dolar barbadoski"
+                        },
+                        new
+                        {
+                            Code = "BZD",
+                            Name = "dolar belizeński"
+                        },
+                        new
+                        {
+                            Code = "BND",
+                            Name = "dolar brunejski"
+                        },
+                        new
+                        {
+                            Code = "FJD",
+                            Name = "dolar Fidżi"
+                        },
+                        new
+                        {
+                            Code = "GYD",
+                            Name = "dolar gujański"
+                        },
+                        new
+                        {
+                            Code = "JMD",
+                            Name = "dolar jamajski"
+                        },
+                        new
+                        {
+                            Code = "LRD",
+                            Name = "dolar liberyjski"
+                        },
+                        new
+                        {
+                            Code = "NAD",
+                            Name = "dolar namibijski"
+                        },
+                        new
+                        {
+                            Code = "SRD",
+                            Name = "dolar surinamski"
+                        },
+                        new
+                        {
+                            Code = "TTD",
+                            Name = "dolar Trynidadu i Tobago"
+                        },
+                        new
+                        {
+                            Code = "XCD",
+                            Name = "dolar wschodniokaraibski"
+                        },
+                        new
+                        {
+                            Code = "SBD",
+                            Name = "dolar Wysp Salomona"
+                        },
+                        new
+                        {
+                            Code = "VND",
+                            Name = "dong wietnamski"
+                        },
+                        new
+                        {
+                            Code = "AMD",
+                            Name = "dram armeński"
+                        },
+                        new
+                        {
+                            Code = "CVE",
+                            Name = "escudo Zielonego Przylądka"
+                        },
+                        new
+                        {
+                            Code = "AWG",
+                            Name = "florin arubański"
+                        },
+                        new
+                        {
+                            Code = "BIF",
+                            Name = "frank burundyjski"
+                        },
+                        new
+                        {
+                            Code = "XOF",
+                            Name = "frank CFA BCEAO"
+                        },
+                        new
+                        {
+                            Code = "XAF",
+                            Name = "frank CFA BEAC"
+                        },
+                        new
+                        {
+                            Code = "XPF",
+                            Name = "frank CFP"
+                        },
+                        new
+                        {
+                            Code = "DJF",
+                            Name = "frank Dżibuti"
+                        },
+                        new
+                        {
+                            Code = "GNF",
+                            Name = "frank gwinejski"
+                        },
+                        new
+                        {
+                            Code = "KMF",
+                            Name = "frank Komorów"
+                        },
+                        new
+                        {
+                            Code = "CDF",
+                            Name = "frank kongijski"
+                        },
+                        new
+                        {
+                            Code = "RWF",
+                            Name = "frank rwandyjski"
+                        },
+                        new
+                        {
+                            Code = "EGP",
+                            Name = "funt egipski"
+                        },
+                        new
+                        {
+                            Code = "GIP",
+                            Name = "funt gibraltarski"
+                        },
+                        new
+                        {
+                            Code = "LBP",
+                            Name = "funt libański"
+                        },
+                        new
+                        {
+                            Code = "SSP",
+                            Name = "funt południowosudański"
+                        },
+                        new
+                        {
+                            Code = "SDG",
+                            Name = "funt sudański"
+                        },
+                        new
+                        {
+                            Code = "SYP",
+                            Name = "funt syryjski"
+                        },
+                        new
+                        {
+                            Code = "GHS",
+                            Name = "cedi ghański"
+                        },
+                        new
+                        {
+                            Code = "HTG",
+                            Name = "gourde haitańskie"
+                        },
+                        new
+                        {
+                            Code = "PYG",
+                            Name = "guarani paragwajskie"
+                        },
+                        new
+                        {
+                            Code = "XCG",
+                            Name = "gulden karaibski"
+                        },
+                        new
+                        {
+                            Code = "PGK",
+                            Name = "kina papuaska"
+                        },
+                        new
+                        {
+                            Code = "LAK",
+                            Name = "kip laotański"
+                        },
+                        new
+                        {
+                            Code = "MWK",
+                            Name = "kwacha malawijska"
+                        },
+                        new
+                        {
+                            Code = "ZMW",
+                            Name = "kwacha zambijska"
+                        },
+                        new
+                        {
+                            Code = "AOA",
+                            Name = "kwanza angolska"
+                        },
+                        new
+                        {
+                            Code = "MMK",
+                            Name = "kiat birmański"
+                        },
+                        new
+                        {
+                            Code = "GEL",
+                            Name = "lari gruzińskie"
+                        },
+                        new
+                        {
+                            Code = "MDL",
+                            Name = "lej mołdawski"
+                        },
+                        new
+                        {
+                            Code = "ALL",
+                            Name = "lek albański"
+                        },
+                        new
+                        {
+                            Code = "HNL",
+                            Name = "lempira honduraska"
+                        },
+                        new
+                        {
+                            Code = "SLE",
+                            Name = "leone Sierra Leone"
+                        },
+                        new
+                        {
+                            Code = "SZL",
+                            Name = "lilangeni Eswatini"
+                        },
+                        new
+                        {
+                            Code = "LSL",
+                            Name = "loti Lesotho"
+                        },
+                        new
+                        {
+                            Code = "AZN",
+                            Name = "manat azerbejdżański"
+                        },
+                        new
+                        {
+                            Code = "MZN",
+                            Name = "metical mozambicki"
+                        },
+                        new
+                        {
+                            Code = "NGN",
+                            Name = "naira nigeryjska"
+                        },
+                        new
+                        {
+                            Code = "ERN",
+                            Name = "nakfa erytrejska"
+                        },
+                        new
+                        {
+                            Code = "TWD",
+                            Name = "dolar tajwański"
+                        },
+                        new
+                        {
+                            Code = "TMT",
+                            Name = "manat turkmeński"
+                        },
+                        new
+                        {
+                            Code = "MRU",
+                            Name = "ouguiya mauretańska"
+                        },
+                        new
+                        {
+                            Code = "TOP",
+                            Name = "paʻanga tongijska"
+                        },
+                        new
+                        {
+                            Code = "MOP",
+                            Name = "pataca Makau"
+                        },
+                        new
+                        {
+                            Code = "ARS",
+                            Name = "peso argentyńskie"
+                        },
+                        new
+                        {
+                            Code = "DOP",
+                            Name = "peso dominikańskie"
+                        },
+                        new
+                        {
+                            Code = "COP",
+                            Name = "peso kolumbijskie"
+                        },
+                        new
+                        {
+                            Code = "CUP",
+                            Name = "peso kubańskie"
+                        },
+                        new
+                        {
+                            Code = "UYU",
+                            Name = "peso urugwajskie"
+                        },
+                        new
+                        {
+                            Code = "BWP",
+                            Name = "pula botswańska"
+                        },
+                        new
+                        {
+                            Code = "GTQ",
+                            Name = "quetzal gwatemalski"
+                        },
+                        new
+                        {
+                            Code = "IRR",
+                            Name = "rial irański"
+                        },
+                        new
+                        {
+                            Code = "YER",
+                            Name = "rial jemeński"
+                        },
+                        new
+                        {
+                            Code = "QAR",
+                            Name = "rial katarski"
+                        },
+                        new
+                        {
+                            Code = "OMR",
+                            Name = "rial omański"
+                        },
+                        new
+                        {
+                            Code = "SAR",
+                            Name = "rial saudyjski"
+                        },
+                        new
+                        {
+                            Code = "KHR",
+                            Name = "riel kambodżański"
+                        },
+                        new
+                        {
+                            Code = "BYN",
+                            Name = "rubel białoruski"
+                        },
+                        new
+                        {
+                            Code = "RUB",
+                            Name = "rubel rosyjski"
+                        },
+                        new
+                        {
+                            Code = "LKR",
+                            Name = "rupia lankijska"
+                        },
+                        new
+                        {
+                            Code = "MVR",
+                            Name = "rupia malediwska"
+                        },
+                        new
+                        {
+                            Code = "MUR",
+                            Name = "rupia Mauritiusu"
+                        },
+                        new
+                        {
+                            Code = "NPR",
+                            Name = "rupia nepalska"
+                        },
+                        new
+                        {
+                            Code = "PKR",
+                            Name = "rupia pakistańska"
+                        },
+                        new
+                        {
+                            Code = "SCR",
+                            Name = "rupia seszelska"
+                        },
+                        new
+                        {
+                            Code = "PEN",
+                            Name = "sol peruwiański"
+                        },
+                        new
+                        {
+                            Code = "KGS",
+                            Name = "som kirgiski"
+                        },
+                        new
+                        {
+                            Code = "TJS",
+                            Name = "somoni tadżyckie"
+                        },
+                        new
+                        {
+                            Code = "UZS",
+                            Name = "sum uzbecki"
+                        },
+                        new
+                        {
+                            Code = "KES",
+                            Name = "szyling kenijski"
+                        },
+                        new
+                        {
+                            Code = "SOS",
+                            Name = "szyling somalijski"
+                        },
+                        new
+                        {
+                            Code = "TZS",
+                            Name = "szyling tanzański"
+                        },
+                        new
+                        {
+                            Code = "UGX",
+                            Name = "szyling ugandyjski"
+                        },
+                        new
+                        {
+                            Code = "BDT",
+                            Name = "taka bengalska"
+                        },
+                        new
+                        {
+                            Code = "WST",
+                            Name = "tala samoańska"
+                        },
+                        new
+                        {
+                            Code = "KZT",
+                            Name = "tenge kazachskie"
+                        },
+                        new
+                        {
+                            Code = "MNT",
+                            Name = "tugrik mongolski"
+                        },
+                        new
+                        {
+                            Code = "VUV",
+                            Name = "vatu Vanuatu"
+                        },
+                        new
+                        {
+                            Code = "BAM",
+                            Name = "marka zamienna Bośni i Hercegowiny"
+                        },
+                        new
+                        {
+                            Code = "BGN",
+                            Name = "lew bułgarski"
+                        },
+                        new
+                        {
+                            Code = "ANG",
+                            Name = "gulden Antyli Holenderskich"
+                        },
+                        new
+                        {
+                            Code = "ZWG",
+                            Name = "złoto Zimbabwe"
+                        });
                 });
 
             modelBuilder.Entity("Vatowiec.Core.Domain.RegistryConfiguration", b =>
@@ -2136,6 +3152,24 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                     b.HasOne("Vatowiec.Core.Domain.CompanyOperation", null)
                         .WithMany()
                         .HasForeignKey("OperationId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.ExchangeRate", b =>
+                {
+                    b.HasOne("Vatowiec.Core.Domain.ReferenceCurrency", null)
+                        .WithMany()
+                        .HasForeignKey("CurrencyCode")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.ExchangeRateConflict", b =>
+                {
+                    b.HasOne("Vatowiec.Core.Domain.ExchangeRate", null)
+                        .WithMany()
+                        .HasForeignKey("RateId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
                 });

@@ -23,6 +23,7 @@ internal static class ApiPipeline
         services.AddScoped<CompanyOperationRequests>();
         services.AddScoped<CompanyBackupService>();
         services.AddScoped<Core.Infrastructure.ServerTls.ServerTlsService>();
+        services.AddScoped<Core.Infrastructure.ExchangeRates.ExchangeRateAdministrationService>();
         services.AddSingleton<Core.Infrastructure.ServerTls.IServerCertificateSource, Core.Infrastructure.ServerTls.LocalMachineCertificateSource>();
         services.AddSingleton(sp => Core.Infrastructure.ServerTls.ServerTlsPaths.From(sp.GetRequiredService<IConfiguration>()));
         services.AddSingleton<ServerCertificateProvider>();
