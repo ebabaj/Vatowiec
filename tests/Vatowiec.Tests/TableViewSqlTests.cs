@@ -38,7 +38,8 @@ public sealed class TableViewSqlTests
                 await using var db = System(target);
                 var usersBefore = await db.Users.AsNoTracking().Select(x => new { x.Id, x.PasswordHash, x.ConcurrencyStamp }).ToArrayAsync();
                 // Only this brand-new isolated fixture is moved across the new migration boundary.
-                var previous = db.Database.GetMigrations().Reverse().Skip(1).First();
+                var migrations = db.Database.GetMigrations().ToArray();
+                var previous = migrations[Array.FindIndex(migrations, x => x.EndsWith("_TableViews", StringComparison.Ordinal)) - 1];
                 await db.GetService<IMigrator>().MigrateAsync(previous);
                 await db.Database.MigrateAsync();
                 Assert.Equal(usersBefore, await db.Users.AsNoTracking().Select(x => new { x.Id, x.PasswordHash, x.ConcurrencyStamp }).ToArrayAsync());

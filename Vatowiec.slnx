@@ -18,6 +18,9 @@
   <Folder Name="/src/Server/Api/">
     <Project Path="src/Server/Api/Vatowiec.Api.csproj" />
   </Folder>
+  <Folder Name="/src/Server/Operations/">
+    <Project Path="src/Server/Operations/Vatowiec.Operations.csproj" />
+  </Folder>
   <Folder Name="/src/SharedContracts/">
     <Project Path="src/SharedContracts/Vatowiec.SharedContracts.csproj" />
   </Folder>

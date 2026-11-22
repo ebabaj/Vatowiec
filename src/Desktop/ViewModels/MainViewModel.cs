@@ -46,7 +46,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
     public bool IsBusy => busy;
     public bool CanInteract => !busy && personalFailure == null;
     public bool IsLogin => session is null;
-    public bool IsCompanySelection => session is not null && profile is null && !gusSettings && !usersSettings && !IsOwnPasswordChange && !passwordPolicyScreen;
+    public bool IsCompanySelection => session is not null && profile is null && !gusSettings && !usersSettings && !IsOwnPasswordChange && !passwordPolicyScreen && !companyOperationsScreen;
     public bool IsWorkspace => session is not null && profile is not null;
     public string CurrentUser => session?.UserName ?? "";
     public string CurrentCompany => profile?.Name ?? "";
@@ -259,7 +259,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
                 message = "Hasło wymaga zmiany. Ustaw własne hasło przed dalszą pracą.";
                 return;
             }
-            if (ex.StatusCode == 403 && (IsUsersSettings || IsPasswordPolicyScreen))
+            if (ex.StatusCode == 403 && (IsUsersSettings || IsPasswordPolicyScreen || IsCompanyOperationsScreen))
             {
                 ResetUsersSettings(); ResetGusSettings(); ResetPasswordPolicy();
                 if (session != null) session = session with { IsInstallationAdministrator = false };

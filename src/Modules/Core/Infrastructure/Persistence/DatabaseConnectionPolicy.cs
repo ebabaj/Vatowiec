@@ -1,4 +1,5 @@
 using Microsoft.Data.SqlClient;
+using Vatowiec.SharedContracts;
 
 namespace Vatowiec.Core.Infrastructure.Persistence;
 
@@ -69,7 +70,8 @@ public static class DatabaseConnectionPolicy
             if (!isDevelopment ||
                 !string.Equals(connection.DataSource, @"localhost\SQLEXPRESS", StringComparison.OrdinalIgnoreCase) ||
                 !connection.IntegratedSecurity || connection.UserID.Length != 0 || connection.Password.Length != 0 ||
-                !localCatalogs.Contains(connection.InitialCatalog, StringComparer.OrdinalIgnoreCase))
+                (!localCatalogs.Contains(connection.InitialCatalog, StringComparer.OrdinalIgnoreCase) &&
+                 !CompanyDatabaseNames.IsCompanyDatabase(connection.InitialCatalog)))
             {
                 throw new InvalidOperationException("Zaufanie certyfikatowi SQL dozwolone tylko dla jawnych lokalnych baz Development z Windows Authentication.");
             }

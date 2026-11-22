@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <!-- ADR-044: osobny proces techniczny z własną tożsamością SQL (CREATE DATABASE, migracje). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UserSecretsId>vatowiec-operations-development</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Modules/Core/Infrastructure/Vatowiec.Core.Infrastructure.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Vatowiec.Tests" />
+  </ItemGroup>
+
+</Project>

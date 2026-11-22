@@ -67,6 +67,10 @@ public interface IVatowiecApiClient : IDisposable
     Task<DataPortConfigurationResponse> DataPortConfiguration(Guid companyId) => throw new NotSupportedException();
     Task<DataPortConfigurationResponse> SaveDataPortKey(Guid companyId, SaveDataPortKeyRequest value) => throw new NotSupportedException();
     Task<DataPortConfigurationResponse> DeleteDataPortKey(Guid companyId, DeleteDataPortKeyRequest value) => throw new NotSupportedException();
+    Task<CompanyOperationResponse[]> CompanyOperations(int offset) => throw new NotSupportedException();
+    Task<ServerProfileResponse[]> ServerProfiles() => throw new NotSupportedException();
+    Task<CompanyOperationResponse> ProvisionCompany(ProvisionCompanyRequest value) => throw new NotSupportedException();
+    Task<CompanyOperationResponse> RetryCompanyOperation(Guid operationId, CompanyOperationRetryRequest value) => throw new NotSupportedException();
 }
 
 public sealed class ApiException(int statusCode, string message) : Exception(message)
@@ -160,6 +164,11 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
     public Task<UserAdministrationHistory[]> UserHistory(Guid? id, int offset) => Get<UserAdministrationHistory[]>($"api/v1/installation/users/history?offset={offset}" + (id == null ? "" : $"&userId={id}"));
     public async Task ChangeOwnPassword(OwnPasswordRequest value) => await Post<System.Text.Json.JsonElement>("api/v1/auth/password", value);
     public Task<GusConfigurationResponse> GusConfiguration() => Get<GusConfigurationResponse>("api/v1/installation/integrations/gus");
+    public Task<CompanyOperationResponse[]> CompanyOperations(int offset) => Get<CompanyOperationResponse[]>($"api/v1/installation/company-operations?offset={offset}");
+    public Task<ServerProfileResponse[]> ServerProfiles() => Get<ServerProfileResponse[]>("api/v1/installation/company-operations/server-profiles");
+    public Task<CompanyOperationResponse> ProvisionCompany(ProvisionCompanyRequest value) => Post<CompanyOperationResponse>("api/v1/installation/company-operations/provision", value);
+    public Task<CompanyOperationResponse> RetryCompanyOperation(Guid operationId, CompanyOperationRetryRequest value) =>
+        Post<CompanyOperationResponse>($"api/v1/installation/company-operations/{operationId}/retry", value);
     public Task<RegistryConfigurationResponse[]> RegistryConfigurations() => Get<RegistryConfigurationResponse[]>("api/v1/installation/integrations/registries");
     public Task<RegistryConfigurationResponse> SaveRegistryConfiguration(string source, RegistryConfigurationRequest value) =>
         Write<RegistryConfigurationResponse>($"api/v1/installation/integrations/registries/{Uri.EscapeDataString(source)}", value, true);
@@ -292,8 +301,12 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         try { error = await response.Content.ReadFromJsonAsync<ApiError>(); }
         catch (JsonException) { }
         var userAdministration = uri?.AbsolutePath.StartsWith("/api/v1/installation/users", StringComparison.Ordinal) == true;
+        var companyOperations = uri?.AbsolutePath.StartsWith("/api/v1/installation/company-operations", StringComparison.Ordinal) == true;
         var message = response.StatusCode switch
         {
+            _ when companyOperations && error?.Message is { Length: > 0 } => error.Message,
+            HttpStatusCode.Forbidden when companyOperations => "Tworzenie firm wymaga aktualnej roli administratora instalacji.",
+            HttpStatusCode.NotFound when companyOperations => "API nie udostępnia tworzenia firm. Uruchom aktualną wersję API.",
             _ when error?.Code?.StartsWith("table_", StringComparison.Ordinal) == true => error.Message ?? "Nie potwierdzono ustawień tabeli. Odśwież widok.",
             HttpStatusCode.NotFound when error?.Code == "user_missing" => error.Message ?? "Nie znaleziono użytkownika. Odśwież listę użytkowników.",
             HttpStatusCode.Conflict when error?.Code == "user_stale" => error.Message ?? "Inny administrator zmienił użytkownika lub jego prawa. Odśwież szczegóły i porównaj aktualny stan.",

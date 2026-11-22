@@ -84,6 +84,13 @@ public partial class MainWindow : Window
 
     private async void LoginClick(object? sender, RoutedEventArgs e) => await Login();
     private async void UsersSettingsClick(object? sender, RoutedEventArgs e) => await model.OpenUsersSettings();
+    private async void CompanyOperationsClick(object? sender, RoutedEventArgs e) => await model.OpenCompanyOperations();
+    private async void ProvisionCompanyClick(object? sender, RoutedEventArgs e) => await model.ProvisionCompany();
+    private async void RefreshCompanyOperationsClick(object? sender, RoutedEventArgs e) => await model.RefreshCompanyOperations();
+    private async void RetryCompanyOperationClick(object? sender, RoutedEventArgs e) => await model.RetryCompanyOperation();
+    private async void CompanyOperationsPreviousClick(object? sender, RoutedEventArgs e) => await model.RefreshCompanyOperations(-1);
+    private async void CompanyOperationsNextClick(object? sender, RoutedEventArgs e) => await model.RefreshCompanyOperations(1);
+    private async void CloseCompanyOperationsClick(object? sender, RoutedEventArgs e) => await model.CloseCompanyOperations();
     private async void PasswordPolicyClick(object? sender, RoutedEventArgs e) => await model.OpenPasswordPolicy();
     private async Task SavePasswordPolicy()
     {

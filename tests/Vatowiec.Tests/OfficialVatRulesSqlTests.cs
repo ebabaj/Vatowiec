@@ -64,12 +64,12 @@ public sealed class OfficialVatRulesSqlTests
         await using var system = System(); await VerifyLocalTarget(system);
         var stored = await system.TaxIdentifierSchemes.AsNoTracking().OrderBy(x => x.Id).ToArrayAsync();
         Assert.Equal(JsonSerializer.Serialize(TaxSchemeSeed.Rules().OrderBy(x => x.Id)), JsonSerializer.Serialize(stored));
-        Assert.Equal(11, (await system.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(system.Database.GetMigrations(), await system.Database.GetAppliedMigrationsAsync());
         foreach (var id in new[] { CompanyA, CompanyB })
         {
             await using var company = Company(id); await VerifyLocalTarget(company);
             Assert.Equal(id, (await company.CompanyProfiles.SingleAsync()).CompanyId);
-            Assert.Equal(9, (await company.Database.GetAppliedMigrationsAsync()).Count());
+            Assert.Equal(company.Database.GetMigrations(), await company.Database.GetAppliedMigrationsAsync());
         }
     }
 

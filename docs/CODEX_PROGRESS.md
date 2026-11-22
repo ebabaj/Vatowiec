@@ -20,6 +20,31 @@ Weryfikacja: build Debug 0 ostrzeżeń/0 błędów; testy bez SQL i bez Personal
 i skan podatnych pakietów bez uwag. Pełnego runnera SQL nie uruchamiano.
 Logi lokalne: `TestResults/m0-docs/`.
 
+Zadanie 2026-11-22 (ADR-044 krok 1 — tworzenie firmy, bez Commit i Push):
+domena `CompanyOperation`/`CompanyOperationEvent`, migracja System
+`CompanyProvisioning` (wykonana jawnie `migrate-system` na developerskim
+`Vatowiec_System`), usługa `src/Server/Operations`, endpointy administratora
+instalacji, ekran Avalonia „Ustawienia instalacji → Firmy”, testy bez SQL i SQL.
+Poprawiono też nieaktualne liczby migracji w `OfficialVatRulesSqlTests` i
+`TableViewSqlTests` (porównanie z listą migracji zamiast stałej liczby).
+Weryfikacja: build 0/0; 581 zaliczonych, 0 błędów, 109 pominiętych (bez Personal,
+z `VATOWIEC_PRESERVED_VAT_SQL=1` i `VATOWIEC_PROVISIONING_SQL=1`); formatowanie
+bez uwag; po testach brak pozostawionych baz i wierszy; usługa uruchomiona
+próbnie w Development. Nie wykonano próby w oknie Avalonia ani pełnego runnera
+`DatabaseTools test` (jego preflight oczekuje nieaktualnej liczby tabel System —
+znana wcześniejsza niezgodność). Logi: `TestResults/m0-provisioning/`.
+
+Zadanie 2026-11-22 (ADR-045 — nazwy baz z nazwy firmy, bez Commit i Push):
+`CompanyDatabaseNames` przeniesione do SharedContracts (podgląd w Avalonia, ta sama
+reguła na serwerze), kontrola „Nazwa zajęta…” (katalog, zlecenia, `sys.databases`,
+nazwy zastrzeżone), formularz pyta tylko o nazwę firmy. Jednorazowo zmieniono nazwę
+bazy Tenjin `Vatowiec_Company_0057827c8b3045d599b1230c1db2e92b` → `Vatowiec_Tenjin`
+po sprawdzeniu znaczników, profilu i rejestracji; zaktualizowano `core.CompanyDatabases`
+i `ops.CompanyOperations` w jednej transakcji. Pliki .mdf/.ldf zachowały poprzednie
+nazwy fizyczne. Weryfikacja: build 0/0; 588 zaliczonych, 0 błędów, 109 pominiętych;
+formatowanie bez uwag. Do zatrzymania przed buildem: API, usługa Operations i klient
+Desktop użytkownika (blokował pliki); API i usługę przywrócono.
+
 ## Archiwum: naprawa zakładki Finansowe
 
 2026-10-23. Ukończone. BEZ Commit i Push.

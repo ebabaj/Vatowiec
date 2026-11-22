@@ -272,6 +272,193 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                         });
                 });
 
+            modelBuilder.Entity("Vatowiec.Core.Domain.CompanyOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ActorIssuerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Attempt")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CompanyName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset?>("CompletedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ConnectionProfileKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DatabaseName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LeaseOwner")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset?>("NextAttemptAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("OperationKey")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<Guid>("RequestedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RequestedByName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("ServerName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique()
+                        .HasFilter("[Kind] = N'Provision'");
+
+                    b.HasIndex("RequestedById", "OperationKey")
+                        .IsUnique();
+
+                    b.HasIndex("ServerName", "DatabaseName")
+                        .IsUnique()
+                        .HasFilter("[Kind] = N'Provision'");
+
+                    b.HasIndex("Status", "NextAttemptAtUtc");
+
+                    b.ToTable("CompanyOperations", "ops", t =>
+                        {
+                            t.HasCheckConstraint("CK_CompanyOperations_Attempt", "[Attempt] >= 0");
+
+                            t.HasCheckConstraint("CK_CompanyOperations_Completed", "([Status] = N'Completed' AND [Stage] = N'Ready' AND [CompletedAtUtc] IS NOT NULL) OR ([Status] <> N'Completed' AND [CompletedAtUtc] IS NULL)");
+
+                            t.HasCheckConstraint("CK_CompanyOperations_Kind", "[Kind] IN (N'Provision')");
+
+                            t.HasCheckConstraint("CK_CompanyOperations_Lease", "([Status] = N'Running' AND [LeaseOwner] IS NOT NULL AND [LeaseExpiresAtUtc] IS NOT NULL) OR ([Status] <> N'Running' AND [LeaseOwner] IS NULL AND [LeaseExpiresAtUtc] IS NULL)");
+
+                            t.HasCheckConstraint("CK_CompanyOperations_Stage", "[Stage] IN (N'Requested', N'DatabaseCreated', N'SchemaApplied', N'ProfileInitialized', N'Ready')");
+
+                            t.HasCheckConstraint("CK_CompanyOperations_Status", "[Status] IN (N'Pending', N'Running', N'Failed', N'NeedsReconciliation', N'Completed')");
+                        });
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.CompanyOperationEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(48)
+                        .HasColumnType("nvarchar(48)");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActorKind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("ActorName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<int>("Attempt")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperationId", "Id");
+
+                    b.ToTable("CompanyOperationEvents", "ops", t =>
+                        {
+                            t.HasTrigger("TR_CompanyOperationEvents_Immutable");
+                        });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
+                });
+
             modelBuilder.Entity("Vatowiec.Core.Domain.GusConfiguration", b =>
                 {
                     b.Property<int>("SingletonKey")
@@ -1409,6 +1596,15 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                     b.HasOne("Vatowiec.Core.Domain.Company", null)
                         .WithOne()
                         .HasForeignKey("Vatowiec.Core.Domain.CompanyDatabaseRegistration", "CompanyId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.CompanyOperationEvent", b =>
+                {
+                    b.HasOne("Vatowiec.Core.Domain.CompanyOperation", null)
+                        .WithMany()
+                        .HasForeignKey("OperationId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
                 });

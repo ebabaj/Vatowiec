@@ -19,6 +19,7 @@ public sealed class UserAdministrationHistoryRow(UserAdministrationHistory value
         "RevokeInstallationAdministrator" => "Odebranie roli administratora instalacji",
         "ActivateUser" => "Aktywowanie konta",
         "ChangeCompanyAccess" => "Zmiana dostępu do firmy",
+        "CompanyCreatorAccessGranted" => "Pełne prawa twórcy nowej firmy",
         "ArchiveUser" => "Usunięcie logiczne użytkownika",
         "RestoreSameUser" => "Przywrócenie tej samej osoby",
         "ReleaseArchivedLogin" => "Zwolnienie loginu dla nowej osoby",

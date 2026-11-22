@@ -29,9 +29,11 @@ i CompanyDbContext, trzy bazy SQL Server oraz dwie fikcyjne firmy.
 Nie jest to jeszcze program do prowadzenia księgowości.
 
 **Aktualny etap: domknięcie M0.** Dodano CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)),
-[CONTRIBUTING.md](CONTRIBUTING.md) i [SECURITY.md](SECURITY.md). Do zamknięcia M0
-pozostaje wznawialne tworzenie firmy oraz backup i odtworzenie jednej firmy —
-propozycja [ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md) czeka na akceptację.
+[CONTRIBUTING.md](CONTRIBUTING.md) i [SECURITY.md](SECURITY.md).
+[Tworzenie firmy z aplikacji](docs/company-provisioning.md) (ADR-044 krok 1) wykonuje
+osobna usługa VATowiec Operations — uruchom ją obok API. Do zamknięcia M0 pozostaje
+kopia z rotacją i harmonogramem oraz odtworzenie jednej firmy
+([ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md), kroki 2–3).
 Stan i dowody: [SPECYFIKACJA.md §13](SPECYFIKACJA.md#m0--repozytorium-i-architektura).
 
 Standardowe warunki finansowe kontrahenta (ADR-031):
@@ -222,6 +224,7 @@ src/
     Application/      # kontrakty aplikacyjne: kontekst firmy, walidatory, uprawnienia
     Infrastructure/   # dwa konteksty EF, rozłączne mapowania i migracje
   Server/Api/         # host, Identity/cookie/CSRF, autoryzowany odczyt firm
+  Server/Operations/  # usługa VATowiec Operations: tworzenie baz firm (ADR-044)
   Desktop/            # Avalonia UI
   SharedContracts/    # DTO publicznego API
 tests/Vatowiec.Tests/  # testy domeny/API i jawnie włączane testy SQL
@@ -317,9 +320,9 @@ kontrakt HTTP: [logowanie](docs/authentication.md).
 
 ## Dalsze kroki
 
-Do zamknięcia M0 pozostaje wznawialne tworzenie firmy z aplikacji oraz niezależny
-backup i odtworzenie jednej firmy ([ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md),
-propozycja). Następnie M1: dokumenty, faktury i audyt księgowy. Narzędzie
+Do zamknięcia M0 pozostaje niezależny backup z rotacją i harmonogramem oraz odtworzenie
+jednej firmy ([ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md), kroki 2–3).
+Następnie M1: dokumenty, faktury i audyt księgowy. Narzędzie
 wdrożeniowe `DatabaseTools` działa poza API. Nie przeniesiono danych z usuniętej Vatowiec_Dev.
 
 Nie zaimplementowano podatków, KSeF, JPK ani wtyczek. M0 nie jest ukończone;

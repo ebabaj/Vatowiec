@@ -37,6 +37,7 @@ builder.Services.AddSingleton<Vatowiec.Core.Application.IIdentifierChecksum, Vat
 builder.Services.AddSingleton<Vatowiec.Core.Application.IIdentifierChecksum, Vatowiec.Core.Application.CroatianVatChecksum>();
 builder.Services.AddScoped<Vatowiec.Core.Application.TaxIdentifierValidator>();
 builder.Services.AddScoped<IdentifierChecks>();
+builder.Services.AddScoped<Vatowiec.Core.Infrastructure.Operations.CompanyOperationRequests>();
 Vatowiec.Core.Infrastructure.Registries.RegistryRegistration.AddRegistryAdapters(builder.Services);
 
 var app = builder.Build();
@@ -117,6 +118,7 @@ app.MapUserAdministration();
 app.MapGusConfiguration();
 app.MapRegistryConfiguration();
 app.MapCompanies();
+app.MapCompanyOperations();
 app.MapTableViews();
 
 if (personalWorker != null && OperatingSystem.IsWindows()) personalWorker.Attach(app);

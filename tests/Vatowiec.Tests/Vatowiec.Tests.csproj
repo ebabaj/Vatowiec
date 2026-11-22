@@ -8,6 +8,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Desktop/Vatowiec.Desktop.csproj" />
     <ProjectReference Include="../../src/Server/Api/Vatowiec.Api.csproj" />
+    <ProjectReference Include="../../src/Server/Operations/Vatowiec.Operations.csproj" />
     <ProjectReference Include="../../src/Modules/Core/Infrastructure/Vatowiec.Core.Infrastructure.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />

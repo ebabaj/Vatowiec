@@ -25,6 +25,8 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
     public DbSet<GusConfiguration> GusConfigurations => Set<GusConfiguration>();
     public DbSet<RegistryConfiguration> RegistryConfigurations => Set<RegistryConfiguration>();
     public DbSet<RegistryConfigurationChange> RegistryConfigurationChanges => Set<RegistryConfigurationChange>();
+    public DbSet<CompanyOperation> CompanyOperations => Set<CompanyOperation>();
+    public DbSet<CompanyOperationEvent> CompanyOperationEvents => Set<CompanyOperationEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -137,6 +139,8 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
         modelBuilder.ApplyConfiguration(new CompanyDatabaseRegistrationConfiguration());
         modelBuilder.ApplyConfiguration(new CompanyAccessConfiguration());
         modelBuilder.ApplyConfiguration(new UserSessionConfiguration());
+        modelBuilder.ApplyConfiguration(new CompanyOperationConfiguration());
+        modelBuilder.ApplyConfiguration(new CompanyOperationEventConfiguration());
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -163,5 +167,7 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
             throw new InvalidOperationException("Historia administracji użytkownikami jest niezmienna.");
         if (ChangeTracker.Entries<RegistryConfigurationChange>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("Audyt konfiguracji rejestrów jest niezmienny.");
+        if (ChangeTracker.Entries<CompanyOperationEvent>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Historia operacji technicznych firm jest niezmienna.");
     }
 }

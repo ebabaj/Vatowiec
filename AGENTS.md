@@ -67,10 +67,43 @@ Nie odinstalowuj go ani składników Visual Studio w ramach usuwania Personal.
 **Aktualne prace Network (2026-11-22): domknięcie M0.** Właściciel zlecił
 zamknięcie M0 według `SPECYFIKACJA.md` §13. Brakujące elementy: CI, CONTRIBUTING,
 SECURITY, wznawialny provisioning firmy i niezależny backup/restore jednej firmy.
-Provisioning i backup/restore najpierw opisuje propozycja
-[ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md) z kryteriami akceptacji;
-**implementacja dopiero po jej akceptacji przez właściciela**. Do tego czasu nie
-dodawaj tabel, migracji ani endpointów provisioningu/backupu.
+Provisioning i backup/restore opisuje
+[ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md), **przyjęty przez
+właściciela 2026-11-22**. Wdrażamy go w kolejności: (1) tworzenie firmy,
+(2) kopia z rotacją i harmonogramem, (3) odtworzenie; każdy krok z własną
+addytywną migracją System i testami. Domyślny harmonogram nowej firmy: co 30 dni,
+przypomnienie. **Krok 1 wdrożony 2026-11-22** ([docs/company-provisioning.md](docs/company-provisioning.md)):
+kod tworzenia baz, migracji i nadawania praw twórcy jest wyłącznie w `src/Server/Operations`
+(usługa VATowiec Operations, osobne `OperationsConnections:*`); API tylko zapisuje zlecenie
+w `ops.CompanyOperations` i nie może referencjonować tego projektu. Testy tworzące fizyczne
+bazy firm uruchamiaj jawnie `VATOWIEC_PROVISIONING_SQL=1`; usuwają one wyłącznie bazy ze
+znacznikiem własnej operacji (lub puste bazy utworzone przez ten sam test).
+
+**ADR-045 (decyzje właściciela 2026-11-22)** — [nazwy baz i usuwanie firmy](docs/adr/ADR-045-nazwy-baz-i-usuwanie-firmy.md):
+- Nazwa bazy = stały prefiks `Vatowiec_` (ten sam co `Vatowiec_System`) + nazwa firmy bez
+  polskich znaków, spacje i inne znaki → `_` (`CompanyDatabaseNames.FromCompanyName` w
+  SharedContracts). Program pyta tylko o nazwę firmy; zajęta lub zastrzeżona nazwa bazy →
+  komunikat „Nazwa zajęta…”, bez automatycznych sufiksów. Nazwy firm mogą się powtarzać
+  w czasie (kolejne firmy pod tą samą nazwą, nie jednocześnie).
+- Usuwanie firmy (wdrożyć po ADR-044 krok 2): administrator instalacji, wykonuje usługa
+  Operations; pytanie o kopię archiwalną (domyślnie TAK, osobny katalog, bez rotacji);
+  jedno zwykłe potwierdzenie, dodatkowe ostrzeżenie tylko bez archiwum. Usunięcie czyści
+  bazę, katalog, `CompanyAccess`, historię operacji i audyt dotyczący firmy — świadomy,
+  kontrolowany wyjątek od niezmienności historii. Zostaje rejestr usuniętych: CompanyId,
+  nazwa, NIP/REGON, data, kto usunął. CompanyId zablokowany poza przywróceniem z archiwum.
+- Kolejność: nazwy baz (wdrożone, baza Tenjin → `Vatowiec_Tenjin`) → kopia z rotacją
+  i harmonogramem → usuwanie → odtwarzanie (istniejącej i usuniętej firmy).
+Decyzje właściciela do ADR-044 (2026-11-22): tworzenie firmy i odtworzenie kopii
+wyłącznie przez administratora instalacji; twórca firmy od razu dostaje do niej
+pełne prawa (jawne, audytowane nadanie, nie prawo wynikające z roli). Kopię na
+serwerze może zlecić każdy użytkownik z dostępem do firmy, bez możliwości pobrania
+pliku; administrator instalacji może to wyłączyć i sam zleca kopię zawsze.
+Program pamięta datę ostatniej udanej kopii firmy; harmonogram firmy:
+codziennie / co 7 dni / co 30 dni / nigdy, z trybem przypomnienia albo kopii
+automatycznej. Ustawia go administrator instalacji lub prawo firmy
+`ManageCompanyBackups`. Bez pytań przy każdym zamknięciu programu. Kopie mają
+rotację z automatycznym usuwaniem najstarszych plików utworzonych przez
+instalację (domyślnie 7 na firmę). Operacje wykonuje osobna usługa Windows.
 
 Wdrożone wcześniej: interfejs i widoki tabel
 [ADR-042](docs/adr/ADR-042-interfejs-i-widoki-tabel.md) (zlecone jako „ADR-041”,

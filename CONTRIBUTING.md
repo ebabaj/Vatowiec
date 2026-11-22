@@ -54,6 +54,7 @@ Testy bez SQL uruchamiają się zawsze. Pozostałe są jawnie włączane zmienny
 |---|---|
 | `VATOWIEC_DATABASE_PER_COMPANY_SQL=1` i `VATOWIEC_DEMO_RESET_AUTHORIZED=1` | Testy SQL/API z resetującymi fixture; ustawia je runner `DatabaseTools test` |
 | `VATOWIEC_PRESERVED_VAT_SQL=1` | Niedestrukcyjne testy SQL z wycofywanymi transakcjami |
+| `VATOWIEC_PROVISIONING_SQL=1` | Tworzenie firmy: tworzy i usuwa własne bazy `Vatowiec_Company_{guid}`, zmiany w System wycofuje |
 | `VATOWIEC_REAL_UI=1` | Natywne testy okna Avalonia (Windows) |
 | `VATOWIEC_PERSONAL_SETUP_TESTS=1` | Testy LocalDB edycji Personal (prace wstrzymane) |
 

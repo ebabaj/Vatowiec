@@ -26,8 +26,8 @@ public sealed partial class MainViewModel
     public bool CanStartContractorEdit => IsContractorReadOnly && CanEditContractors;
     public bool CanEditContractors => CanViewContractors && selectedCompany?.CanEditContractors == true;
     public bool CanManagePesel => selectedCompany?.Permissions.Contains("ManageContractorPesel", StringComparer.Ordinal) == true;
-    public bool CanBrowse => CanViewContractors && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !IsGusSettings && !IsUsersSettings && !IsOwnPasswordChange && !IsPasswordPolicyScreen;
-    public bool IsBrowsingWorkspace => IsWorkspace && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !IsGusSettings && !IsUsersSettings && !IsOwnPasswordChange && !IsPasswordPolicyScreen;
+    public bool CanBrowse => CanViewContractors && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !IsGusSettings && !IsUsersSettings && !IsOwnPasswordChange && !IsPasswordPolicyScreen && !IsCompanyOperationsScreen;
+    public bool IsBrowsingWorkspace => IsWorkspace && !IsEditing && !IsDataPortSettings && !IsCurrencyScreen && !IsGusSettings && !IsUsersSettings && !IsOwnPasswordChange && !IsPasswordPolicyScreen && !IsCompanyOperationsScreen;
     public bool IsEditing => editor is not null;
     public bool CanSaveContractor => IsMainTab && IsEditing && !HasConflict && CanModifyContractor && DetailEditor is null;
     public bool HasConflict => conflictCurrent is not null;
@@ -49,7 +49,7 @@ public sealed partial class MainViewModel
 
     public void NewContractor()
     {
-        if (busy || !CanEditContractors || IsEditing || IsDataPortSettings || IsCurrencyScreen || IsGusSettings || IsUsersSettings || IsOwnPasswordChange || IsPasswordPolicyScreen) return;
+        if (busy || !CanEditContractors || IsEditing || IsDataPortSettings || IsCurrencyScreen || IsGusSettings || IsUsersSettings || IsOwnPasswordChange || IsPasswordPolicyScreen || IsCompanyOperationsScreen) return;
         CancelContractorLoading();
         contractorReadOnly = false;
         editor = new ContractorEditor();

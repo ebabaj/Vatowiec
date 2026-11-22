@@ -1,8 +1,33 @@
 # ADR-044: wznawialne tworzenie firmy oraz backup i odtworzenie jednej firmy
 
-Data: 2026-11-22. **Status: PROPOZYCJA — czeka na akceptację właściciela.**
-Do czasu akceptacji nie dodajemy tabel, migracji, endpointów ani procesów
-opisanych poniżej.
+Data: 2026-11-22. **Status: PRZYJĘTY przez właściciela 2026-11-22.**
+Wdrożenie w trzech krokach: (1) tworzenie firmy, (2) kopia z rotacją
+i harmonogramem, (3) odtworzenie. Każdy krok ma własną addytywną migrację System
+i testy.
+
+## Decyzje właściciela (2026-11-22)
+
+1. **Tworzenie firmy i odtworzenie kopii** wykonuje wyłącznie administrator
+   instalacji (rola sprawdzana świeżo na serwerze). Bez osobnego prawa firmy.
+2. **Kopię na serwerze** może zlecić każdy użytkownik z dostępem do danej firmy.
+   Kopii **nie można pobrać** przez API ani klienta; plik pozostaje na serwerze.
+3. Administrator instalacji może **wyłączyć** zlecanie kopii przez użytkowników.
+   Sam może zlecić kopię zawsze.
+4. **Harmonogram kopii firmy:** program pamięta datę ostatniej udanej kopii każdej
+   firmy. Parametr firmy określa częstotliwość — **codziennie / co 7 dni /
+   co 30 dni / nigdy** — oraz tryb po upływie okresu: **przypomnienie** użytkownikowi
+   albo **kopia automatyczna** na serwerze. „Nigdy” jest pełnoprawnym wyborem
+   (są scenariusze użycia bez kopii). Program nie pyta o kopię przy każdym
+   zamknięciu; przypomina najwyżej raz po upływie ustawionego okresu.
+5. Parametr harmonogramu zmienia administrator instalacji oraz użytkownik
+   z nowym prawem firmy `ManageCompanyBackups`.
+6. Kopie podlegają **rotacji z automatycznym sprzątaniem**, żeby nie gromadzić
+   dziesiątek dużych plików (przykład właściciela: kopia raz na dobę z rotacją 7 dni).
+7. Operacje wykonuje **osobna usługa Windows** (Operations Worker, §1).
+8. Administrator instalacji, który tworzy firmę, **od razu dostaje pełne prawa**
+   do tej firmy (wszystkie uprawnienia `CompanyAccess`). To jawne, audytowane
+   nadanie przy tworzeniu, a nie automatyczne prawo wynikające z roli: rola
+   administratora instalacji nadal nie daje dostępu do danych innych firm (ADR-033).
 
 Wymagania: ORG-010 (backup, odtworzenie, przeniesienie jednej firmy),
 SPECYFIKACJA §3.4 (cykl życia bazy), §11.3 (backup i odtwarzanie), §13 M0
@@ -57,8 +82,9 @@ Nowy schemat `ops`:
 - `CompanyDatabaseRegistration.Status`: `Ready` / `Maintenance`.
   Resolver odmawia (`503 company_maintenance`) dla `Maintenance`.
 
-Nazwę bazy wyznacza serwer z identyfikatora firmy
-(`Vatowiec_Company_{CompanyId:N}`), nigdy z tekstu użytkownika. Docelowy serwer
+Nazwę bazy wyznacza serwer — **zmienione przez [ADR-045](ADR-045-nazwy-baz-i-usuwanie-firmy.md):**
+stały prefiks `Vatowiec_` i oczyszczona nazwa firmy (pierwotnie `Vatowiec_Company_{CompanyId:N}`);
+zajęta nazwa oznacza komunikat „Nazwa zajęta…”. Docelowy serwer
 wybierany jest wyłącznie z serwerowej listy profili `CompanyConnections:*`.
 
 ### 3. Tworzenie firmy
@@ -77,18 +103,56 @@ Etapy zgodne ze SPECYFIKACJA §3.4:
 - `ProfileInitialized`: `CompanyProfile` i dane początkowe Network
   (słownik walut jak dotychczasowa inicjalizacja firm demonstracyjnych).
 - `Ready`: w jednej transakcji System wpis `Company`,
-  `CompanyDatabaseRegistration (Ready)` i zdarzenie audytu. Firma jest widoczna
-  dla resolvera dopiero od tego momentu.
+  `CompanyDatabaseRegistration (Ready)`, `CompanyAccess` z pełnymi prawami dla
+  administratora, który zlecił utworzenie (decyzja właściciela), domyślny
+  harmonogram kopii firmy i zdarzenia audytu (operacja oraz
+  `UserAdministrationChanges` dla nadania praw). Firma jest widoczna dla resolvera
+  dopiero od tego momentu.
 - Po awarii każdy etap **sprawdza rzeczywisty stan** (istnienie bazy, znacznik,
   historia migracji, profil), a nie sam checkpoint. Baza o tej nazwie bez
   zgodnego znacznika → `NeedsReconciliation`, bez DROP i bez przejmowania.
-- Brak automatycznego `CompanyAccess`: administrator nadaje prawa istniejącym
-  ekranem użytkowników (ADR-033). Patrz pytanie otwarte 3.
+- Innym użytkownikom prawa do nowej firmy nadaje się istniejącym ekranem
+  użytkowników (ADR-033).
 
 ### 4. Backup jednej firmy
 
-- Zlecenie: `POST /api/v1/companies/{companyId}/operations/backup` z CSRF
-  i nowym prawem firmy `BackupCompany = 1024`.
+- Zlecenie: `POST /api/v1/companies/{companyId}/operations/backup` z CSRF.
+  Wystarcza dowolny `CompanyAccess` do tej firmy, o ile polityka kopii instalacji
+  na to pozwala; administrator instalacji może zlecić kopię zawsze. Nie ma nowego
+  prawa firmy. Dla jednej firmy działa najwyżej jedna kopia naraz: kolejne
+  zlecenie w trakcie zwraca istniejącą operację.
+- **Brak pobierania:** API udostępnia tylko listę kopii (data, rozmiar, wynik
+  weryfikacji, kto zlecił), nigdy ścieżki pliku ani jego treści.
+- Polityka kopii instalacji (jeden wiersz w System, `RowVersion`, niezmienny
+  audyt zmian, edycja tylko przez administratora instalacji):
+  `UsersMayRequestBackups` (domyślnie włączone) i `RetainedBackupsPerCompany`
+  (domyślnie 7, zakres 1–365).
+- **Rotacja:** po udanej weryfikacji nowej kopii Worker usuwa najstarsze kopie
+  tej firmy ponad limit. Usuwa wyłącznie pliki utworzone przez tę instalację,
+  rozpoznane po manifeście z `InstallationId` i `CompanyId`, w katalogu
+  `Operations:BackupRoot`. Obcych plików nie dotyka. Usunięcie jest zapisane
+  w audycie. Nieudana kopia nigdy nie powoduje usunięcia starszych.
+- Kopie bezpieczeństwa wykonywane automatycznie przed odtworzeniem (§5) mają
+  osobny limit: zachowujemy dwie ostatnie.
+- **Harmonogram firmy** (osobny wiersz na firmę w System, `RowVersion`, audyt
+  zmian): `Frequency` = `Never` / `Daily` / `Every7Days` / `Every30Days`,
+  `Mode` = `Reminder` / `Automatic`, `PreferredHour` (0–23) dla kopii
+  automatycznej. Ustawienia domyślne nowej firmy (decyzja właściciela):
+  **co 30 dni, przypomnienie**. Zmiana: administrator instalacji albo prawo firmy
+  `ManageCompanyBackups = 1024` (nowe; istniejące konta go nie otrzymują
+  automatycznie), z CSRF i kontrolą wersji.
+- Datą odniesienia jest ostatnia **udana i zweryfikowana** kopia firmy, niezależnie
+  od tego, kto ją zlecił.
+- Tryb `Automatic`: Worker co kilka minut sprawdza firmy, dla których okres minął,
+  i od `PreferredHour` wykonuje kopię jako operację z aktorem technicznym
+  (Worker) w audycie. Działa niezależnie od przełącznika zlecania kopii przez
+  użytkowników. Nieudana kopia jest ponawiana najwyżej raz na godzinę i widoczna
+  na liście kopii.
+- Tryb `Reminder`: po otwarciu firmy klient pyta API o stan; jeżeli okres minął,
+  a użytkownik może zlecić kopię, widzi jedno nieblokujące powiadomienie
+  z „Utwórz kopię teraz” i „Przypomnij później” (ponownie najwcześniej
+  następnego dnia). Bez pytań przy zamykaniu programu.
+- `Never`: brak przypomnień i kopii automatycznych; kopię nadal można zlecić ręcznie.
 - Worker: pełny `BACKUP DATABASE … WITH CHECKSUM, COPY_ONLY` do serwerowego
   katalogu `Operations:BackupRoot`, następnie `RESTORE VERIFYONLY … WITH CHECKSUM`.
 - Obok pliku `.bak` manifest JSON: CompanyId, nazwa bazy, lista migracji,
@@ -101,10 +165,10 @@ Etapy zgodne ze SPECYFIKACJA §3.4:
 
 ### 5. Odtworzenie jednej firmy
 
-- Zlecenie: `POST /api/v1/companies/{companyId}/operations/restore` z CSRF,
-  prawem firmy `RestoreCompany = 2048` **i** rolą administratora instalacji
-  (patrz pytanie otwarte 2), wskazaniem kopii z listy backupów tej firmy
-  i jawnym potwierdzeniem.
+- Zlecenie: `POST /api/v1/installation/company-operations/restore` z CSRF,
+  wyłącznie przez administratora instalacji (decyzja właściciela), ze wskazaniem
+  firmy i kopii z jej listy oraz jawnym potwierdzeniem. Rola administratora nie
+  daje przy tym dostępu do odczytu danych firmy.
 - Worker odtwarza do **nowej bazy roboczej** z unikalną nazwą, sprawdza
   `DBCC CHECKDB`, SHA-256 z manifestu, `CompanyProfile.CompanyId` oraz zgodność
   historii migracji z bieżącą wersją aplikacji. Starsza historia → odmowa
@@ -120,12 +184,19 @@ Etapy zgodne ze SPECYFIKACJA §3.4:
 ### 6. Avalonia
 
 Ustawienia instalacji → **Firmy**: lista operacji, „Utwórz firmę”, postęp etapów,
-„Wznów” dla operacji przerwanej. Menu FIRMA → **Kopie zapasowe**: lista kopii,
-„Utwórz kopię”, „Odtwórz…” z potwierdzeniem. Klient tylko odpytuje stan przez API.
+„Wznów” dla operacji przerwanej, „Odtwórz kopię…” z potwierdzeniem.
+Ustawienia instalacji → **Kopie zapasowe**: przełącznik zlecania kopii przez
+użytkowników i liczba zachowywanych kopii na firmę. Menu FIRMA → **Kopie zapasowe**:
+lista kopii, data ostatniej udanej kopii, „Utwórz kopię na serwerze” (ukryte, gdy
+polityka nie pozwala; serwer i tak sprawdza politykę) oraz harmonogram firmy
+(edytowalny z `ManageCompanyBackups` lub przez administratora instalacji).
+Klient tylko odpytuje stan przez API. Przypomnienie pojawia się wyłącznie w trybie
+`Reminder` po upływie okresu, nigdy przy zamykaniu programu.
 
 ## Poza zakresem M0
 
-Harmonogramy, retencja, RPO/RTO (ADR-011 pozostaje otwarty), szyfrowanie plików
+Dokładniejsze harmonogramy (dni tygodnia, kilka kopii dziennie), kopie poza
+serwerem, RPO/RTO (ADR-011 pozostaje otwarty w tym zakresie), szyfrowanie plików
 kopii (do sprawdzenia możliwości SQL Server Express; w M0 ochrona ACL katalogu),
 przeniesienie firmy na inną instancję, klon jako nowa firma, eksport kluczy,
 załączniki (brak modułu), automatyczna migracja starszych kopii.
@@ -152,22 +223,51 @@ załączniki (brak modułu), automatyczna migracja starszych kopii.
     i connection stringów w logach i błędach.
 11. `docs/backup-restore.md` opisuje backup i odtworzenie firmy oraz bazy System
     (warunek M0 „odtworzenie kopii jest udokumentowane”).
+12. Użytkownik z dostępem do firmy zleca kopię; po wyłączeniu polityki dostaje
+    odmowę z serwera, a administrator instalacji nadal może zlecić kopię.
+    Tworzenie firmy i odtworzenie bez roli administratora → 403.
+13. Żaden endpoint nie zwraca treści ani ścieżki pliku kopii.
+14. Po przekroczeniu limitu zostaje dokładnie N najnowszych zweryfikowanych kopii
+    firmy; nieudana kopia nie usuwa starszych; obce pliki w katalogu pozostają.
+15. Harmonogram (testy z kontrolowanym zegarem): `Automatic` wykonuje kopię
+    po upływie okresu od `PreferredHour` i nie wcześniej; `Reminder` zgłasza
+    potrzebę kopii tylko po upływie okresu i nie częściej niż raz dziennie
+    po „Przypomnij później”; `Never` nie zgłasza niczego. Zmiana harmonogramu
+    bez `ManageCompanyBackups` i bez roli administratora → 403.
+16. Administrator tworzący firmę ma po `Ready` pełne prawa do niej, zapisane
+    w audycie; nie zyskuje praw do innych firm.
 
 ## Wdrożenie i ryzyko
 
-Jedna addytywna migracja System (schemat `ops`, kolumna `Status` z domyślnym
-`Ready` dla istniejących rejestracji). Bazy firm bez zmian. Istniejące bazy
+Addytywne migracje System, po jednej na krok wdrożenia (schemat `ops`
+z operacjami, historią, polityką kopii instalacji i harmonogramami firm, kolumna `Status` z domyślnym `Ready`
+dla istniejących rejestracji, nowe prawo `ManageCompanyBackups` w katalogu uprawnień). Bazy firm bez zmian. Istniejące bazy
 developerskie można zmigrować jawnie lub odtworzyć (AGENTS.md). Ryzyko:
 dodatkowy proces do instalacji i nadzoru; w M0 akceptujemy ręczne uruchamianie
 Workera i opisujemy instalację usługi Windows.
 
-## Pytania otwarte do właściciela
+## Stan wdrożenia
 
-1. **Proces wykonawczy:** osobny Worker (usługa Windows, propozycja) czy
-   komendy administracyjne `DatabaseTools` uruchamiane ręcznie?
-2. **Uprawnienia odtworzenia:** samo prawo firmy `RestoreCompany` czy
-   (propozycja) prawo firmy **i** rola administratora instalacji?
-3. **Prawa twórcy firmy:** brak automatycznego `CompanyAccess` (propozycja,
-   zgodnie z ADR-033) czy pełne prawa dla administratora tworzącego firmę?
-4. **Kolejność wdrożenia:** propozycja — najpierw tworzenie firmy, potem backup,
-   na końcu odtworzenie; każdy krok jako osobny commit z testami.
+**Krok 1 — tworzenie firmy: wdrożony 2026-11-22.** Migracja System
+`20261122123552_CompanyProvisioning`, usługa `src/Server/Operations`, endpointy
+`/api/v1/installation/company-operations`, ekran Avalonia „Ustawienia instalacji → Firmy”.
+Spełnione kryteria 1–6, 10 i 16 (testy `CompanyProvisioningTests` i
+`CompanyProvisioningSqlTests`). Rozstrzygnięcie techniczne: wykonawca nie zapisuje
+osobnego zdarzenia `StageReached` dla `Ready` — `Ready` i `Completed` powstają w tej samej
+transakcji co katalog. Ograniczenie: nadanie dostępu osobnemu loginowi SQL API do nowej bazy
+jest na razie ręczne (docs/company-provisioning.md). Kryterium 6 w części „skrypt ról”
+pozostaje do kroku z osobnym loginem SQL. Instrukcja: [docs/company-provisioning.md](../company-provisioning.md).
+
+Kroki 2 (kopia z rotacją i harmonogramem) i 3 (odtworzenie) — do wykonania.
+
+## Pytania do właściciela
+
+Rozstrzygnięte 2026-11-22 (patrz „Decyzje właściciela”): wykonawca — usługa
+Windows; odtworzenie i tworzenie firmy — administrator instalacji; twórca firmy —
+pełne prawa do niej; harmonogram — codziennie / 7 / 30 dni / nigdy, z wyborem
+przypomnienia lub kopii automatycznej, ustawiany przez administratora instalacji
+lub prawo `ManageCompanyBackups`.
+
+Przy akceptacji 2026-11-22 właściciel potwierdził kolejność wdrożenia (tworzenie
+firmy → kopia z rotacją i harmonogramem → odtworzenie, każdy krok osobno
+z testami) i ustawił domyślny harmonogram nowej firmy: co 30 dni, przypomnienie.

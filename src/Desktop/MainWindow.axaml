@@ -229,6 +229,7 @@
         <StackPanel Spacing="12" MaxWidth="740" HorizontalAlignment="Left">
           <Button Content="Użytkownicy i uprawnienia" Click="UsersSettingsClick" AutomationProperties.AutomationId="OpenUsers"/>
           <Button Content="Bezpieczeństwo → Polityka haseł" Click="PasswordPolicyClick" AutomationProperties.AutomationId="OpenPasswordPolicy"/>
+          <Button Content="Firmy → Tworzenie nowej firmy" Click="CompanyOperationsClick" AutomationProperties.AutomationId="OpenCompanyOperations"/>
           <TextBlock Text="Ustawienia instalacji → Integracje zewnętrzne" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>
           <ComboBox SelectedIndex="{Binding RegistryServiceIndex, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.AutomationId="RegistryService">
             <ComboBoxItem Content="GUS BIR1.2"/><ComboBoxItem Content="MF — wykaz VAT i WL2"/><ComboBoxItem Content="VIES"/>
@@ -272,6 +273,33 @@
         </StackPanel>
       </ScrollViewer>
       <desktop:UserAdministrationView IsVisible="{Binding IsUsersSettings}"/>
+      <ScrollViewer IsVisible="{Binding IsCompanyOperationsScreen}">
+        <StackPanel Spacing="12" MaxWidth="820" HorizontalAlignment="Left">
+          <TextBlock Text="Ustawienia instalacji → Firmy" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>
+          <TextBlock Text="Nowa firma otrzymuje własną bazę SQL Server. Bazę tworzy usługa VATowiec Operations na serwerze; aplikacja tylko przyjmuje zlecenie i pokazuje postęp. Po zakończeniu otrzymujesz pełne prawa do nowej firmy, a firma pojawia się na liście firm." TextWrapping="Wrap"/>
+          <TextBlock Text="Nazwa nowej firmy *"/>
+          <TextBox Text="{Binding NewCompanyName, Mode=TwoWay}" MaxLength="256" AutomationProperties.AutomationId="NewCompanyName"/>
+          <TextBlock Text="{Binding NewCompanyDatabaseText}" Opacity="0.7" TextWrapping="Wrap" AutomationProperties.AutomationId="NewCompanyDatabase"/>
+          <TextBlock Text="Serwer baz danych *" IsVisible="{Binding IsServerChoiceVisible}"/>
+          <ComboBox ItemsSource="{Binding ServerProfiles}" SelectedItem="{Binding SelectedServerProfile, Mode=TwoWay}" IsVisible="{Binding IsServerChoiceVisible}" HorizontalAlignment="Stretch" AutomationProperties.AutomationId="NewCompanyServer">
+            <ComboBox.ItemTemplate><DataTemplate x:DataType="contracts:ServerProfileResponse"><TextBlock Text="{Binding ServerName}"/></DataTemplate></ComboBox.ItemTemplate>
+          </ComboBox>
+          <WrapPanel><Button Content="Utwórz firmę" Click="ProvisionCompanyClick" IsEnabled="{Binding CanProvisionCompany}" AutomationProperties.AutomationId="ProvisionCompany"/></WrapPanel>
+          <TextBlock Text="Zlecenia" FontSize="20"/>
+          <TextBlock Text="Brak zleceń tworzenia firm." IsVisible="{Binding HasNoCompanyOperations}"/>
+          <ListBox ItemsSource="{Binding CompanyOperations}" SelectedItem="{Binding SelectedCompanyOperation, Mode=TwoWay}" MaxHeight="360" AutomationProperties.AutomationId="CompanyOperationsList">
+            <ListBox.ItemTemplate><DataTemplate x:DataType="vm:CompanyOperationRow"><StackPanel Spacing="3"><TextBlock Text="{Binding Summary}" TextWrapping="Wrap"/><TextBlock Text="{Binding Details}" Opacity="0.7" TextWrapping="Wrap"/><TextBlock Text="{Binding Error}" Foreground="#B42318" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
+          </ListBox>
+          <WrapPanel>
+            <Button Content="Odśwież" Click="RefreshCompanyOperationsClick" AutomationProperties.AutomationId="RefreshCompanyOperations"/>
+            <Button Content="Ponów wybraną operację" Click="RetryCompanyOperationClick" IsEnabled="{Binding CanRetryCompanyOperation}" AutomationProperties.AutomationId="RetryCompanyOperation"/>
+            <Button Content="Poprzednie" Click="CompanyOperationsPreviousClick" IsEnabled="{Binding CompanyOperationsHasPrevious}"/>
+            <Button Content="Następne" Click="CompanyOperationsNextClick" IsEnabled="{Binding CompanyOperationsHasNext}"/>
+          </WrapPanel>
+          <TextBlock Text="Ponowienie operacji wymagającej sprawdzenia ma sens dopiero po wyjaśnieniu stanu serwera SQL. Program nigdy nie usuwa ani nie przejmuje bazy o niepotwierdzonym pochodzeniu." TextWrapping="Wrap" Opacity="0.7"/>
+          <WrapPanel><Button Content="Wróć" Click="CloseCompanyOperationsClick" AutomationProperties.AutomationId="CloseCompanyOperations"/><Button Content="Wyloguj" Click="LogoutClick"/></WrapPanel>
+        </StackPanel>
+      </ScrollViewer>
       <ScrollViewer IsVisible="{Binding IsPasswordPolicyScreen}">
         <StackPanel MaxWidth="740" HorizontalAlignment="Left" Spacing="14">
           <TextBlock Text="Ustawienia instalacji → Bezpieczeństwo → Polityka haseł" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>
