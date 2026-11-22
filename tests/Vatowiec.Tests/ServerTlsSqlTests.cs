@@ -34,6 +34,20 @@ public sealed class ServerTlsSqlTests
         try
         {
             await using var tx = await PreservedSystemTransaction.Open();
+            // Baza developerska może mieć już CA utworzone przez usługę Operations i zmienioną konfigurację.
+            // Wewnątrz wycofywanej transakcji przywracamy stan świeżej instalacji (jak po migracji, przed
+            // pierwszym uruchomieniem Operations). Niezmiennej historii nie czyścimy — test sprawdza tylko
+            // wpisy powstałe od tego momentu.
+            long auditBaseline;
+            await using (var db = tx.Context())
+            {
+                await db.Database.ExecuteSqlRawAsync("""
+                    DELETE FROM [security].[ServerTlsState];
+                    UPDATE [security].[ServerTlsConfiguration]
+                    SET [Mode] = N'InstallationCa', [DnsNames] = N'', [IpAddresses] = N'', [IssuerThumbprint] = NULL, [CaGeneration] = 1;
+                    """);
+                auditBaseline = await db.ServerTlsChanges.Select(x => (long?)x.Id).MaxAsync() ?? 0;
+            }
             using var app = App(tx).WithWebHostBuilder(b => b.ConfigureServices(s =>
             {
                 s.RemoveAll<IServerCertificateSource>(); s.AddSingleton<IServerCertificateSource>(new FixedSource([own]));
@@ -65,7 +79,7 @@ public sealed class ServerTlsSqlTests
             var saved = await Read(adminClient.PutAsJsonAsync(Route, ownRequest));
             Assert.Equal(ServerTlsModeNames.OwnCertificate, saved.Mode);
             Assert.Equal(["api.firma.local"], saved.DnsNames);
-            var change = Assert.Single(saved.History, x => x.Kind == ServerTlsChangeKinds.ConfigurationChanged);
+            var change = Assert.Single(saved.History, x => x.Id > auditBaseline && x.Kind == ServerTlsChangeKinds.ConfigurationChanged);
             Assert.Equal(admin.UserName, change.ActorName);
             Assert.Contains("OwnCertificate", change.AfterJson);
 
@@ -144,7 +158,7 @@ public sealed class ServerTlsSqlTests
                 Assert.True(await ServerTlsService.LocalRecovery(db, "Lokalny administrator Windows: TEST", clock, CancellationToken.None));
             var recovered = (await adminClient.GetFromJsonAsync<ServerTlsResponse>(Route))!;
             Assert.Equal(ServerTlsModeNames.InstallationCa, recovered.Mode);
-            Assert.Contains(recovered.History, x => x.Kind == ServerTlsChangeKinds.LocalRecovery);
+            Assert.Contains(recovered.History, x => x.Id > auditBaseline && x.Kind == ServerTlsChangeKinds.LocalRecovery);
             await using (var db = tx.Context())
             {
                 Assert.All(await db.ServerTlsChanges.AsNoTracking().ToListAsync(), x =>
