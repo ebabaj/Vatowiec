@@ -42,7 +42,8 @@ public sealed partial class DesktopTests
     public async Task SystemDatabaseErrorsNeverClaimCompanyDatabaseFailure()
     {
         using var client = new VatowiecApiClient(new HttpClient(new Handler(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
-        { Content = System.Net.Http.Json.JsonContent.Create(new { code = "system_unavailable" }) }))) { BaseAddress = new Uri("https://localhost") });
+        { Content = System.Net.Http.Json.JsonContent.Create(new { code = "system_unavailable" }) })))
+        { BaseAddress = new Uri("https://localhost") });
         var error = await Assert.ThrowsAsync<ApiException>(() => client.PasswordPolicy());
         Assert.Contains("systemowa instalacji", error.Message); Assert.DoesNotContain("Baza firmy", error.Message);
     }

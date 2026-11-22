@@ -12,8 +12,10 @@ public sealed class PasswordPolicyEditor : INotifyPropertyChanged
     private bool history, expiration;
     private int previousCount, validityDays;
     public PasswordPolicyEditor(PasswordPolicyResponse value)
-    { original = value; enabled = value.IsEnabled; minimum = value.MinimumLength; upper = value.RequireUppercase; lower = value.RequireLowercase; digit = value.RequireDigit; special = value.RequireSpecialCharacter;
-        history = value.PreventPasswordReuse; previousCount = value.PreviousPasswordCount; expiration = value.EnforcePasswordExpiration; validityDays = value.PasswordValidityDays; }
+    {
+        original = value; enabled = value.IsEnabled; minimum = value.MinimumLength; upper = value.RequireUppercase; lower = value.RequireLowercase; digit = value.RequireDigit; special = value.RequireSpecialCharacter;
+        history = value.PreventPasswordReuse; previousCount = value.PreviousPasswordCount; expiration = value.EnforcePasswordExpiration; validityDays = value.PasswordValidityDays;
+    }
     public bool IsEnabled { get => enabled; set { enabled = value; Notify(); } }
     public int MinimumLength { get => minimum; set { minimum = value; Notify(); } }
     public bool RequireUppercase { get => upper; set { upper = value; Notify(); } }

@@ -110,7 +110,8 @@ public sealed class TableAppearanceUiTests
                 })).StartWithClassicDesktopLifetime([], ShutdownMode.OnExplicitShutdown);
             }
             catch (Exception e) { finished.TrySetException(e); }
-        }) { IsBackground = true, Name = "Network table appearance verification" };
+        })
+        { IsBackground = true, Name = "Network table appearance verification" };
         thread.SetApartmentState(ApartmentState.STA); thread.Start();
         await finished.Task.WaitAsync(TimeSpan.FromSeconds(60)); Assert.True(thread.Join(TimeSpan.FromSeconds(5)));
     }

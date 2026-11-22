@@ -100,7 +100,7 @@ public sealed class PersonalLifecycleTests
                 Assert.Equal(HttpStatusCode.BadRequest, noCsrf.StatusCode);
             }
             using (var model = new MainViewModel(first.Connect, preferencesStore: preferences, credentialStore: credentials, apiAddressOverride: firstConnection.Identity)
-                { UserName = "wizard.fixture", RememberCredentials = true, AutomaticLogin = true })
+            { UserName = "wizard.fixture", RememberCredentials = true, AutomaticLogin = true })
             {
                 await model.Login("Fictional-Setup-42!"); Assert.False(model.IsLogin, model.Message);
                 model.SelectedCompany = Assert.Single(model.Companies); company = model.SelectedCompany.CompanyId;

@@ -45,8 +45,11 @@ public sealed class InstallationPasswordValidator(IPasswordPolicyProvider polici
     private static bool IsAsciiLetterOrDigit(char c) => c is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9';
     public static PasswordOptions GeneratorOptions(PasswordPolicy p) => new()
     {
-        RequiredLength = p.IsEnabled ? p.MinimumLength : 1, RequiredUniqueChars = 1,
-        RequireUppercase = p.IsEnabled && p.RequireUppercase, RequireLowercase = p.IsEnabled && p.RequireLowercase,
-        RequireDigit = p.IsEnabled && p.RequireDigit, RequireNonAlphanumeric = p.IsEnabled && p.RequireSpecialCharacter
+        RequiredLength = p.IsEnabled ? p.MinimumLength : 1,
+        RequiredUniqueChars = 1,
+        RequireUppercase = p.IsEnabled && p.RequireUppercase,
+        RequireLowercase = p.IsEnabled && p.RequireLowercase,
+        RequireDigit = p.IsEnabled && p.RequireDigit,
+        RequireNonAlphanumeric = p.IsEnabled && p.RequireSpecialCharacter
     };
 }

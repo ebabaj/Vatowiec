@@ -173,8 +173,14 @@ internal sealed class WorkspaceTestApi : IVatowiecApiClient
         if (TableSaveError != null) throw TableSaveError;
         var current = await TableView(id, table);
         if (value.Reset) { views.Remove(table); return TableCatalog.Factory(table, []); }
-        return views[table] = current with { PageSize = value.PageSize ?? current.PageSize, VisibleColumns = value.Columns ?? current.VisibleColumns,
-            ColumnOrder = value.ColumnOrder ?? current.ColumnOrder, ColumnWidths = value.ColumnWidths ?? current.ColumnWidths, UserVersion = Guid.NewGuid().ToString() };
+        return views[table] = current with
+        {
+            PageSize = value.PageSize ?? current.PageSize,
+            VisibleColumns = value.Columns ?? current.VisibleColumns,
+            ColumnOrder = value.ColumnOrder ?? current.ColumnOrder,
+            ColumnWidths = value.ColumnWidths ?? current.ColumnWidths,
+            UserVersion = Guid.NewGuid().ToString()
+        };
     }
     public Task Logout() => Task.CompletedTask;
     public Task<CurrencyResponse[]> Currencies(Guid companyId) => Task.FromResult(CurrencyData.Select(c => c with { CompanyId = companyId }).ToArray());

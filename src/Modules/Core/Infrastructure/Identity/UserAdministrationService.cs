@@ -161,10 +161,11 @@ public sealed partial class UserAdministrationService(SystemDbContext db, UserMa
             if (targetIsAdministrator)
             {
                 var now = clock.GetUtcNow();
-                active = await (from u in db.Users join m in db.UserRoles on u.Id equals m.UserId
-                    join r in db.Roles on m.RoleId equals r.Id
-                    where r.NormalizedName == "INSTALLATIONADMINISTRATOR" && !u.IsArchived && !u.IsBlocked && (!u.LockoutEnabled || u.LockoutEnd == null || u.LockoutEnd <= now)
-                    select u.Id).Distinct().CountAsync(ct);
+                active = await (from u in db.Users
+                                join m in db.UserRoles on u.Id equals m.UserId
+                                join r in db.Roles on m.RoleId equals r.Id
+                                where r.NormalizedName == "INSTALLATIONADMINISTRATOR" && !u.IsArchived && !u.IsBlocked && (!u.LockoutEnabled || u.LockoutEnd == null || u.LockoutEnd <= now)
+                                select u.Id).Distinct().CountAsync(ct);
             }
             try { UserAdministrationSafety.ValidateBlock(actorId, id, targetIsAdministrator, active); }
             catch (ArgumentException e) { throw Invalid(e.Message); }
@@ -226,10 +227,11 @@ public sealed partial class UserAdministrationService(SystemDbContext db, UserMa
         if (!request.IsAdministrator)
         {
             var now = clock.GetUtcNow();
-            var count = await (from u in db.Users join m in db.UserRoles on u.Id equals m.UserId
-                join r in db.Roles on m.RoleId equals r.Id
-                where r.NormalizedName == "INSTALLATIONADMINISTRATOR" && !u.IsArchived && !u.IsBlocked && (!u.LockoutEnabled || u.LockoutEnd == null || u.LockoutEnd <= now)
-                select u.Id).Distinct().CountAsync(ct);
+            var count = await (from u in db.Users
+                               join m in db.UserRoles on u.Id equals m.UserId
+                               join r in db.Roles on m.RoleId equals r.Id
+                               where r.NormalizedName == "INSTALLATIONADMINISTRATOR" && !u.IsArchived && !u.IsBlocked && (!u.LockoutEnabled || u.LockoutEnd == null || u.LockoutEnd <= now)
+                               select u.Id).Distinct().CountAsync(ct);
             try { UserAdministrationSafety.ValidateRoleRemoval(actorId, id, active && current, count); }
             catch (ArgumentException e) { throw Invalid(e.Message); }
         }

@@ -49,8 +49,14 @@ public partial class PersonalSetupWindow : Window
         if (busy) return;
         if (string.IsNullOrEmpty(SetupPassword.Text) || SetupPassword.Text != SetupPasswordConfirmation.Text)
         { SetupStatus.Text = "Wpisz takie samo niepuste hasło w obu polach."; SetupPassword.Text = SetupPasswordConfirmation.Text = ""; return; }
-        var command = new PersonalSetupCommand { Operation = "initialize", UserName = SetupLogin.Text, Password = SetupPassword.Text,
-            CompanyName = SetupCompany.Text, Nip = SetupNip.Text };
+        var command = new PersonalSetupCommand
+        {
+            Operation = "initialize",
+            UserName = SetupLogin.Text,
+            Password = SetupPassword.Text,
+            CompanyName = SetupCompany.Text,
+            Nip = SetupNip.Text
+        };
         SetupPassword.Text = SetupPasswordConfirmation.Text = ""; Busy(true);
         try
         {

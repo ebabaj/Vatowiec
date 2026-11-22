@@ -135,14 +135,27 @@ public static class ContractorDetailEndpoints
             var original = entity is null ? null : Values(entity);
             errors = DetailValidation.Validate(kind, data, original);
             if (errors.Count != 0) return Results.Json(new { code = "validation_failed", errors }, statusCode: 400);
-            if (kind == "contacts") data = data with { Phone = original is null
-                ? PhoneNumberService.NormalizeForStorage(data.Phone) : PhoneNumberService.NormalizeForUpdate(data.Phone, original.Phone) };
+            if (kind == "contacts") data = data with
+            {
+                Phone = original is null
+                ? PhoneNumberService.NormalizeForStorage(data.Phone) : PhoneNumberService.NormalizeForUpdate(data.Phone, original.Phone)
+            };
             var normalized = New(kind, contractorId, data);
             Apply(normalized, data);
             var fingerprint = Hash(JsonSerializer.Serialize(new { kind, contractorId, Data = Values(normalized) }));
             var check = kind == "bank-accounts" ? validator.Validate(data.AccountNumber!) : null;
-            var warningHash = Hash(JsonSerializer.Serialize(new { check, fingerprint, companyId, contractorId,
-                ActorId = Actor(http), issuer, value.Id, value.RowVersion, value.OperationId }));
+            var warningHash = Hash(JsonSerializer.Serialize(new
+            {
+                check,
+                fingerprint,
+                companyId,
+                contractorId,
+                ActorId = Actor(http),
+                issuer,
+                value.Id,
+                value.RowVersion,
+                value.OperationId
+            }));
             var warning = check?.RequiresWarning == true;
             if (!detailId.HasValue)
             {

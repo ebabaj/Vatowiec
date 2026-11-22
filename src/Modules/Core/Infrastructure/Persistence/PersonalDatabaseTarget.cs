@@ -23,7 +23,15 @@ public sealed class PersonalDatabaseTarget(Guid installationId)
     public string Connection(string database)
     {
         if (database != System && database != Company && database != "master") throw new InvalidOperationException("Niedozwolona baza Personal.");
-        return new SqlConnectionStringBuilder { DataSource = Server, InitialCatalog = database, IntegratedSecurity = true,
-            Encrypt = SqlConnectionEncryptOption.Mandatory, TrustServerCertificate = true, Pooling = false, ConnectTimeout = 15 }.ConnectionString;
+        return new SqlConnectionStringBuilder
+        {
+            DataSource = Server,
+            InitialCatalog = database,
+            IntegratedSecurity = true,
+            Encrypt = SqlConnectionEncryptOption.Mandatory,
+            TrustServerCertificate = true,
+            Pooling = false,
+            ConnectTimeout = 15
+        }.ConnectionString;
     }
 }

@@ -26,7 +26,8 @@ public sealed partial class DesktopTests
             var response = code == null ? new HttpResponseMessage((HttpStatusCode)status) { Content = new StringContent("<html>unrelated server diagnostics</html>") }
                 : Json(new { code, message = code == "user_missing" ? "Nie znaleziono użytkownika. Odśwież listę." : "Wersja użytkownika zmieniła się. Odśwież szczegóły." });
             response.StatusCode = (HttpStatusCode)status; return Task.FromResult(response);
-        })) { BaseAddress = new Uri("https://localhost") });
+        }))
+        { BaseAddress = new Uri("https://localhost") });
         var error = await Assert.ThrowsAsync<ApiException>(() => client.SaveAdministratorRole(id, new("version", true, true)));
         Assert.Equal(status, error.StatusCode); Assert.Contains(expected, error.Message);
         Assert.DoesNotContain("kontrahent", error.Message); Assert.DoesNotContain("diagnostics", error.Message);
@@ -36,7 +37,8 @@ public sealed partial class DesktopTests
     public async Task Generic404DoesNotAssumeContractorContext()
     {
         using var client = new VatowiecApiClient(new HttpClient(new Handler(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
-        { Content = new StringContent("") }))) { BaseAddress = new Uri("https://localhost") });
+        { Content = new StringContent("") })))
+        { BaseAddress = new Uri("https://localhost") });
         var error = await Assert.ThrowsAsync<ApiException>(() => client.Profile(A));
         Assert.Contains("zasobu lub operacji", error.Message); Assert.DoesNotContain("kontrahent", error.Message);
     }

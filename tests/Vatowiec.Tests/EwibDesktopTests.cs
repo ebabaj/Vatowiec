@@ -6,14 +6,19 @@ public sealed partial class DesktopTests
 {
     private static BankAccountValidationResponse BankReply(params string[] bics) => new("ValidIban", "valid_iban", "Poprawny IBAN.",
         "39114021050000561640001001", true, "bank-iban-v3/test")
-        { BankLookup = new("Found", "Dane banku pobrano z NBP EWIB", "11402105", "Bank demonstracyjny EWIB", bics) };
+    { BankLookup = new("Found", "Dane banku pobrano z NBP EWIB", "11402105", "Bank demonstracyjny EWIB", bics) };
 
     [Theory]
-    [InlineData(0)][InlineData(1)][InlineData(2)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
     public async Task BankLookup_BlankFieldsAutoFillOnlyUnambiguousValues(int bicCount)
     {
-        var api = new FakeApi { Permissions = ["ViewProfile", "ViewContractors", "EditContractors"],
-            BankCheck = BankReply(new[] { "TESTPLPW", "TESTPLPW001" }.Take(bicCount).ToArray()) };
+        var api = new FakeApi
+        {
+            Permissions = ["ViewProfile", "ViewContractors", "EditContractors"],
+            BankCheck = BankReply(new[] { "TESTPLPW", "TESTPLPW001" }.Take(bicCount).ToArray())
+        };
         using var model = await OpenDetailForm(api); model.SelectedTab = 3; model.NewDetail();
         model.DetailEditor!.AccountNumber = "39-1140-2105-0000-5616-4000-1001";
         await model.ValidateBankAccount();
@@ -42,8 +47,11 @@ public sealed partial class DesktopTests
     [Fact]
     public async Task BankLookup_UnavailableDoesNotBlockManualSaveOrReplaceFields()
     {
-        var api = new FakeApi { Permissions = ["ViewProfile", "ViewContractors", "EditContractors"],
-            BankCheck = BankReply() with { BankLookup = new("Unavailable", "NBP EWIB: timeout", "11402105", null, []) } };
+        var api = new FakeApi
+        {
+            Permissions = ["ViewProfile", "ViewContractors", "EditContractors"],
+            BankCheck = BankReply() with { BankLookup = new("Unavailable", "NBP EWIB: timeout", "11402105", null, []) }
+        };
         using var model = await OpenDetailForm(api); model.SelectedTab = 3; model.NewDetail();
         model.DetailEditor!.AccountNumber = "39114021050000561640001001";
         model.DetailEditor.BankName = "Własny bank"; model.DetailEditor.Bic = "MYOWNBIC";

@@ -1,0 +1,9 @@
+# Repozytorium przechowuje pliki tekstowe z LF, zgodnie z .editorconfig (end_of_line = lf).
+# Wymuszenie LF także przy checkout na Windows (core.autocrlf=true) utrzymuje zgodność
+# z `dotnet format --verify-no-changes` lokalnie i w CI.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.pfx binary
+*.snk binary

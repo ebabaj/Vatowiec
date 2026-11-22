@@ -204,11 +204,12 @@ public sealed partial class UserAdministrationSqlTests
     private static async Task SessionFixture(IServiceProvider services, HttpClient client)
     {
         var db = services.GetRequiredService<SystemDbContext>(); var now = DateTimeOffset.UtcNow;
-        var actor = await (from user in db.Users.AsNoTracking() join membership in db.UserRoles on user.Id equals membership.UserId
-            join role in db.Roles on membership.RoleId equals role.Id
-            where role.NormalizedName == "INSTALLATIONADMINISTRATOR" && !user.IsBlocked && !user.MustChangePassword &&
-                (!user.LockoutEnabled || user.LockoutEnd == null || user.LockoutEnd <= now)
-            select user).FirstAsync();
+        var actor = await (from user in db.Users.AsNoTracking()
+                           join membership in db.UserRoles on user.Id equals membership.UserId
+                           join role in db.Roles on membership.RoleId equals role.Id
+                           where role.NormalizedName == "INSTALLATIONADMINISTRATOR" && !user.IsBlocked && !user.MustChangePassword &&
+                               (!user.LockoutEnabled || user.LockoutEnd == null || user.LockoutEnd <= now)
+                           select user).FirstAsync();
         var session = new UserSession(actor.Id, now, TimeSpan.FromMinutes(5)); db.UserSessions.Add(session); await db.SaveChangesAsync();
         var principal = await services.GetRequiredService<SignInManager<ApplicationUser>>().CreateUserPrincipalAsync(actor);
         ((ClaimsIdentity)principal.Identity!).AddClaim(new Claim(ApiSecurity.SessionClaim, session.Id.ToString()));

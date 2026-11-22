@@ -18,7 +18,10 @@ public static class PersonalPipeClient
         var origin = new Uri(endpoint.HttpOrigin);
         var handler = new SocketsHttpHandler
         {
-            CookieContainer = new CookieContainer(), UseCookies = true, UseProxy = false, AllowAutoRedirect = false,
+            CookieContainer = new CookieContainer(),
+            UseCookies = true,
+            UseProxy = false,
+            AllowAutoRedirect = false,
             ConnectTimeout = TimeSpan.FromSeconds(5),
             ConnectCallback = async (context, ct) =>
             {

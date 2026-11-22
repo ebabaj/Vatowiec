@@ -8,14 +8,22 @@ public sealed class UserAdministrationHistoryRow(UserAdministrationHistory value
     public string Operation => value.Operation switch
     {
         "PersonalInitialized" => "Pierwsze uruchomienie instalacji Personal",
-        "Created" => "Utworzenie konta", "AdministratorGranted" => "Nadanie roli administratora instalacji",
+        "Created" => "Utworzenie konta",
+        "AdministratorGranted" => "Nadanie roli administratora instalacji",
         "CompanyAccessGranted" => "Nadanie dostępu do pierwszej firmy",
-        "CreateUser" => "Utworzenie konta", "ResetPassword" => "Administracyjny reset hasła",
-        "ChangeOwnPassword" => "Zmiana własnego hasła", "BlockUser" => "Zablokowanie konta",
-        "GrantInstallationAdministrator" => "Nadanie roli administratora instalacji", "RevokeInstallationAdministrator" => "Odebranie roli administratora instalacji",
-        "ActivateUser" => "Aktywowanie konta", "ChangeCompanyAccess" => "Zmiana dostępu do firmy",
-        "ArchiveUser" => "Usunięcie logiczne użytkownika", "RestoreSameUser" => "Przywrócenie tej samej osoby",
-        "ReleaseArchivedLogin" => "Zwolnienie loginu dla nowej osoby", "CreateFromArchivedLogin" => "Utworzenie nowej osoby z loginem archiwalnym", _ => value.Operation
+        "CreateUser" => "Utworzenie konta",
+        "ResetPassword" => "Administracyjny reset hasła",
+        "ChangeOwnPassword" => "Zmiana własnego hasła",
+        "BlockUser" => "Zablokowanie konta",
+        "GrantInstallationAdministrator" => "Nadanie roli administratora instalacji",
+        "RevokeInstallationAdministrator" => "Odebranie roli administratora instalacji",
+        "ActivateUser" => "Aktywowanie konta",
+        "ChangeCompanyAccess" => "Zmiana dostępu do firmy",
+        "ArchiveUser" => "Usunięcie logiczne użytkownika",
+        "RestoreSameUser" => "Przywrócenie tej samej osoby",
+        "ReleaseArchivedLogin" => "Zwolnienie loginu dla nowej osoby",
+        "CreateFromArchivedLogin" => "Utworzenie nowej osoby z loginem archiwalnym",
+        _ => value.Operation
     };
     public string Actor => "Wykonawca: " + value.ActorName;
     public string Target => "Konto: " + value.TargetName;

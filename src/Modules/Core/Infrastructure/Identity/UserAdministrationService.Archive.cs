@@ -26,9 +26,11 @@ public sealed partial class UserAdministrationService
         if (await IsAdministrator(db, id, ct))
         {
             var now = clock.GetUtcNow();
-            var count = await (from u in db.Users join m in db.UserRoles on u.Id equals m.UserId join r in db.Roles on m.RoleId equals r.Id
-                where r.NormalizedName == "INSTALLATIONADMINISTRATOR" && !u.IsArchived && !u.IsBlocked && (!u.LockoutEnabled || u.LockoutEnd == null || u.LockoutEnd <= now)
-                select u.Id).Distinct().CountAsync(ct);
+            var count = await (from u in db.Users
+                               join m in db.UserRoles on u.Id equals m.UserId
+                               join r in db.Roles on m.RoleId equals r.Id
+                               where r.NormalizedName == "INSTALLATIONADMINISTRATOR" && !u.IsArchived && !u.IsBlocked && (!u.LockoutEnabled || u.LockoutEnd == null || u.LockoutEnd <= now)
+                               select u.Id).Distinct().CountAsync(ct);
             var targetActive = !target.IsBlocked && (!target.LockoutEnabled || target.LockoutEnd == null || target.LockoutEnd <= now);
             try { UserAdministrationSafety.ValidateArchive(actorId, id, targetActive, count); }
             catch (ArgumentException e) { throw Invalid(e.Message); }

@@ -17,9 +17,18 @@ public static class PersonalWindowLifetime
             var graceful = await backend.ShutdownAsync();
             if (!graceful)
             {
-                var warning = new Window { Title = "Zamykanie VATowca Personal", Width = 520, Height = 180,
-                    Content = new TextBlock { Margin = new(20), TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                        Text = "Serwer nie potwierdził poprawnego zamknięcia. Przy następnym uruchomieniu sprawdź ostatnią operację zapisu. Nie usuwaj plików bazy ani konfiguracji." } };
+                var warning = new Window
+                {
+                    Title = "Zamykanie VATowca Personal",
+                    Width = 520,
+                    Height = 180,
+                    Content = new TextBlock
+                    {
+                        Margin = new(20),
+                        TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                        Text = "Serwer nie potwierdził poprawnego zamknięcia. Przy następnym uruchomieniu sprawdź ostatnią operację zapisu. Nie usuwaj plików bazy ani konfiguracji."
+                    }
+                };
                 await warning.ShowDialog(window);
             }
             confirmed = true; window.Close();

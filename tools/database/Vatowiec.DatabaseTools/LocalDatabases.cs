@@ -522,8 +522,11 @@ internal static class LocalDatabases
                 CompanyPermission.AcceptWarnings | CompanyPermission.VerifyRegistries | CompanyPermission.ManageCompanyIntegrations |
                 CompanyPermission.ManageCurrencies | CompanyPermission.ImportExchangeRates;
             var access = role == "Operator"
-                ? new Dictionary<Guid, CompanyPermission> { [DemoCompanies[0].Id] = operatorA,
-                    [DemoCompanies[1].Id] = read | CompanyPermission.ViewContractors }
+                ? new Dictionary<Guid, CompanyPermission>
+                {
+                    [DemoCompanies[0].Id] = operatorA,
+                    [DemoCompanies[1].Id] = read | CompanyPermission.ViewContractors
+                }
                 : new Dictionary<Guid, CompanyPermission> { [DemoCompanies[0].Id] = read };
             var created = await initializer.CreateIfMissing(name, password, role, access);
             Console.WriteLine(created ? $"Utworzono brakujące konto demonstracyjne: {name}." : $"Pominięto istniejące konto: {name}; hasło, role i uprawnienia bez zmian.");

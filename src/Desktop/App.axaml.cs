@@ -19,9 +19,15 @@ public partial class App : Avalonia.Application
                 {
                     desktop.MainWindow = new Avalonia.Controls.Window
                     {
-                        Title = "VATowiec Personal jest już uruchomiony", Width = 500, Height = 180,
-                        Content = new Avalonia.Controls.TextBlock { Margin = new(24), TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                            Text = "VATowiec Personal już działa dla tego użytkownika Windows. Wróć do otwartego okna programu. Drugi serwer nie został uruchomiony." }
+                        Title = "VATowiec Personal jest już uruchomiony",
+                        Width = 500,
+                        Height = 180,
+                        Content = new Avalonia.Controls.TextBlock
+                        {
+                            Margin = new(24),
+                            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                            Text = "VATowiec Personal już działa dla tego użytkownika Windows. Wróć do otwartego okna programu. Drugi serwer nie został uruchomiony."
+                        }
                     };
                     base.OnFrameworkInitializationCompleted(); return;
                 }
@@ -34,8 +40,13 @@ public partial class App : Avalonia.Application
                 catch (ArgumentException)
                 {
                     single.Dispose();
-                    desktop.MainWindow = new Avalonia.Controls.Window { Title = "Nieprawidłowa konfiguracja Personal", Width = 500, Height = 180,
-                        Content = new Avalonia.Controls.TextBlock { Margin = new(24), Text = "Nieprawidłowy katalog danych Personal. Nie uruchomiono serwera ani nie zmieniono danych." , TextWrapping = Avalonia.Media.TextWrapping.Wrap } };
+                    desktop.MainWindow = new Avalonia.Controls.Window
+                    {
+                        Title = "Nieprawidłowa konfiguracja Personal",
+                        Width = 500,
+                        Height = 180,
+                        Content = new Avalonia.Controls.TextBlock { Margin = new(24), Text = "Nieprawidłowy katalog danych Personal. Nie uruchomiono serwera ani nie zmieniono danych.", TextWrapping = Avalonia.Media.TextWrapping.Wrap }
+                    };
                     base.OnFrameworkInitializationCompleted(); return;
                 }
                 desktop.MainWindow = new PersonalSetupWindow(backend);

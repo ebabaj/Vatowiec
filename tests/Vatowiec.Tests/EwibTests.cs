@@ -42,9 +42,16 @@ public sealed class EwibTests
         Assert.Equal("11402105", check.PolishClearingNumber);
     }
     [Theory]
-    [InlineData("-")][InlineData("\u2010")][InlineData("\u2011")][InlineData("\u2012")]
-    [InlineData("\u2013")][InlineData("\u2014")][InlineData("\u2015")]
-    [InlineData("\u2212")][InlineData("\uFE63")][InlineData("\uFF0D")]
+    [InlineData("-")]
+    [InlineData("\u2010")]
+    [InlineData("\u2011")]
+    [InlineData("\u2012")]
+    [InlineData("\u2013")]
+    [InlineData("\u2014")]
+    [InlineData("\u2015")]
+    [InlineData("\u2212")]
+    [InlineData("\uFE63")]
+    [InlineData("\uFF0D")]
     public void ExplicitVisualSeparatorsAndUnicodeWhitespaceAreShared(string dash)
     {
         var input = "\t pl39\u00a01140" + dash + "2105\u20030000 5616 4000 1001\r\n";
@@ -76,7 +83,9 @@ public sealed class EwibTests
         if (number.StartsWith("LOCAL", StringComparison.Ordinal)) Assert.Equal(number, check.NormalizedNumber);
     }
     [Theory]
-    [InlineData(0)][InlineData(1)][InlineData(2)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
     public async Task FindsNameAndExactBicsWithoutGuessing(int count)
     {
         var body = Reply("11402105", new[] { "TESTPLPW", "TESTPLPW001" }.Take(count).ToArray());
@@ -128,7 +137,10 @@ public sealed class EwibTests
         }
     }
     [Theory]
-    [InlineData(400)][InlineData(500)][InlineData(302)][InlineData(429)]
+    [InlineData(400)]
+    [InlineData(500)]
+    [InlineData(302)]
+    [InlineData(429)]
     public async Task HttpErrorsNeverBlockManualEntryOrEchoBody(int status)
     {
         var calls = 0;
@@ -138,7 +150,8 @@ public sealed class EwibTests
         Assert.DoesNotContain("PRIVATE", result.Message); Assert.Equal(1, calls);
     }
     [Theory]
-    [InlineData(true)][InlineData(false)]
+    [InlineData(true)]
+    [InlineData(false)]
     public async Task TimeoutAndConnectionFailureAreNotMissingBank(bool timeout)
     {
         using var stub = new DataPortTests.Stub(_ => { if (timeout) throw new TaskCanceledException(); throw new HttpRequestException(); });
@@ -146,7 +159,9 @@ public sealed class EwibTests
         Assert.Equal("Unavailable", result.Status);
     }
     [Theory]
-    [InlineData("")][InlineData("1234567")][InlineData("11402105&format=xml")]
+    [InlineData("")]
+    [InlineData("1234567")]
+    [InlineData("11402105&format=xml")]
     public async Task NeverRequestsFullDirectoryOrArbitraryQuery(string number)
     {
         using var stub = new DataPortTests.Stub(_ => throw new InvalidOperationException("No HTTP expected"));

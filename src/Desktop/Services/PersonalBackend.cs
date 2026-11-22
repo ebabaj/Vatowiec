@@ -52,8 +52,14 @@ public sealed class PersonalBackend : IPersonalBackend
         if (!OperatingSystem.IsWindows()) throw new InvalidOperationException("VATowiec Personal wymaga Windows i SQL Server 2025 LocalDB.");
         var api = FindApi();
         input = new(PipeDirection.In, HandleInheritability.Inheritable); output = new(PipeDirection.Out, HandleInheritability.Inheritable);
-        var start = new ProcessStartInfo(api) { WorkingDirectory = Path.GetDirectoryName(api)!, UseShellExecute = false, CreateNoWindow = true,
-            RedirectStandardOutput = true, RedirectStandardError = true };
+        var start = new ProcessStartInfo(api)
+        {
+            WorkingDirectory = Path.GetDirectoryName(api)!,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
         start.ArgumentList.Add("--personal-worker"); start.ArgumentList.Add(output.GetClientHandleAsString()); start.ArgumentList.Add(input.GetClientHandleAsString());
         // Never inherit a Network environment or its user-secrets. The host builds an isolated configuration.
         start.Environment["ASPNETCORE_ENVIRONMENT"] = "Personal"; start.Environment["DOTNET_ENVIRONMENT"] = "Personal";

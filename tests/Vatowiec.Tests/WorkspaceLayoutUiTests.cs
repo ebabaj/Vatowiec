@@ -66,7 +66,8 @@ public sealed class WorkspaceLayoutUiTests
                 })).StartWithClassicDesktopLifetime([], ShutdownMode.OnExplicitShutdown);
             }
             catch (Exception e) { finished.TrySetException(e); }
-        }) { IsBackground = true, Name = "Network layout verification" };
+        })
+        { IsBackground = true, Name = "Network layout verification" };
         thread.SetApartmentState(ApartmentState.STA); thread.Start();
         await finished.Task.WaitAsync(TimeSpan.FromSeconds(60));
         Assert.True(thread.Join(TimeSpan.FromSeconds(5)));
@@ -116,9 +117,18 @@ public sealed class WorkspaceLayoutUiTests
                     for (var i = 0; i < heading.Children.Count; i++)
                         Assert.Equal(heading.Children[i].TranslatePoint(default, table)!.Value.X, row.Children[i].TranslatePoint(default, table)!.Value.X, 1);
                 }
-                measurements.Add(new { Table = id, Scenario = scenario, WindowWidth = window.Bounds.Width, Columns = count,
-                    Offset = body.Offset.X, TableWidth = table.Bounds.Width, GearRight = bounds.X + button.Bounds.Width,
-                    HeaderWidth = header.Bounds.Width, Viewport = body.Viewport.Width });
+                measurements.Add(new
+                {
+                    Table = id,
+                    Scenario = scenario,
+                    WindowWidth = window.Bounds.Width,
+                    Columns = count,
+                    Offset = body.Offset.X,
+                    TableWidth = table.Bounds.Width,
+                    GearRight = bounds.X + button.Bounds.Width,
+                    HeaderWidth = header.Bounds.Width,
+                    Viewport = body.Viewport.Width
+                });
                 SaveImage(window, Path.Combine(output, $"{id}-{scenario}-{count}-{offset:0}.png"));
             }
         }

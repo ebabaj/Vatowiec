@@ -311,10 +311,13 @@ public sealed class PersonalInstallation : IDisposable
     }
     public Dictionary<string, string?> Configuration() => new()
     {
-        ["Vatowiec:Edition"] = PersonalDatabaseTarget.Edition, ["Personal:InstallationId"] = State.InstallationId.ToString(),
-        ["ConnectionStrings:VatowiecSystem"] = Target.Connection(Target.System), ["CompanyConnections:Personal"] = Target.Connection(Target.Company),
+        ["Vatowiec:Edition"] = PersonalDatabaseTarget.Edition,
+        ["Personal:InstallationId"] = State.InstallationId.ToString(),
+        ["ConnectionStrings:VatowiecSystem"] = Target.Connection(Target.System),
+        ["CompanyConnections:Personal"] = Target.Connection(Target.Company),
         ["AllowedHosts"] = "personal-" + State.InstallationId.ToString("N") + ".vatowiec.invalid",
-        ["DataPort:KeyRingDirectory"] = Path.Combine(Root, "Keys", "DataPort"), ["Gus:KeyRingDirectory"] = Path.Combine(Root, "Keys", "Gus")
+        ["DataPort:KeyRingDirectory"] = Path.Combine(Root, "Keys", "DataPort"),
+        ["Gus:KeyRingDirectory"] = Path.Combine(Root, "Keys", "Gus")
     };
     public async Task StopLocalDb()
     {

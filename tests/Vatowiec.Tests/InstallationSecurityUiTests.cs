@@ -134,7 +134,8 @@ public sealed class InstallationSecurityUiTests
                     })).StartWithClassicDesktopLifetime([], ShutdownMode.OnExplicitShutdown);
             }
             catch (Exception e) { finished.TrySetException(e); }
-        }) { IsBackground = true, Name = "Avalonia installation security verification" };
+        })
+        { IsBackground = true, Name = "Avalonia installation security verification" };
         thread.SetApartmentState(ApartmentState.STA); thread.Start();
         await finished.Task.WaitAsync(TimeSpan.FromSeconds(Environment.GetEnvironmentVariable("VATOWIEC_PERSONAL_SETUP_TESTS") == "1" ? 240 : 40));
         Assert.True(thread.Join(TimeSpan.FromSeconds(5)));

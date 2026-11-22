@@ -64,7 +64,8 @@ public sealed class ColumnLayoutUiTests
                 })).StartWithClassicDesktopLifetime([], ShutdownMode.OnExplicitShutdown);
             }
             catch (Exception ex) { completion.TrySetException(ex); }
-        }) { IsBackground = true, Name = "Network native column gestures" };
+        })
+        { IsBackground = true, Name = "Network native column gestures" };
         thread.SetApartmentState(ApartmentState.STA); thread.Start();
         await completion.Task.WaitAsync(TimeSpan.FromSeconds(90)); Assert.True(thread.Join(TimeSpan.FromSeconds(5)));
     }

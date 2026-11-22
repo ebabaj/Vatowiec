@@ -372,8 +372,11 @@ public sealed class DetailEditor : System.ComponentModel.INotifyPropertyChanged
     public DetailWriteRequest Request()
     {
         var data = Values();
-        if (Kind == "contacts") data = data with { Phone = Id == 0
-            ? PhoneNumberService.NormalizeForStorage(Phone) : PhoneNumberService.NormalizeForUpdate(Phone, storedPhone) };
+        if (Kind == "contacts") data = data with
+        {
+            Phone = Id == 0
+            ? PhoneNumberService.NormalizeForStorage(Phone) : PhoneNumberService.NormalizeForUpdate(Phone, storedPhone)
+        };
         return new(Id, data, RowVersion, Id == 0 ? OperationId : null);
     }
     public string Summary() => $"Nazwa: {Name}\nAdres: {Street} {BuildingNo}/{ApartmentNo}, {PostalCode} {City}, {Region} {CountryCode}\nRodzaj: {AddressTypeId}; preferowany: {IsDefault}; aktywny: {IsActive}\nKontakt: {Position} · {Email} · {Phone}\nRachunek: {AccountNumber} · {BankName} · {Bic} · {CurrencyCode ?? "bez waluty"} · {AccountHolderName}\nUwagi: {Notes}";

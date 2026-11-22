@@ -103,9 +103,17 @@ public static class PersonalBootstrapDefaults
         foreach (var row in currencies)
         { row.IsActive = row.Code == "PLN"; row.DownloadA = row.DownloadB = row.DownloadC = false; }
         var details = JsonSerializer.Serialize(new { Operation = "PersonalCompanyInitialized", Active = new[] { "PLN" }, ForeignInactive = currencies.Length - 1, DownloadA = false, DownloadB = false, DownloadC = false });
-        company.CurrencyOperations.Add(new() { OperationId = Guid.NewGuid(), Kind = "PersonalInitialized", ActorId = installationId,
-            ActorIssuerId = issuer, ActorName = "Inicjalizacja VATowiec Personal", OccurredAtUtc = DateTimeOffset.UtcNow,
-            RequestHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(details))), DetailsJson = details });
+        company.CurrencyOperations.Add(new()
+        {
+            OperationId = Guid.NewGuid(),
+            Kind = "PersonalInitialized",
+            ActorId = installationId,
+            ActorIssuerId = issuer,
+            ActorName = "Inicjalizacja VATowiec Personal",
+            OccurredAtUtc = DateTimeOffset.UtcNow,
+            RequestHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(details))),
+            DetailsJson = details
+        });
         await company.SaveChangesAsync();
         check.CommandText = "EXEC sys.sp_addextendedproperty @name=N'Vatowiec.Personal.CompanyDefaults',@value=N'1'";
         await check.ExecuteNonQueryAsync();
