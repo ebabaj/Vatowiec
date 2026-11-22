@@ -16,7 +16,9 @@ public static class OperationsProgram
             // Konfiguracja jak usługi: appsettings z katalogu programu, niezależnie od bieżącego katalogu konsoli.
             var commandHost = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
             {
-                Args = [], ContentRootPath = AppContext.BaseDirectory, EnvironmentName = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
+                Args = [],
+                ContentRootPath = AppContext.BaseDirectory,
+                EnvironmentName = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
             });
             Environment.ExitCode = OperatingSystem.IsWindows() ? await ServerTls.ServerTlsCommand.Run(args, commandHost.Configuration) : 5;
             return;

@@ -15,7 +15,8 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer expiryTimer = new() { Interval = TimeSpan.FromSeconds(1) };
 
     public MainWindow() : this(new MainViewModel(preferencesStore: new FileLoginPreferencesStore(), credentialStore: new WindowsLoginCredentialStore(),
-        trustStore: new FileServerTrustStore())) { }
+        trustStore: new FileServerTrustStore()))
+    { }
 
     public MainWindow(MainViewModel model)
     {

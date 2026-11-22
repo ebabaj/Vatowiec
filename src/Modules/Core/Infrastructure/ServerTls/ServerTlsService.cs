@@ -107,7 +107,10 @@ public sealed class ServerTlsService(SystemDbContext db, TimeProvider clock)
 
     private static string Json(ServerTlsConfiguration x) => JsonSerializer.Serialize(new
     {
-        mode = x.Mode, dnsNames = x.DnsNameList, ipAddresses = x.IpAddressList, issuerThumbprint = x.IssuerThumbprint
+        mode = x.Mode,
+        dnsNames = x.DnsNameList,
+        ipAddresses = x.IpAddressList,
+        issuerThumbprint = x.IssuerThumbprint
     });
 
     public static ServerTlsResponse Response(ServerTlsConfiguration configuration, ServerTlsState? state, ServerTlsServedCertificate served,
