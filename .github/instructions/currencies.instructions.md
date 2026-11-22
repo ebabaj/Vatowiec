@@ -1,5 +1,5 @@
 ---
-applyTo: "src/Modules/Core/Domain/Currency.cs,src/Modules/Core/Application/ExchangeRates.cs,src/Modules/Core/Infrastructure/Persistence/Currency*.cs,src/Modules/Core/Infrastructure/Persistence/ExchangeRateService.cs,src/Modules/Core/Infrastructure/Registries/NbpClient.cs,src/Server/Api/Security/CurrencyEndpoints.cs,src/SharedContracts/CurrencyContracts.cs,src/Desktop/ViewModels/MainViewModel.Currencies.cs,src/Desktop/Converters/FinanceCurrencyLabelConverter.cs,tests/Vatowiec.Tests/ActiveCurrencyChoiceTests.cs,tests/Vatowiec.Tests/*Currency*.cs,tests/Vatowiec.Tests/NbpTests.cs"
+applyTo: "src/Modules/Core/Domain/Currency.cs,src/Modules/Core/Application/ExchangeRates.cs,src/Modules/Core/Infrastructure/Persistence/Currency*.cs,src/Modules/Core/Infrastructure/Persistence/ExchangeRateService.cs,src/Modules/Core/Infrastructure/Registries/NbpClient.cs,src/Server/Api/Endpoints/CurrencyEndpoints.cs,src/SharedContracts/CurrencyContracts.cs,src/Desktop/ViewModels/MainViewModel.Currencies.cs,src/Desktop/Converters/FinanceCurrencyLabelConverter.cs,tests/Vatowiec.Tests/ActiveCurrencyChoiceTests.cs,tests/Vatowiec.Tests/*Currency*.cs,tests/Vatowiec.Tests/NbpTests.cs"
 ---
 
 # Currencies

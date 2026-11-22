@@ -145,7 +145,7 @@ public sealed class StandardIdentifierSqlTests
         var legacyResponse = new ContractorResponse(legacyRow.Id, A, legacyRow.Code, legacyRow.Name, "PL", RowVersion: Convert.ToBase64String(legacyRow.RowVersion));
         db.ContractorChanges.Add(new(legacyRow.Id, owner.Id, audit.ActorIssuerId, owner.UserName!, DateTimeOffset.UtcNow, "legacy-fixture", null, legacySnapshot));
         db.ContractorCreateOperations.Add(new(legacyRequest.OperationId!.Value, owner.Id, audit.ActorIssuerId,
-            Vatowiec.Api.Security.IdentifierChecks.Hash(legacySnapshot), legacyRow.Id, JsonSerializer.Serialize(legacyResponse, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+            Vatowiec.Core.Infrastructure.Contractors.IdentifierChecks.Hash(legacySnapshot), legacyRow.Id, JsonSerializer.Serialize(legacyResponse, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
         await db.SaveChangesAsync();
         using var oldReplay = await admin.PostAsJsonAsync(route, legacyRequest); Assert.Equal(HttpStatusCode.OK, oldReplay.StatusCode);
         Assert.Equal(legacyRow.Id, (await oldReplay.Content.ReadFromJsonAsync<ContractorResponse>())!.Id);

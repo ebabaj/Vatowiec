@@ -32,8 +32,10 @@ public sealed class CompanyDatabaseContextFactory : ICompanyDatabaseContextFacto
 }
 
 public sealed class CompanyDatabaseResolver(SystemDbContext system, IConfiguration configuration, ILogger<CompanyDatabaseResolver> logger,
-    ICompanyDatabaseContextFactory? contexts = null)
+    ICompanyDatabaseContextFactory? contexts = null, CompanySchemaVerificationCache? schemas = null)
 {
+    private readonly CompanySchemaVerificationCache schemaCache = schemas ?? new();
+
     public async Task<AuthorizedCompanyDatabase> Resolve(Guid userId, Guid companyId,
         CompanyPermission required, bool isDevelopment, CancellationToken cancellationToken = default)
     {
@@ -66,9 +68,18 @@ public sealed class CompanyDatabaseResolver(SystemDbContext system, IConfigurati
                 .SingleOrDefaultAsync(cancellationToken);
             if (identity is null || identity.CompanyId != companyId)
                 throw new CompanyResolutionException("company_identity_mismatch");
-            var applied = (await context.Database.GetAppliedMigrationsAsync(cancellationToken)).Order().ToArray();
-            if (!applied.SequenceEqual(context.Database.GetMigrations().Order()))
-                throw new CompanyResolutionException("company_schema_incompatible");
+            // Historia migracji jest odpytywana co najwyżej raz na CompanySchemaVerificationCache.Lifetime
+            // dla danej bazy; profil firmy powyżej jest sprawdzany przy każdym żądaniu (ADR-046).
+            if (!schemaCache.IsVerified(connection.DataSource, registration.DatabaseName, companyId))
+            {
+                var applied = (await context.Database.GetAppliedMigrationsAsync(cancellationToken)).Order().ToArray();
+                if (!applied.SequenceEqual(context.Database.GetMigrations().Order()))
+                {
+                    schemaCache.Forget(connection.DataSource, registration.DatabaseName, companyId);
+                    throw new CompanyResolutionException("company_schema_incompatible");
+                }
+                schemaCache.MarkVerified(connection.DataSource, registration.DatabaseName, companyId);
+            }
             return new AuthorizedCompanyDatabase(context, access.Permissions);
         }
         catch (Exception error) when (error is SqlException or InvalidOperationException or ArgumentException or CompanyResolutionException)

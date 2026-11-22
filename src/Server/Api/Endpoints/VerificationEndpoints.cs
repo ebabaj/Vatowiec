@@ -1,3 +1,4 @@
+using Vatowiec.Core.Infrastructure.Contractors;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -9,7 +10,9 @@ using Vatowiec.Core.Infrastructure.Persistence;
 using Vatowiec.Core.Infrastructure.Registries;
 using Vatowiec.SharedContracts;
 
-namespace Vatowiec.Api.Security;
+using static Vatowiec.Api.Endpoints.EndpointResults;
+
+namespace Vatowiec.Api.Endpoints;
 
 public static class VerificationEndpoints
 {
@@ -23,16 +26,14 @@ public static class VerificationEndpoints
         companies.MapGet("/{companyId:guid}/registry-environments", async (Guid companyId, HttpContext http,
             CompanyDatabaseResolver resolver, IWebHostEnvironment host, RegistrySettings settings) =>
         {
-            await using var access = await resolver.Resolve(Actor(http), companyId, CompanyPermission.ViewContractors, host.IsDevelopment(), http.RequestAborted);
+            await using var access = await resolver.Resolve(http.UserId(), companyId, CompanyPermission.ViewContractors, host.IsDevelopment(), http.RequestAborted);
             return Results.Ok(new RegistryEnvironmentResponse(settings.Mode("MF"), settings.Mode("GUS"), settings.Mode("VIES")));
         }).AddEndpointFilter(CompanyEndpoints.ValidateCompanySource);
     }
-    private static Guid Actor(HttpContext http) => Guid.Parse(http.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-    private static IResult Error(int status, string code, string message) => Results.Json(new { code, message }, statusCode: status);
     private static async Task<IResult> List(Guid companyId, int contractorId, HttpContext http, CompanyDatabaseResolver resolver,
         IWebHostEnvironment host, int offset = 0, int limit = 50)
     {
-        await using var access = await resolver.Resolve(Actor(http), companyId, CompanyPermission.ViewContractors, host.IsDevelopment(), http.RequestAborted);
+        await using var access = await resolver.Resolve(http.UserId(), companyId, CompanyPermission.ViewContractors, host.IsDevelopment(), http.RequestAborted);
         if (offset < 0 || offset > 1_000_000 || limit is < 1 or > 100) return Error(400, "invalid_filter", "Nieprawidłowa strona historii.");
         if (!await access.Context.Contractors.AnyAsync(x => x.Id == contractorId)) return Error(404, "contractor_not_found", "Nie znaleziono kontrahenta.");
         var rows = await access.Context.ExternalVerifications.AsNoTracking().Where(x => x.ContractorId == contractorId)
@@ -44,13 +45,13 @@ public static class VerificationEndpoints
         IRegistryAdapters adapters, TimeProvider clock, IDataPortClient dataPort, IDataPortKeyProtector protector,
         Vatowiec.Core.Application.TaxIdentifierValidator validator)
     {
-        await using var access = await resolver.Resolve(Actor(http), companyId, CompanyPermission.ViewContractors | CompanyPermission.VerifyRegistries,
+        await using var access = await resolver.Resolve(http.UserId(), companyId, CompanyPermission.ViewContractors | CompanyPermission.VerifyRegistries,
             host.IsDevelopment(), http.RequestAborted);
         try { await csrf.ValidateRequestAsync(http); }
         catch (AntiforgeryValidationException) { return Error(400, "csrf_invalid", "Nie udało się potwierdzić żądania."); }
         if (value.OperationId == Guid.Empty || value.Operation is not ("DataPort" or "Gus" or "Vies" or "MfTaxpayer" or "MfAccount" or "MfStatus"))
             return Error(400, "verification_invalid", "Nieprawidłowy rodzaj lub identyfikator sprawdzenia.");
-        var db = access.Context; var actor = Actor(http);
+        var db = access.Context; var actor = http.UserId();
         var issuer = await system.InstallationIdentities.Select(x => x.Id).SingleAsync(http.RequestAborted);
         var name = http.User.Identity?.Name;
         if (issuer == Guid.Empty || string.IsNullOrWhiteSpace(name)) return Error(503, "audit_identity_unavailable", "Brak trwałej tożsamości wykonawcy.");

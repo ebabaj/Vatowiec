@@ -6,7 +6,7 @@ using Vatowiec.Core.Infrastructure.Persistence;
 using Vatowiec.Core.Infrastructure.Registries;
 using Vatowiec.SharedContracts;
 
-namespace Vatowiec.Api.Security;
+namespace Vatowiec.Api.Endpoints;
 
 public static class CurrencyEndpoints
 {
@@ -30,15 +30,14 @@ public static class CurrencyEndpoints
         group.MapGet("/exchange-rates/history", History);
         group.MapGet("/exchange-rates/lookup", Lookup);
     }
-    private static Guid ActorId(HttpContext http) => Guid.Parse(http.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     private static Task<AuthorizedCompanyDatabase> Access(Guid company, HttpContext http, CompanyDatabaseResolver resolver, IWebHostEnvironment env, CompanyPermission permission) =>
-        resolver.Resolve(ActorId(http), company, permission, env.IsDevelopment(), http.RequestAborted);
+        resolver.Resolve(http.UserId(), company, permission, env.IsDevelopment(), http.RequestAborted);
     private static async Task<CurrencyActor> Actor(HttpContext http, SystemDbContext system)
     {
         var issuer = await system.InstallationIdentities.Select(x => x.Id).SingleAsync(http.RequestAborted);
         var name = http.User.Identity?.Name;
         if (issuer == Guid.Empty || string.IsNullOrWhiteSpace(name)) throw new CurrencyOperationException(503, "currency_actor", "Brak trwałej identyfikacji wykonawcy.");
-        return new(ActorId(http), issuer, name);
+        return new(http.UserId(), issuer, name);
     }
     private static async Task<IResult> ListCurrencies(Guid companyId, HttpContext http, CompanyDatabaseResolver resolver, IWebHostEnvironment env, bool withRatesOnly = false)
     {

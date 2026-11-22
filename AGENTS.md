@@ -129,6 +129,17 @@ automatycznej. Ustawia go administrator instalacji lub prawo firmy
 rotację z automatycznym usuwaniem najstarszych plików utworzonych przez
 instalację (domyślnie 7 na firmę). Operacje wykonuje osobna usługa Windows.
 
+**ADR-046 (spłata długu po M0, przyjęty przez właściciela 2026-11-22)** —
+[miejsce logiki](docs/adr/ADR-046-warstwa-aplikacyjna-i-splata-dlugu.md): endpointy są
+w `src/Server/Api/Endpoints` i odpowiadają tylko za HTTP; przypadki użycia (zwłaszcza M1:
+zatwierdzanie, księgowanie, numeracja) w usługach modułu (`Domain`/`Application`, usługa
+z `CompanyDbContext` w `Infrastructure`). Istniejące endpointy kartoteki/walut/rejestrów
+przenosimy przyrostowo przy zmianie obszaru, bez masowego przepisywania. Błędy endpointów
+przez wspólne `EndpointResults`. W kliencie nie dodawaj `async void` — obsługi zdarzeń przez
+`UiActions.Run`; nowe ekrany dostają własne modele widoku, nie kolejne partiale
+`MainViewModel`. Pamięć weryfikacji migracji bazy firmy (30 s) nie zastępuje kontroli praw
+i profilu firmy przy każdym żądaniu.
+
 Wdrożone wcześniej: interfejs i widoki tabel
 [ADR-042](docs/adr/ADR-042-interfejs-i-widoki-tabel.md) (zlecone jako „ADR-041”,
 który opisuje ustawienia Personal) oraz wspólna obsługa numerów telefonów

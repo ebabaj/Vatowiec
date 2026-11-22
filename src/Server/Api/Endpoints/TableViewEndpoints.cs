@@ -1,3 +1,4 @@
+using Vatowiec.Api.Security;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
@@ -6,7 +7,9 @@ using Vatowiec.Core.Infrastructure.Identity;
 using Vatowiec.Core.Infrastructure.Persistence;
 using Vatowiec.SharedContracts;
 
-namespace Vatowiec.Api.Security;
+using static Vatowiec.Api.Endpoints.EndpointResults;
+
+namespace Vatowiec.Api.Endpoints;
 
 public static class TableViewEndpoints
 {
@@ -20,14 +23,12 @@ public static class TableViewEndpoints
         group.MapPut("/{tableId}/installation", (Guid companyId, string tableId, TableViewRequest value, HttpContext http,
             SystemDbContext db, IAntiforgery csrf, TimeProvider clock) => Write(companyId, tableId, value, true, http, db, csrf, clock));
     }
-    private static Guid User(HttpContext http) => Guid.Parse(http.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-    private static IResult Error(int status, string code, string message) => Results.Json(new { code, message }, statusCode: status);
     private static async Task<string[]?> Permissions(Guid companyId, string tableId, HttpContext http, SystemDbContext db)
     {
         if (TableCatalog.Find(tableId) is not { } table) return null;
         var permission = await (from access in db.CompanyAccesses.AsNoTracking()
                                 join company in db.Companies.AsNoTracking() on access.CompanyId equals company.Id
-                                where access.UserId == User(http) && access.CompanyId == companyId && company.IsActive
+                                where access.UserId == http.UserId() && access.CompanyId == companyId && company.IsActive
                                 select (CompanyPermission?)access.Permissions).SingleOrDefaultAsync(http.RequestAborted);
         var codes = UserAdministrationService.Codes(permission ?? CompanyPermission.None);
         return codes.Contains(table.ReadPermission, StringComparer.Ordinal) ? codes : null;
@@ -36,7 +37,7 @@ public static class TableViewEndpoints
     {
         var permissions = await Permissions(companyId, tableId, http, db);
         if (permissions == null) return Error(403, "table_access_denied", "Brak dostępu do tabeli w tej firmie.");
-        return Results.Ok(await Response(tableId, User(http), permissions, db, http.RequestAborted));
+        return Results.Ok(await Response(tableId, http.UserId(), permissions, db, http.RequestAborted));
     }
     private static string? Version(TableView? row) => row == null ? null : Convert.ToBase64String(row.RowVersion);
     private static async Task<TableViewResponse> Response(string tableId, Guid userId, string[] permissions, SystemDbContext db, CancellationToken ct)
@@ -63,7 +64,7 @@ public static class TableViewEndpoints
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         // Same lock as role/access mutations: check the current role and company permissions inside the transaction.
         await UserAdministrationService.Lock(db, http.RequestAborted);
-        var userId = User(http);
+        var userId = http.UserId();
         var permissions = await Permissions(companyId, tableId, http, db);
         if (permissions == null || global && !await InstallationAdministration.IsAdministrator(db, userId, http.RequestAborted))
             return Error(403, "table_access_denied", "Brak uprawnienia do zmiany tego widoku.");

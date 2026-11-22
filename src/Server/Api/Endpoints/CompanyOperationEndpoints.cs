@@ -1,3 +1,4 @@
+using Vatowiec.Api.Security;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.Data.SqlClient;
@@ -7,7 +8,9 @@ using Vatowiec.Core.Infrastructure.Operations;
 using Vatowiec.Core.Infrastructure.Persistence;
 using Vatowiec.SharedContracts;
 
-namespace Vatowiec.Api.Security;
+using static Vatowiec.Api.Endpoints.EndpointResults;
+
+namespace Vatowiec.Api.Endpoints;
 
 // ADR-044 krok 1: API przyjmuje zlecenie i pokazuje stan. Nie tworzy baz, nie wykonuje migracji ani DDL.
 public static class CompanyOperationEndpoints
@@ -133,11 +136,10 @@ public static class CompanyOperationEndpoints
     }
 
     private static OperationRequester Requester(HttpContext http) =>
-        new(Guid.Parse(http.User.FindFirstValue(ClaimTypes.NameIdentifier)!), http.User.Identity?.Name ?? "");
+        new(http.UserId(), http.User.Identity?.Name ?? "");
 
     internal static CompanyOperationResponse Response(CompanyOperation x) => new(x.Id, x.Kind, x.CompanyId, x.CompanyName, x.Stage,
         x.Status, x.Attempt, x.LastErrorCode, x.RequestedByName, x.CreatedAtUtc, x.UpdatedAtUtc, x.CompletedAtUtc,
         Convert.ToBase64String(x.RowVersion), x.CreateArchive);
 
-    private static IResult Error(int status, string code, string message) => Results.Json(new { code, message }, statusCode: status);
 }

@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Vatowiec.Api.Security;
+using Vatowiec.Core.Infrastructure.Contractors;
 using Vatowiec.Core.Application;
 using Vatowiec.Core.Infrastructure.Persistence;
 using Vatowiec.SharedContracts;

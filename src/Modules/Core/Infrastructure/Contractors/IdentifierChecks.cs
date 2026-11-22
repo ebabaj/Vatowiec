@@ -6,7 +6,7 @@ using Vatowiec.Core.Application;
 using Vatowiec.Core.Infrastructure.Persistence;
 using Vatowiec.SharedContracts;
 
-namespace Vatowiec.Api.Security;
+namespace Vatowiec.Core.Infrastructure.Contractors;
 
 public sealed class IdentifierChecks(SystemDbContext system, TaxIdentifierValidator validator, TimeProvider clock)
 {

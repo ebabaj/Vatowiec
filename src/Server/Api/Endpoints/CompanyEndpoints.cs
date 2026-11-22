@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Vatowiec.Core.Domain;
 using Vatowiec.Core.Infrastructure.Persistence;
 
-namespace Vatowiec.Api.Security;
+namespace Vatowiec.Api.Endpoints;
 
 public static class CompanyEndpoints
 {
@@ -12,7 +12,7 @@ public static class CompanyEndpoints
         var group = app.MapGroup("/api/v1/companies").RequireAuthorization();
         group.MapGet("", async (HttpContext context, SystemDbContext system) =>
         {
-            var userId = Guid.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var userId = context.UserId();
             var rows = await (from access in system.CompanyAccesses.AsNoTracking()
                               join company in system.Companies.AsNoTracking() on access.CompanyId equals company.Id
                               where access.UserId == userId && company.IsActive
@@ -24,7 +24,7 @@ public static class CompanyEndpoints
         group.MapGet("/{companyId:guid}/profile", async (Guid companyId, HttpContext request,
             CompanyDatabaseResolver resolver, IWebHostEnvironment environment) =>
         {
-            await using var database = await resolver.Resolve(UserId(request), companyId,
+            await using var database = await resolver.Resolve(request.UserId(), companyId,
                 CompanyPermission.ViewProfile, environment.IsDevelopment(), request.RequestAborted);
             var profile = await database.Context.CompanyProfiles.AsNoTracking().SingleAsync(request.RequestAborted);
             return Results.Ok(new { profile.CompanyId, profile.Name, profile.Nip, profile.Regon });
@@ -39,7 +39,6 @@ public static class CompanyEndpoints
         group.MapCompanyBackups();
     }
 
-    private static Guid UserId(HttpContext context) => Guid.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     private static string[] Permissions(CompanyPermission permissions) => Enum.GetValues<CompanyPermission>()
         .Where(x => x != CompanyPermission.None && (permissions & x) == x).Select(x => x.ToString()).ToArray();

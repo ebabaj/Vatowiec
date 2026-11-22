@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Vatowiec.Api.Endpoints;
 using Vatowiec.Api.Security;
 using Vatowiec.Core.Application;
 using Vatowiec.Core.Domain;

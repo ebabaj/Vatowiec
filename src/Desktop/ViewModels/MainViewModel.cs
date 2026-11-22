@@ -304,6 +304,15 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
+    // Ostatnia linia obrony dla obsługi zdarzeń UI (UiActions, ADR-046): komunikat zamiast zamknięcia
+    // programu. Treści wyjątku nie pokazujemy ani nie logujemy — może zawierać dane formularza.
+    public void ReportUnexpectedError(Exception error)
+    {
+        message = "Wystąpił nieoczekiwany błąd programu (" + error.GetType().Name + "). Operacja mogła nie zostać wykonana. " +
+            "Odśwież dane przed ponowieniem; jeśli błąd się powtarza, zgłoś go administratorowi.";
+        ChangedAll();
+    }
+
     private static bool IsExpected(Exception ex) => ex is ApiException or HttpRequestException or TaskCanceledException or JsonException;
     private void ClearCompanyData()
     {

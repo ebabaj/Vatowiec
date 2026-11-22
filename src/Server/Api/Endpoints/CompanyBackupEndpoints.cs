@@ -1,9 +1,10 @@
+using Vatowiec.Api.Security;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Antiforgery;
 using Vatowiec.Core.Infrastructure.Operations;
 using Vatowiec.SharedContracts;
 
-namespace Vatowiec.Api.Security;
+namespace Vatowiec.Api.Endpoints;
 
 // ADR-044 krok 2: zlecenie kopii, harmonogram i przypomnienia. Kopii nie można pobrać przez API.
 public static class CompanyBackupEndpoints
@@ -12,7 +13,7 @@ public static class CompanyBackupEndpoints
     {
         var group = companies.MapGroup("/{companyId:guid}/backups").AddEndpointFilter(CompanyEndpoints.ValidateCompanySource);
         group.MapGet("", (Guid companyId, HttpContext http, CompanyBackupService backups) =>
-            Handle(() => backups.Status(UserId(http), companyId, http.RequestAborted)));
+            Handle(() => backups.Status(http.UserId(), companyId, http.RequestAborted)));
         group.MapPost("", async (Guid companyId, CompanyBackupRequest value, HttpContext http, IAntiforgery csrf, CompanyBackupService backups) =>
         {
             if (!await ValidCsrf(csrf, http)) return Csrf();
@@ -27,7 +28,7 @@ public static class CompanyBackupEndpoints
         group.MapPut("/schedule", async (Guid companyId, CompanyBackupScheduleRequest value, HttpContext http, IAntiforgery csrf, CompanyBackupService backups) =>
             await ValidCsrf(csrf, http) ? await Handle(() => backups.SaveSchedule(Requester(http), companyId, value, http.RequestAborted)) : Csrf());
         group.MapPost("/reminder/snooze", async (Guid companyId, HttpContext http, IAntiforgery csrf, CompanyBackupService backups) =>
-            await ValidCsrf(csrf, http) ? await Handle(() => backups.Snooze(UserId(http), companyId, http.RequestAborted)) : Csrf());
+            await ValidCsrf(csrf, http) ? await Handle(() => backups.Snooze(http.UserId(), companyId, http.RequestAborted)) : Csrf());
     }
 
     public static void MapBackupPolicy(this WebApplication app)
@@ -50,8 +51,7 @@ public static class CompanyBackupEndpoints
         catch (AntiforgeryValidationException) { return false; }
     }
 
-    private static Guid UserId(HttpContext http) => Guid.Parse(http.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-    private static OperationRequester Requester(HttpContext http) => new(UserId(http), http.User.Identity?.Name ?? "");
+    private static OperationRequester Requester(HttpContext http) => new(http.UserId(), http.User.Identity?.Name ?? "");
     private static IResult Csrf() => Results.Json(new { code = "csrf_invalid", message = "Nie udało się potwierdzić żądania." }, statusCode: 400);
     private static IResult Error(CompanyOperationException error) =>
         Results.Json(new { code = error.Code, message = error.Message }, statusCode: error.Status);

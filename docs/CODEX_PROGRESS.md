@@ -91,6 +91,18 @@ tylko do odczytu. Wynik: **141/141 testów SQL, 0 pominiętych**; bez SQL 578 za
 0 błędów; formatowanie bez uwag. Bazy developerskie nietknięte (konta, A/B, Tenjin, kopia).
 Logi: `TestResults/m0-sql/`.
 
+Zadanie 2026-11-22 (ADR-046 — spłata długu technicznego z analizy, bez Commit i Push):
+endpointy przeniesione z `Api/Security` do `Api/Endpoints`, `IdentifierChecks` do
+`Core.Infrastructure.Contractors`, wspólne `EndpointResults` zamiast zduplikowanych
+pomocników, `Program.cs` uporządkowany (`Hosting/ApiPipeline.cs`, kody odpowiedzi bez
+zmian); klient: 128 obsług `async void` zastąpionych `UiActions.Run` z komunikatem
+o nieoczekiwanym błędzie zamiast zamknięcia programu, plus siatka
+`Dispatcher.UIThread.UnhandledException`; resolver bazy firmy pamięta udaną weryfikację
+migracji przez 30 s (profil firmy i prawa nadal przy każdym żądaniu). Reguła miejsca
+logiki dla M1 (ADR-046) przyjęta przez właściciela 2026-11-22.
+Wynik: build 0/0; bez SQL 580 zaliczonych, 0 błędów; **SQL 141/141**; natywny test okna
+1/1; formatowanie bez uwag.
+
 ## Archiwum: naprawa zakładki Finansowe
 
 2026-10-23. Ukończone. BEZ Commit i Push.

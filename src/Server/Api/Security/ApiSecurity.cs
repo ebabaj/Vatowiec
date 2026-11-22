@@ -21,6 +21,7 @@ public static class ApiSecurity
     public static void AddApiSecurity(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddVatowiecIdentity();
+        services.AddSingleton<CompanySchemaVerificationCache>();
         services.AddScoped<CompanyDatabaseResolver>();
         services.AddScoped<ICompanyDatabaseContextFactory, CompanyDatabaseContextFactory>();
         services.AddSingleton<DummyPassword>();

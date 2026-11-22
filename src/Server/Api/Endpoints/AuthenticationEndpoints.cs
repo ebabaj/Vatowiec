@@ -1,3 +1,4 @@
+using Vatowiec.Api.Security;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
@@ -8,7 +9,7 @@ using Microsoft.Extensions.Options;
 using Vatowiec.Core.Infrastructure.Identity;
 using Vatowiec.Core.Infrastructure.Persistence;
 
-namespace Vatowiec.Api.Security;
+namespace Vatowiec.Api.Endpoints;
 
 public sealed record LoginRequest(string UserName, string Password);
 
@@ -74,7 +75,7 @@ public static class AuthenticationEndpoints
         {
             if (!await ValidCsrf(context, csrf)) return Results.BadRequest(new { code = "csrf_invalid" });
             var sessionId = Guid.Parse(context.User.FindFirstValue(ApiSecurity.SessionClaim)!);
-            var userId = Guid.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var userId = context.UserId();
             // Warunek jest także ochroną przed unieważnieniem cudzej sesji.
             await system.UserSessions.Where(x => x.Id == sessionId && x.UserId == userId && x.RevokedAtUtc == null)
                 .ExecuteUpdateAsync(update => update.SetProperty(x => x.RevokedAtUtc, clock.GetUtcNow()), context.RequestAborted);

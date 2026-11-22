@@ -1,3 +1,4 @@
+using Vatowiec.Core.Infrastructure.Contractors;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -10,7 +11,9 @@ using Vatowiec.Core.Application;
 using Vatowiec.Core.Infrastructure.Persistence;
 using Vatowiec.SharedContracts;
 
-namespace Vatowiec.Api.Security;
+using static Vatowiec.Api.Endpoints.EndpointResults;
+
+namespace Vatowiec.Api.Endpoints;
 
 public static class ContractorEndpoints
 {
@@ -30,7 +33,7 @@ public static class ContractorEndpoints
 
     private static Task<AuthorizedCompanyDatabase> Resolve(Guid companyId, HttpContext context,
         CompanyDatabaseResolver resolver, IWebHostEnvironment environment, bool edit = false) =>
-        resolver.Resolve(Guid.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!), companyId,
+        resolver.Resolve(context.UserId(), companyId,
             edit ? CompanyPermission.ViewContractors | CompanyPermission.EditContractors : CompanyPermission.ViewContractors,
             environment.IsDevelopment(), context.RequestAborted);
 
@@ -118,7 +121,7 @@ public static class ContractorEndpoints
         catch (AntiforgeryValidationException) { return Error(400, "csrf_invalid", "Nie udało się potwierdzić żądania."); }
         var errors = ContractorValidation.Validate(value);
         if (errors.Count > 0) return Results.Json(new { code = "validation_failed", errors }, statusCode: 400);
-        return Results.Ok(await identifiers.Check(db.Context, companyId, Guid.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!), value, context.RequestAborted));
+        return Results.Ok(await identifiers.Check(db.Context, companyId, context.UserId(), value, context.RequestAborted));
     }
 
     private static async Task<IResult> Write(Guid companyId, int? contractorId, ContractorWriteRequest value, HttpContext context,
@@ -146,7 +149,7 @@ public static class ContractorEndpoints
         }
         if (errors.Count != 0) return Results.Json(new { code = "validation_failed", errors }, statusCode: 400);
         var issuer = await system.InstallationIdentities.AsNoTracking().Select(x => x.Id).SingleOrDefaultAsync(context.RequestAborted);
-        var actor = Guid.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var actor = context.UserId();
         var actorName = context.User.Identity?.Name;
         if (issuer == Guid.Empty || string.IsNullOrWhiteSpace(actorName))
             return Error(503, "audit_identity_unavailable", "Brak identyfikacji wykonawcy lub instalacji. Zapis jest zablokowany.");
@@ -246,7 +249,6 @@ public static class ContractorEndpoints
         current = Response(row, companyId, canPesel)
     }, statusCode: 409);
 
-    private static IResult Error(int status, string code, string message) => Results.Json(new { code, message }, statusCode: status);
     private static string RequestSnapshot(Contractor row) => row.Regon != null || row.Krs != null || row.Bdo != null || row.Pesel != null
         ? Snapshot(row)
         // Preserve durable request hashes created before the additive schema change.

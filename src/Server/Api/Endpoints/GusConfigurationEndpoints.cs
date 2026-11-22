@@ -1,3 +1,4 @@
+using Vatowiec.Api.Security;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -8,7 +9,9 @@ using Vatowiec.Core.Infrastructure.Persistence;
 using Vatowiec.Core.Infrastructure.Registries;
 using Vatowiec.SharedContracts;
 
-namespace Vatowiec.Api.Security;
+using static Vatowiec.Api.Endpoints.EndpointResults;
+
+namespace Vatowiec.Api.Endpoints;
 
 public static class GusConfigurationEndpoints
 {
@@ -32,7 +35,6 @@ public static class GusConfigurationEndpoints
     }
     private static GusConfigurationResponse Status(GusConfiguration? row, string mode) =>
         new(row?.ProtectedApiKey != null, row == null ? null : Convert.ToBase64String(row.RowVersion), mode);
-    private static IResult Error(int status, string code, string message) => Results.Json(new { code, message }, statusCode: status);
     private static async Task<IResult> Write(string? key, string? version, bool delete, bool confirm, HttpContext http,
         SystemDbContext system, RegistrySettings settings, IAntiforgery csrf, IGusKeyProtector protector, ILoggerFactory logs)
     {

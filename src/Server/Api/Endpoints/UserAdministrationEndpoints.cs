@@ -1,3 +1,4 @@
+using Vatowiec.Api.Security;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
@@ -6,7 +7,7 @@ using Vatowiec.Core.Infrastructure.Persistence;
 using Vatowiec.SharedContracts;
 using System.Text.Json;
 
-namespace Vatowiec.Api.Security;
+namespace Vatowiec.Api.Endpoints;
 
 public static class UserAdministrationEndpoints
 {
@@ -40,25 +41,25 @@ public static class UserAdministrationEndpoints
                 x.PermissionsAfter == null ? null : UserAdministrationService.Codes(x.PermissionsAfter.Value), x.BlockedBefore, x.BlockedAfter, x.RelatedUserId)));
         });
         group.MapPost("", (UserCreateRequest value, HttpContext http, IAntiforgery csrf, UserAdministrationService service, CancellationToken ct) =>
-            Write(http, csrf, () => service.Create(Actor(http), Session(http), value, ct)));
+            Write(http, csrf, () => service.Create(http.UserId(), Session(http), value, ct)));
         group.MapPost("/{id:guid}/password-reset", (Guid id, UserVersionRequest value, HttpContext http, IAntiforgery csrf, UserAdministrationService service, CancellationToken ct) =>
-            Write(http, csrf, () => service.ResetPassword(Actor(http), Session(http), id, value, ct)));
+            Write(http, csrf, () => service.ResetPassword(http.UserId(), Session(http), id, value, ct)));
         group.MapPost("/{id:guid}/archive", (Guid id, UserVersionRequest value, HttpContext http, IAntiforgery csrf, UserAdministrationService service, CancellationToken ct) =>
-            Write(http, csrf, () => service.Archive(Actor(http), Session(http), id, value, ct)));
+            Write(http, csrf, () => service.Archive(http.UserId(), Session(http), id, value, ct)));
         group.MapPost("/{id:guid}/restore", (Guid id, UserVersionRequest value, HttpContext http, IAntiforgery csrf, UserAdministrationService service, CancellationToken ct) =>
-            Write(http, csrf, () => service.Restore(Actor(http), Session(http), id, value, false, ct)));
+            Write(http, csrf, () => service.Restore(http.UserId(), Session(http), id, value, false, ct)));
         group.MapPost("/{id:guid}/reuse-login", (Guid id, UserVersionRequest value, HttpContext http, IAntiforgery csrf, UserAdministrationService service, CancellationToken ct) =>
-            Write(http, csrf, () => service.Restore(Actor(http), Session(http), id, value, true, ct)));
+            Write(http, csrf, () => service.Restore(http.UserId(), Session(http), id, value, true, ct)));
         group.MapPut("/{id:guid}/state", (Guid id, UserBlockRequest value, HttpContext http, IAntiforgery csrf, UserAdministrationService service, CancellationToken ct) =>
-            Write(http, csrf, () => service.Block(Actor(http), Session(http), id, value, ct)));
+            Write(http, csrf, () => service.Block(http.UserId(), Session(http), id, value, ct)));
         group.MapPut("/{id:guid}/access", (Guid id, UserAccessRequest value, HttpContext http, IAntiforgery csrf, UserAdministrationService service, CancellationToken ct) =>
-            Write(http, csrf, () => service.SaveAccess(Actor(http), Session(http), id, value, ct)));
+            Write(http, csrf, () => service.SaveAccess(http.UserId(), Session(http), id, value, ct)));
         group.MapPut("/{id:guid}/administrator-role", (Guid id, AdministratorRoleRequest value, HttpContext http, IAntiforgery csrf, UserAdministrationService service, CancellationToken ct) =>
-            Write(http, csrf, () => service.ChangeAdministratorRole(Actor(http), Session(http), id, value, ct)));
+            Write(http, csrf, () => service.ChangeAdministratorRole(http.UserId(), Session(http), id, value, ct)));
         var policy = app.MapGroup("/api/v1/installation/security/password-policy").RequireAuthorization(InstallationAdministration.Policy);
         policy.MapGet("", (UserAdministrationService service, CancellationToken ct) => Execute(() => service.ReadPasswordPolicy(ct), passwordPolicy: true));
         policy.MapPut("", (PasswordPolicyRequest value, HttpContext http, IAntiforgery csrf, UserAdministrationService service, CancellationToken ct) =>
-            Write(http, csrf, () => service.SavePasswordPolicy(Actor(http), Session(http), value, ct), passwordPolicy: true));
+            Write(http, csrf, () => service.SavePasswordPolicy(http.UserId(), Session(http), value, ct), passwordPolicy: true));
         policy.MapGet("/history", async (int? offset, SystemDbContext db, CancellationToken ct) =>
         {
             if (offset is < 0 or > 1000000) return Results.BadRequest();
@@ -70,9 +71,8 @@ public static class UserAdministrationEndpoints
             }, passwordPolicy: true);
         });
         app.MapPost("/api/v1/auth/password", (OwnPasswordRequest value, HttpContext http, IAntiforgery csrf, UserAdministrationService service, CancellationToken ct) =>
-            Write(http, csrf, async () => { await service.ChangeOwnPassword(Actor(http), Session(http), value, ct); return new { changed = true }; })).RequireAuthorization().RequireRateLimiting("login");
+            Write(http, csrf, async () => { await service.ChangeOwnPassword(http.UserId(), Session(http), value, ct); return new { changed = true }; })).RequireAuthorization().RequireRateLimiting("login");
     }
-    private static Guid Actor(HttpContext http) => Guid.Parse(http.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     private static Guid Session(HttpContext http) => Guid.Parse(http.User.FindFirstValue(ApiSecurity.SessionClaim)!);
     private static async Task<IResult> Write<T>(HttpContext http, IAntiforgery csrf, Func<Task<T>> action, bool passwordPolicy = false)
     {

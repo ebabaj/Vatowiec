@@ -17,9 +17,9 @@ Historia nie jest automatycznie przepisywana, także przy edycji samej notatki.
   zależność i przypięta wersja.
 - `src/Desktop/ViewModels/MainViewModel.Details.cs`: wczytanie formatu UI,
   walidacja szkicu i zapis E.164 z ochroną niezmienionego telefonu.
-- `src/Server/Api/Security/ContractorDetailEndpoints.cs`: obowiązkowa kontrola
+- `src/Server/Api/Endpoints/ContractorDetailEndpoints.cs`: obowiązkowa kontrola
   API, porównanie historii z autorytatywną encją SQL po sprawdzeniu rowversion.
-- `src/Server/Api/Security/ContractorDetailMapping.cs`: zachowanie dokładnej
+- `src/Server/Api/Endpoints/ContractorDetailMapping.cs`: zachowanie dokładnej
   historycznej wartości telefonu, gdy nie została zmieniona.
 - `tests/Vatowiec.Tests/PhoneNumberTests.cs`: 37 przypadków jednostkowych.
 - `tests/Vatowiec.Tests/PhoneNumberSqlTests.cs`: rzeczywisty test SQL/API

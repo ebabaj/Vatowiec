@@ -1,3 +1,4 @@
+using Vatowiec.Core.Infrastructure.Contractors;
 using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Antiforgery;
@@ -7,7 +8,9 @@ using Vatowiec.Core.Domain;
 using Vatowiec.Core.Infrastructure.Persistence;
 using Vatowiec.SharedContracts;
 
-namespace Vatowiec.Api.Security;
+using static Vatowiec.Api.Endpoints.EndpointResults;
+
+namespace Vatowiec.Api.Endpoints;
 
 public static class ContractorFinanceEndpoints
 {
@@ -48,10 +51,8 @@ public static class ContractorFinanceEndpoints
         root.MapPut("/payment-methods/{code}", (Guid companyId, string code, PaymentMethodRequest value, HttpContext http, CompanyDatabaseResolver resolver, IWebHostEnvironment env, IAntiforgery csrf, SystemDbContext system, TimeProvider clock) =>
             Save(companyId, null, "PaymentMethod", null, 0, code, null, null, value, http, resolver, env, csrf, system, clock));
     }
-    private static Guid Actor(HttpContext http) => Guid.Parse(http.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     private static Task<AuthorizedCompanyDatabase> Resolve(Guid id, HttpContext http, CompanyDatabaseResolver resolver, IWebHostEnvironment env, bool edit) =>
-        resolver.Resolve(Actor(http), id, CompanyPermission.ViewContractors | (edit ? CompanyPermission.EditContractors : CompanyPermission.None), env.IsDevelopment(), http.RequestAborted);
-    private static IResult Error(int status, string code, string message) => Results.Json(new { code, message }, statusCode: status);
+        resolver.Resolve(http.UserId(), id, CompanyPermission.ViewContractors | (edit ? CompanyPermission.EditContractors : CompanyPermission.None), env.IsDevelopment(), http.RequestAborted);
     private static IResult Missing() => Error(404, "finance_not_found", "Nie znaleziono kontrahenta lub jego ustawień w tej firmie.");
     private static IResult Invalid(Dictionary<string, string[]> errors) => Results.Json(new { code = "validation_failed", errors }, statusCode: 400);
     private static object Response(object entity, Guid company) => entity switch
@@ -104,7 +105,7 @@ public static class ContractorFinanceEndpoints
         if (contractorId.HasValue && !await db.Contractors.AnyAsync(x => x.Id == contractorId, ct)) return Missing();
         var issuer = await system.InstallationIdentities.Select(x => x.Id).SingleOrDefaultAsync(ct);
         if (issuer == Guid.Empty || string.IsNullOrWhiteSpace(http.User.Identity?.Name)) return Error(503, "audit_identity_unavailable", "Brak trwałej identyfikacji wykonawcy.");
-        var actor = Actor(http);
+        var actor = http.UserId();
         var hash = IdentifierChecks.Hash(JsonSerializer.Serialize(new { contractorId, direction, id, methodRoute, terms, limit, method }));
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         async Task<object?> Find() => kind switch

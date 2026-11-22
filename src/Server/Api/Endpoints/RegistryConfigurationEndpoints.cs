@@ -1,3 +1,4 @@
+using Vatowiec.Api.Security;
 using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Antiforgery;
@@ -7,7 +8,9 @@ using Vatowiec.Core.Infrastructure.Persistence;
 using Vatowiec.Core.Infrastructure.Registries;
 using Vatowiec.SharedContracts;
 
-namespace Vatowiec.Api.Security;
+using static Vatowiec.Api.Endpoints.EndpointResults;
+
+namespace Vatowiec.Api.Endpoints;
 
 public static class RegistryConfigurationEndpoints
 {
@@ -22,7 +25,6 @@ public static class RegistryConfigurationEndpoints
         row.TestUrl, row.ProductionUrl, row.TestWl2Url, row.ProductionWl2Url, Convert.ToBase64String(row.RowVersion));
     private static string Snapshot(RegistryConfiguration row) => JsonSerializer.Serialize(new
     { row.Source, row.Environment, row.TestUrl, row.ProductionUrl, row.TestWl2Url, row.ProductionWl2Url });
-    private static IResult Error(int status, string code, string message) => Results.Json(new { code, message }, statusCode: status);
     private static async Task<IResult> Save(string source, RegistryConfigurationRequest value, HttpContext http,
         SystemDbContext system, IAntiforgery csrf, TimeProvider clock)
     {

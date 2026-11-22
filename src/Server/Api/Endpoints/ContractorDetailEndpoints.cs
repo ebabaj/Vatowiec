@@ -9,9 +9,11 @@ using Vatowiec.Core.Application;
 using Vatowiec.Core.Domain;
 using Vatowiec.Core.Infrastructure.Persistence;
 using Vatowiec.SharedContracts;
-using static Vatowiec.Api.Security.ContractorDetailMapping;
+using static Vatowiec.Api.Endpoints.ContractorDetailMapping;
 
-namespace Vatowiec.Api.Security;
+using static Vatowiec.Api.Endpoints.EndpointResults;
+
+namespace Vatowiec.Api.Endpoints;
 
 public static class ContractorDetailEndpoints
 {
@@ -63,10 +65,8 @@ public static class ContractorDetailEndpoints
         return Results.Ok(response);
     }
     private static Task<AuthorizedCompanyDatabase> Resolve(Guid id, HttpContext http, CompanyDatabaseResolver resolver,
-        IWebHostEnvironment env, bool edit) => resolver.Resolve(Actor(http), id,
+        IWebHostEnvironment env, bool edit) => resolver.Resolve(http.UserId(), id,
         CompanyPermission.ViewContractors | (edit ? CompanyPermission.EditContractors : CompanyPermission.None), env.IsDevelopment(), http.RequestAborted);
-    private static Guid Actor(HttpContext http) => Guid.Parse(http.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-    private static IResult Error(int status, string code, string message) => Results.Json(new { code, message }, statusCode: status);
     private static string Hash(string text) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
     private static async Task<bool> Csrf(IAntiforgery csrf, HttpContext http)
     { try { await csrf.ValidateRequestAsync(http); return true; } catch (AntiforgeryValidationException) { return false; } }
@@ -150,7 +150,7 @@ public static class ContractorDetailEndpoints
                 fingerprint,
                 companyId,
                 contractorId,
-                ActorId = Actor(http),
+                ActorId = http.UserId(),
                 issuer,
                 value.Id,
                 value.RowVersion,
@@ -159,7 +159,7 @@ public static class ContractorDetailEndpoints
             var warning = check?.RequiresWarning == true;
             if (!detailId.HasValue)
             {
-                var previous = await db.ContractorCreateOperations.SingleOrDefaultAsync(x => x.ActorId == Actor(http) && x.ActorIssuerId == issuer && x.OperationKind == Type(kind) && x.OperationId == value.OperationId);
+                var previous = await db.ContractorCreateOperations.SingleOrDefaultAsync(x => x.ActorId == http.UserId() && x.ActorIssuerId == issuer && x.OperationKind == Type(kind) && x.OperationId == value.OperationId);
                 if (previous is not null) return previous.RequestHash == fingerprint ? Results.Content(previous.ResponseJson, "application/json", statusCode: 200)
                     : Error(409, "operation_payload_mismatch", "Ta operacja została już zapisana z innymi danymi. Odśwież listę.");
             }
@@ -195,11 +195,11 @@ public static class ContractorDetailEndpoints
             await db.SaveChangesAsync();
             changes.Add((entity, before));
             foreach (var change in changes)
-                db.ContractorChanges.Add(new ContractorChange(contractorId, Actor(http), issuer, http.User.Identity!.Name!, clock.GetUtcNow(), http.TraceIdentifier,
+                db.ContractorChanges.Add(new ContractorChange(contractorId, http.UserId(), issuer, http.User.Identity!.Name!, clock.GetUtcNow(), http.TraceIdentifier,
                     change.Before, Snapshot(change.Entity), Type(kind), Id(change.Entity), warning && ReferenceEquals(change.Entity, entity)
                         ? JsonSerializer.Serialize(new { Rule = check!.RuleVersion, Message = check.Message, check.Status, check.Code, check.NormalizedNumber, check.IsPolishNrb, Accepted = true, warningHash }) : null));
             var response = Response(entity, kind, companyId, contractorId, validator);
-            if (!detailId.HasValue) db.ContractorCreateOperations.Add(new ContractorCreateOperation(value.OperationId!.Value, Actor(http), issuer, fingerprint, contractorId, JsonSerializer.Serialize(response, Json), Type(kind)));
+            if (!detailId.HasValue) db.ContractorCreateOperations.Add(new ContractorCreateOperation(value.OperationId!.Value, http.UserId(), issuer, fingerprint, contractorId, JsonSerializer.Serialize(response, Json), Type(kind)));
             await db.SaveChangesAsync();
             await transaction.CommitAsync();
             return detailId.HasValue ? Results.Ok(response) : Results.Created($"/api/v1/companies/{companyId}/contractors/{contractorId}/{kind}/{response.Id}", response);
@@ -233,16 +233,16 @@ public static class ContractorDetailEndpoints
         {
             await CompanyWriteLock.Acquire(db, "ContractorDetails");
             var hash = Hash(value.Name.Trim());
-            var previous = await db.ContractorCreateOperations.SingleOrDefaultAsync(x => x.ActorId == Actor(http) && x.ActorIssuerId == issuer && x.OperationKind == "AddressType" && x.OperationId == value.OperationId);
+            var previous = await db.ContractorCreateOperations.SingleOrDefaultAsync(x => x.ActorId == http.UserId() && x.ActorIssuerId == issuer && x.OperationKind == "AddressType" && x.OperationId == value.OperationId);
             if (previous is not null) return previous.RequestHash == hash ? Results.Content(previous.ResponseJson, "application/json", statusCode: 200) : Error(409, "operation_payload_mismatch", "Ta operacja ma inny zapisany wynik.");
             if (await db.AddressTypes.AnyAsync(x => x.Name == value.Name.Trim())) return Error(409, "address_type_exists", "Taki rodzaj adresu już istnieje. Wybierz go z listy.");
             var row = new AddressType(value.Name);
             db.AddressTypes.Add(row);
             await db.SaveChangesAsync();
             var result = new AddressTypeResponse(row.Id, row.Name);
-            db.ContractorChanges.Add(new ContractorChange(null, Actor(http), issuer, http.User.Identity!.Name!, clock.GetUtcNow(), http.TraceIdentifier,
+            db.ContractorChanges.Add(new ContractorChange(null, http.UserId(), issuer, http.User.Identity!.Name!, clock.GetUtcNow(), http.TraceIdentifier,
                 null, JsonSerializer.Serialize(result), "AddressType", row.Id));
-            db.ContractorCreateOperations.Add(new ContractorCreateOperation(value.OperationId, Actor(http), issuer, hash, null, JsonSerializer.Serialize(result, Json), "AddressType"));
+            db.ContractorCreateOperations.Add(new ContractorCreateOperation(value.OperationId, http.UserId(), issuer, hash, null, JsonSerializer.Serialize(result, Json), "AddressType"));
             await db.SaveChangesAsync();
             await transaction.CommitAsync();
             return Results.Created($"/api/v1/companies/{companyId}/address-types/{row.Id}", result);

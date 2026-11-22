@@ -3,7 +3,7 @@ using Vatowiec.Core.Domain;
 using Vatowiec.Core.Application;
 using Vatowiec.SharedContracts;
 
-namespace Vatowiec.Api.Security;
+namespace Vatowiec.Api.Endpoints;
 
 internal static class ContractorDetailMapping
 {

@@ -7,7 +7,9 @@ using Vatowiec.Core.Infrastructure.Registries;
 using Vatowiec.Core.Infrastructure.Persistence;
 using Vatowiec.SharedContracts;
 
-namespace Vatowiec.Api.Security;
+using static Vatowiec.Api.Endpoints.EndpointResults;
+
+namespace Vatowiec.Api.Endpoints;
 
 public static class DataPortEndpoints
 {
@@ -16,14 +18,12 @@ public static class DataPortEndpoints
         var group = companies.MapGroup("/{companyId:guid}/integrations/dataport").AddEndpointFilter(CompanyEndpoints.ValidateCompanySource);
         group.MapGet("", async (Guid companyId, HttpContext http, CompanyDatabaseResolver resolver, IWebHostEnvironment env) =>
         {
-            await using var access = await resolver.Resolve(Actor(http), companyId, CompanyPermission.ViewProfile, env.IsDevelopment(), http.RequestAborted);
+            await using var access = await resolver.Resolve(http.UserId(), companyId, CompanyPermission.ViewProfile, env.IsDevelopment(), http.RequestAborted);
             return Results.Ok(Status(companyId, await access.Context.DataPortConfigurations.AsNoTracking().SingleOrDefaultAsync(http.RequestAborted)));
         });
         group.MapPut("", Save);
         group.MapDelete("", Delete);
     }
-    private static Guid Actor(HttpContext http) => Guid.Parse(http.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-    private static IResult Error(int status, string code, string message) => Results.Json(new { code, message }, statusCode: status);
     private static DataPortConfigurationResponse Status(Guid company, DataPortConfiguration? row) =>
         new(company, row?.ProtectedApiKey != null, row == null ? null : Convert.ToBase64String(row.RowVersion));
 
@@ -37,7 +37,7 @@ public static class DataPortEndpoints
     private static async Task<IResult> Write(Guid companyId, string? key, string? expectedVersion, bool delete,
         HttpContext http, CompanyDatabaseResolver resolver, IWebHostEnvironment env, IAntiforgery csrf, IDataPortKeyProtector protector, bool confirmed = true)
     {
-        await using var access = await resolver.Resolve(Actor(http), companyId,
+        await using var access = await resolver.Resolve(http.UserId(), companyId,
             CompanyPermission.ViewProfile | CompanyPermission.ManageCompanyIntegrations, env.IsDevelopment(), http.RequestAborted);
         try { await csrf.ValidateRequestAsync(http); }
         catch (AntiforgeryValidationException) { return Error(400, "csrf_invalid", "Nie udało się potwierdzić żądania."); }
