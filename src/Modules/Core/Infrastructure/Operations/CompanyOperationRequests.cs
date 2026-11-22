@@ -18,7 +18,7 @@ public sealed class CompanyOperationException(int status, string code, string me
 public sealed record OperationRequester(Guid UserId, string Name);
 
 // ADR-044: API tylko zapisuje zlecenie i jego audyt. Bazę tworzy osobny proces z tożsamością DDL.
-public sealed class CompanyOperationRequests(SystemDbContext db, TimeProvider clock)
+public sealed partial class CompanyOperationRequests(SystemDbContext db, TimeProvider clock)
 {
     // databaseExists: odczyt sys.databases na serwerze docelowym (bez DDL). Null = bez kontroli fizycznej.
     public async Task<(CompanyOperation Operation, bool Created)> RequestProvision(OperationRequester requester,

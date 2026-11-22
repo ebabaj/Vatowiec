@@ -67,6 +67,17 @@ Weryfikacja: build 0/0; 610 zaliczonych, 0 błędów, 109 pominiętych; formatow
 po testach brak baz, plików i wierszy testowych. Kopia Tenjin zlecona przez właściciela
 z aplikacji zakończyła się poprawnie (plik i manifest w katalogu kopii).
 
+Zadanie 2026-11-22 (ADR-044 krok 3 — odtwarzanie; ADR-045 uzupełnienia, bez Commit i Push):
+operacja `Restore` (baza robocza, CHECKDB, migracja starszego schematu, przełączenie nazw,
+kopia `PreRestore`, dotychczasowa baza `…_przed_…`), przywrócenie usuniętej firmy i
+przeniesienie z `_import` (`BackupImportScanner`, `ops.RestoreImportFiles`), migracja
+`CompanyRestore` (wykonana `migrate-system`), sekcja „Odtwarzanie z kopii” w Avalonia.
+ADR-045: 10 minut zwłoki przy usuwaniu bez archiwum (tylko dokumentacja techniczna),
+archiwum historii `.history.json`, dezaktywacja przy przyjęciu zlecenia.
+Weryfikacja: build 0/0; 616 zaliczonych, 0 błędów, 109 pominiętych; formatowanie bez uwag;
+po testach brak baz, plików i wierszy testowych. Do formalnego zamknięcia M0: pełny runner
+SQL (preflight `DatabaseTools` do aktualizacji) i próba dwóch operatorów z właścicielem.
+
 ## Archiwum: naprawa zakładki Finansowe
 
 2026-10-23. Ukończone. BEZ Commit i Push.

@@ -102,7 +102,16 @@ znacznikiem własnej operacji (lub puste bazy utworzone przez ten sam test).
   `….history.json` obok kopii; firma jest dezaktywowana już przy przyjęciu zlecenia.
   Usunięcie **bez** archiwum ma ukryte 10-minutowe opóźnienie wykonania (czas na
   „Anuluj usuwanie”) — **nie opisuj go w instrukcji użytkownika ani w interfejsie**
-  i nie usuwaj jako „błędu”.
+  i nie usuwaj jako „błędu”. W dokumentacji technicznej (ADR, AGENTS, docs techniczne)
+  informacja ma pozostać.
+- Odtwarzanie (ADR-044 krok 3, decyzje 2026-11-22): istniejąca firma — odtworzona baza
+  przejmuje właściwą nazwę, dotychczasowa zostaje jako `…_przed_{data}` plus kopia `.bak`;
+  starsze kopie są automatycznie migrowane w bazie roboczej, nowsze/nieznane odrzucane;
+  źródła: rejestr kopii, archiwa usuniętych firm i pliki z manifestem w `{BackupRoot}\_import`
+  (nieznany CompanyId = przeniesienie jako nowa firma); historia usuniętej firmy zostaje
+  w `.history.json`, nie jest wczytywana. **Wdrożone 2026-11-22**
+  ([docs/company-restore.md](docs/company-restore.md)); usunięcie firmy usuwa także jej
+  bazy `…_przed_…` i `…_odtwarzanie_…` (po potwierdzeniu profilu firmy).
 - Kopie: plik tworzy wyłącznie usługa Operations w `Operations:BackupRoot` (zapis dla konta
   usługi SQL, odczyt/usuwanie dla usługi). Rotacja usuwa tylko pliki z `ops.CompanyBackups`
   potwierdzone manifestem; obcych plików nie dotyka. Developerski katalog:

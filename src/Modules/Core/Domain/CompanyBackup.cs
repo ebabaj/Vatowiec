@@ -6,11 +6,12 @@ namespace Vatowiec.Core.Domain;
 public sealed class CompanyBackup
 {
     public const string RegularKind = "Regular";
+    public const string PreRestoreKind = "PreRestore";
 
     private CompanyBackup() { }
 
     public CompanyBackup(Guid companyId, Guid operationId, string fileName, long sizeBytes, string sha256,
-        DateTimeOffset createdAtUtc, bool isAutomatic, string requestedByName)
+        DateTimeOffset createdAtUtc, bool isAutomatic, string requestedByName, string kind = RegularKind)
     {
         CompanyId = EntityText.Id(companyId, nameof(companyId));
         OperationId = EntityText.Id(operationId, nameof(operationId));
@@ -21,7 +22,7 @@ public sealed class CompanyBackup
         CreatedAtUtc = createdAtUtc;
         IsAutomatic = isAutomatic;
         RequestedByName = EntityText.Required(requestedByName, 256, nameof(requestedByName));
-        Kind = RegularKind;
+        Kind = kind is RegularKind or PreRestoreKind ? kind : throw new ArgumentException("Nieznany rodzaj kopii.", nameof(kind));
     }
 
     public long Id { get; private set; }

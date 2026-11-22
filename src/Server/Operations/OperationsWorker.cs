@@ -20,6 +20,7 @@ public sealed class OperationsWorker(IServiceScopeFactory scopes, IConfiguration
                 {
                     await using var scheduleScope = scopes.CreateAsyncScope();
                     await scheduleScope.ServiceProvider.GetRequiredService<BackupScheduler>().EnqueueDue(stoppingToken);
+                    await scheduleScope.ServiceProvider.GetRequiredService<BackupImportScanner>().Scan(stoppingToken);
                     nextSchedule = clock.GetUtcNow() + scheduleEvery;
                 }
                 await using var scope = scopes.CreateAsyncScope();

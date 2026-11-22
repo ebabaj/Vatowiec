@@ -12,7 +12,7 @@ internal sealed class CompanyBackupConfiguration : IEntityTypeConfiguration<Comp
     {
         builder.ToTable("CompanyBackups", "ops", table =>
         {
-            table.HasCheckConstraint("CK_CompanyBackups_Kind", "[Kind] IN (N'Regular')");
+            table.HasCheckConstraint("CK_CompanyBackups_Kind", "[Kind] IN (N'Regular', N'PreRestore')");
             table.HasCheckConstraint("CK_CompanyBackups_Size", "[SizeBytes] > 0");
             table.HasCheckConstraint("CK_CompanyBackups_Removed",
                 "([RemovedAtUtc] IS NULL AND [RemovedReason] IS NULL) OR ([RemovedAtUtc] IS NOT NULL AND [RemovedReason] IS NOT NULL)");
@@ -82,5 +82,17 @@ internal sealed class BackupReminderSnoozeConfiguration : IEntityTypeConfigurati
         builder.HasKey(x => new { x.UserId, x.CompanyId });
         builder.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         builder.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.NoAction);
+    }
+}
+
+internal sealed class RestoreImportFileConfiguration : IEntityTypeConfiguration<RestoreImportFile>
+{
+    public void Configure(EntityTypeBuilder<RestoreImportFile> builder)
+    {
+        builder.ToTable("RestoreImportFiles", "ops", table => table.HasCheckConstraint("CK_RestoreImportFiles_Size", "[SizeBytes] > 0"));
+        builder.HasKey(x => x.FileName);
+        builder.Property(x => x.FileName).HasMaxLength(260);
+        builder.Property(x => x.CompanyName).HasMaxLength(256).IsRequired();
+        builder.Property(x => x.Sha256).HasMaxLength(64).IsUnicode(false).IsFixedLength().IsRequired();
     }
 }

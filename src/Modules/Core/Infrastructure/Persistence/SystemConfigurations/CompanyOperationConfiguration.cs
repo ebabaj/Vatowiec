@@ -11,17 +11,21 @@ internal sealed class CompanyOperationConfiguration : IEntityTypeConfiguration<C
     {
         builder.ToTable("CompanyOperations", "ops", table =>
         {
-            table.HasCheckConstraint("CK_CompanyOperations_Kind", "[Kind] IN (N'Provision', N'Backup', N'Delete')");
+            table.HasCheckConstraint("CK_CompanyOperations_Kind", "[Kind] IN (N'Provision', N'Backup', N'Delete', N'Restore')");
             table.HasCheckConstraint("CK_CompanyOperations_Stage",
-                "[Stage] IN (N'Requested', N'DatabaseCreated', N'SchemaApplied', N'ProfileInitialized', N'BackupWritten', N'BackupVerified', N'CompanyDeactivated', N'ArchiveWritten', N'ArchiveVerified', N'DatabaseDropped', N'Ready')");
+                "[Stage] IN (N'Requested', N'DatabaseCreated', N'SchemaApplied', N'ProfileInitialized', N'BackupWritten', N'BackupVerified', N'CompanyDeactivated', N'ArchiveWritten', N'ArchiveVerified', N'DatabaseDropped', N'DatabaseRestored', N'RestoreVerified', N'SchemaUpgraded', N'Switched', N'Ready')");
             table.HasCheckConstraint("CK_CompanyOperations_Requester",
                 "[Kind] = N'Backup' OR [RequestedById] IS NOT NULL");
             table.HasCheckConstraint("CK_CompanyOperations_BackupFile",
-                "([Kind] = N'Backup' AND [BackupFileName] IS NOT NULL) OR ([Kind] = N'Provision' AND [BackupFileName] IS NULL) OR " +
+                "([Kind] IN (N'Backup', N'Restore') AND [BackupFileName] IS NOT NULL) OR ([Kind] = N'Provision' AND [BackupFileName] IS NULL) OR " +
                 "([Kind] = N'Delete' AND [CreateArchive] IS NOT NULL AND (([CreateArchive] = 1 AND [BackupFileName] IS NOT NULL) OR ([CreateArchive] = 0 AND [BackupFileName] IS NULL)))");
             table.HasCheckConstraint("CK_CompanyOperations_Status",
                 "[Status] IN (N'Pending', N'Running', N'Failed', N'NeedsReconciliation', N'Completed', N'Cancelled')");
             table.HasCheckConstraint("CK_CompanyOperations_Attempt", "[Attempt] >= 0");
+            table.HasCheckConstraint("CK_CompanyOperations_Restore",
+                "([Kind] = N'Restore' AND [RestoreMode] IN (N'Existing', N'Deleted', N'Import') AND [WorkingDatabaseName] IS NOT NULL AND " +
+                "(([RestoreMode] = N'Existing' AND [PreviousDatabaseName] IS NOT NULL) OR ([RestoreMode] <> N'Existing' AND [PreviousDatabaseName] IS NULL))) OR " +
+                "([Kind] <> N'Restore' AND [RestoreMode] IS NULL AND [WorkingDatabaseName] IS NULL AND [PreviousDatabaseName] IS NULL)");
             table.HasCheckConstraint("CK_CompanyOperations_Lease",
                 "([Status] = N'Running' AND [LeaseOwner] IS NOT NULL AND [LeaseExpiresAtUtc] IS NOT NULL) OR ([Status] <> N'Running' AND [LeaseOwner] IS NULL AND [LeaseExpiresAtUtc] IS NULL)");
             table.HasCheckConstraint("CK_CompanyOperations_Completed",
@@ -41,6 +45,9 @@ internal sealed class CompanyOperationConfiguration : IEntityTypeConfiguration<C
         builder.Property(x => x.LastErrorCode).HasMaxLength(64);
         builder.Property(x => x.LeaseOwner).HasMaxLength(128);
         builder.Property(x => x.BackupFileName).HasMaxLength(260);
+        builder.Property(x => x.RestoreMode).HasMaxLength(16);
+        builder.Property(x => x.WorkingDatabaseName).HasMaxLength(128);
+        builder.Property(x => x.PreviousDatabaseName).HasMaxLength(128);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.Ignore(x => x.IsFinished);
         builder.Ignore(x => x.CanRetry);
@@ -55,6 +62,9 @@ internal sealed class CompanyOperationConfiguration : IEntityTypeConfiguration<C
         // ADR-045: najwyżej jedno nieanulowane usuwanie firmy (operacja zakończona znika razem z firmą).
         builder.HasIndex(x => x.CompanyId, "IX_CompanyOperations_ActiveDelete").IsUnique()
             .HasFilter("[Kind] = N'Delete' AND [Status] <> N'Cancelled'");
+        // Najwyżej jedno niezakończone odtworzenie danej firmy.
+        builder.HasIndex(x => x.CompanyId, "IX_CompanyOperations_ActiveRestore").IsUnique()
+            .HasFilter("[Kind] = N'Restore' AND [Status] IN (N'Pending', N'Running', N'Failed', N'NeedsReconciliation')");
         builder.HasIndex(x => new { x.Status, x.NextAttemptAtUtc });
     }
 }

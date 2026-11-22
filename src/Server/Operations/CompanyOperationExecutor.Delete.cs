@@ -72,6 +72,7 @@ public sealed partial class CompanyOperationExecutor
             logger.LogInformation("Company operation {OperationId} dropped the company database", operation.Id);
         }
         await Checkpoint(operation, CompanyOperationStages.DatabaseDropped, ct);
+        await DropPreviousDatabases(operation, ct);
 
         // Zwykłe kopie firmy są danymi klienta: usuwamy pliki potwierdzone manifestem. Archiwum zostaje.
         foreach (var backup in await system.CompanyBackups.AsNoTracking().Where(x => x.CompanyId == operation.CompanyId && x.RemovedAtUtc == null).ToArrayAsync(ct))
@@ -82,6 +83,40 @@ public sealed partial class CompanyOperationExecutor
         if (archivePath is not null) (archiveSize, archiveSha) = await Hash(archivePath, ct);
         await Renew(operation, Lease, ct); // Potwierdza dzierżawę tuż przed czyszczeniem.
         await Purge(operation, nip, regon, archivePath, archiveSize, archiveSha, ct);
+    }
+
+    // Bazy pozostawione przez odtworzenie (…_przed_…, niedokończone …_odtwarzanie_…) są danymi tej samej firmy.
+    // Usuwane wyłącznie, gdy ich profil potwierdza CompanyId usuwanej firmy.
+    private async Task DropPreviousDatabases(CompanyOperation operation, CancellationToken ct)
+    {
+        var prefix = operation.DatabaseName[..Math.Min(operation.DatabaseName.Length, 90)];
+        var candidates = new List<string>();
+        await using (var master = new SqlConnection(connections.Master(operation)))
+        {
+            await master.OpenAsync(ct);
+            await using var list = new SqlCommand("""
+                SELECT name FROM sys.databases
+                WHERE LEFT(name, LEN(@prefix)) = @prefix AND (name LIKE N'%[_]przed[_]%' OR name LIKE N'%[_]odtwarzanie[_]%')
+                """, master);
+            list.Parameters.AddWithValue("@prefix", prefix);
+            await using var reader = await list.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct)) candidates.Add(reader.GetString(0));
+        }
+        foreach (var database in candidates.Where(CompanyDatabaseNames.IsProjectDatabase))
+        {
+            await using (var company = CompanyContextFor(operation, database))
+            {
+                var profile = await company.CompanyProfiles.IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(ct);
+                if (profile?.CompanyId != operation.CompanyId) continue;
+            }
+            SqlConnection.ClearAllPools();
+            await using var master = new SqlConnection(connections.Master(operation));
+            await master.OpenAsync(ct);
+            await using var drop = new SqlCommand($"ALTER DATABASE [{database}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{database}];", master)
+            { CommandTimeout = 300 };
+            await drop.ExecuteNonQueryAsync(ct);
+            logger.LogInformation("Company operation {OperationId} dropped a previous database of the company", operation.Id);
+        }
     }
 
     public const string HistoryFormat = "vatowiec-company-history-v1";

@@ -33,9 +33,10 @@ Nie jest to jeszcze program do prowadzenia księgowości.
 [Tworzenie firmy z aplikacji](docs/company-provisioning.md) (ADR-044 krok 1) wykonuje
 osobna usługa VATowiec Operations — uruchom ją obok API. Ta sama usługa wykonuje
 [kopie zapasowe firm](docs/company-backups.md) z rotacją i harmonogramem (krok 2).
-[Usuwanie firmy](docs/company-deletion.md) z kopią archiwalną (ADR-045) również wykonuje usługa.
-Do zamknięcia M0 pozostaje odtworzenie istniejącej i usuniętej firmy
-([ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md), krok 3).
+[Usuwanie firmy](docs/company-deletion.md) z kopią archiwalną (ADR-045) i
+[odtwarzanie firmy z kopii](docs/company-restore.md) (ADR-044 krok 3) również wykonuje usługa.
+Wszystkie funkcje M0 są wdrożone; do formalnego zamknięcia pozostaje pełny przebieg SQL
+i próba dwóch operatorów na dwóch stanowiskach.
 Stan i dowody: [SPECYFIKACJA.md §13](SPECYFIKACJA.md#m0--repozytorium-i-architektura).
 
 Standardowe warunki finansowe kontrahenta (ADR-031):
@@ -322,8 +323,8 @@ kontrakt HTTP: [logowanie](docs/authentication.md).
 
 ## Dalsze kroki
 
-Do zamknięcia M0 pozostaje odtworzenie istniejącej i usuniętej firmy
-([ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md), krok 3).
+Do formalnego zamknięcia M0 pozostaje pełny przebieg SQL (aktualizacja runnera
+`DatabaseTools test`) i próba dwóch operatorów na dwóch stanowiskach.
 Następnie M1: dokumenty, faktury i audyt księgowy. Narzędzie
 wdrożeniowe `DatabaseTools` działa poza API. Nie przeniesiono danych z usuniętej Vatowiec_Dev.
 

@@ -25,6 +25,7 @@ public static class OperationsProgram
         builder.Services.AddSingleton<BackupStorage>();
         builder.Services.AddScoped<Vatowiec.Core.Infrastructure.Operations.CompanyBackupService>();
         builder.Services.AddScoped<BackupScheduler>();
+        builder.Services.AddScoped<BackupImportScanner>();
         builder.Services.AddScoped<CompanyOperationExecutor>();
         builder.Services.AddHostedService<OperationsWorker>();
 

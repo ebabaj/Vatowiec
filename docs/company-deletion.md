@@ -30,6 +30,8 @@ Przywrócenie usuniętej firmy z kopii archiwalnej to ADR-044 krok 3 (jeszcze ni
 - **DatabaseDropped** — tylko gdy rejestracja i profil bazy potwierdzają tę firmę:
   `SINGLE_USER WITH ROLLBACK IMMEDIATE` i `DROP DATABASE`.
 - Pliki zwykłych kopii firmy są usuwane (wyłącznie potwierdzone manifestem).
+- Bazy pozostawione przez odtworzenie (`…_przed_…`, niedokończone `…_odtwarzanie_…`) są
+  usuwane, gdy ich profil potwierdza usuwaną firmę.
 - **Czyszczenie** — jedna transakcja System usuwa: harmonogram, odłożone przypomnienia,
   historię ustawień kopii, wpisy historii administracji użytkownikami dotyczące firmy,
   `CompanyAccess`, rejestr kopii, historię i zlecenia operacji (również bieżące),

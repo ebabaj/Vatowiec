@@ -267,7 +267,28 @@ Rozstrzygnięcia techniczne: brak wiersza harmonogramu = ustawienia domyślne; p
 `{BackupRoot}\{baza}\`; wykonawca obsługuje oba rodzaje operacji jedną kolejką
 (`CompanyOperationExecutor`). Instrukcja: [docs/company-backups.md](../company-backups.md).
 
-Krok 3 (odtworzenie) — do wykonania; przed nim usuwanie firmy wg ADR-045.
+Krok 3 (odtworzenie) — decyzje właściciela 2026-11-22 (quiz):
+
+1. **Odtworzenie istniejącej firmy:** odtworzona baza dostaje właściwą nazwę (np.
+   `Vatowiec_Tenjin`), dotychczasowa zostaje obok pod nazwą `…_przed_{data}` (bez
+   automatycznego usuwania) i dodatkowo powstaje kopia bezpieczeństwa `.bak`.
+2. **Starsza wersja schematu:** po odtworzeniu do bazy roboczej usługa wykonuje brakujące
+   migracje i dopiero potem przełącza. Kopia nowsza niż program lub o nieznanej historii — odmowa.
+3. **Źródła:** kopie z rejestru instalacji (zwykłe i archiwa usuniętych firm) **oraz** pliki
+   `.bak` z manifestem VATowca umieszczone w podkatalogu `_import` katalogu kopii (np. z innej
+   instalacji). Identyfikator firmy z manifestu decyduje: istniejąca → odtworzenie, usunięta →
+   przywrócenie, nieznana → przeniesienie jako nowa firma z zachowanym identyfikatorem.
+4. **Historia usuniętej firmy** (`.history.json`) zostaje w pliku do wglądu; nie jest wczytywana
+   z powrotem. Prawa użytkowników nadaje się od nowa (przywracający dostaje pełne prawa).
+
+**Krok 3 — odtworzenie: wdrożony 2026-11-22.** Migracja System `CompanyRestore`, etapy
+`DatabaseRestored → RestoreVerified → SchemaUpgraded → Switched → Ready`, skaner `_import`,
+sekcja „Odtwarzanie z kopii” w Avalonia. Spełnione kryteria 8, 9 i 11 (testy
+`CompanyRestoreTests`, `CompanyRestoreSqlTests`). Rozstrzygnięcia techniczne: znacznik
+`Vatowiec.RestoreOperationId` (nadpisywany przy odtwarzaniu kopii odtworzonej bazy),
+kopia bezpieczeństwa jako rodzaj `PreRestore` w rejestrze kopii (2 ostatnie), usunięcie
+firmy usuwa też jej bazy `…_przed_…`/`…_odtwarzanie_…` po potwierdzeniu profilu, pliki
+`_import` ograniczone do tego podkatalogu. Instrukcja: [docs/company-restore.md](../company-restore.md).
 
 ## Pytania do właściciela
 

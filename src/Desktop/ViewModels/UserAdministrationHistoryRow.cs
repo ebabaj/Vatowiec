@@ -20,6 +20,7 @@ public sealed class UserAdministrationHistoryRow(UserAdministrationHistory value
         "ActivateUser" => "Aktywowanie konta",
         "ChangeCompanyAccess" => "Zmiana dostępu do firmy",
         "CompanyCreatorAccessGranted" => "Pełne prawa twórcy nowej firmy",
+        "CompanyRestorerAccessGranted" => "Pełne prawa osoby przywracającej firmę",
         "ArchiveUser" => "Usunięcie logiczne użytkownika",
         "RestoreSameUser" => "Przywrócenie tej samej osoby",
         "ReleaseArchivedLogin" => "Zwolnienie loginu dla nowej osoby",

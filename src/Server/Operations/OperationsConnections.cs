@@ -23,12 +23,15 @@ public sealed class OperationsConnections(IConfiguration configuration, IHostEnv
         return connection.ConnectionString;
     }
 
-    public string Company(CompanyOperation operation)
+    public string Company(CompanyOperation operation) => Database(operation, operation.DatabaseName);
+
+    // Konkretna baza na serwerze operacji (np. robocza baza odtworzenia), zawsze przez politykę połączeń.
+    public string Database(CompanyOperation operation, string database)
     {
-        if (!CompanyDatabaseNames.IsSafeIdentifier(operation.DatabaseName))
+        if (!CompanyDatabaseNames.IsSafeIdentifier(database))
             throw new OperationFailure("database_name_invalid", reconcile: true);
         var connection = Build(operation);
-        connection.InitialCatalog = operation.DatabaseName;
+        connection.InitialCatalog = database;
         try { DatabaseConnectionPolicy.ValidateCompany(connection.ConnectionString, environment.IsDevelopment()); }
         catch (InvalidOperationException) { throw new OperationFailure("server_profile_policy", reconcile: false); }
         return connection.ConnectionString;

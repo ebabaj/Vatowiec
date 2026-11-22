@@ -81,6 +81,8 @@ public interface IVatowiecApiClient : IDisposable
     Task<DeletedCompanyResponse[]> DeletedCompanies() => throw new NotSupportedException();
     Task<CompanyOperationResponse> DeleteCompany(DeleteCompanyRequest value) => throw new NotSupportedException();
     Task<CompanyOperationResponse> CancelCompanyOperation(Guid operationId, CompanyOperationRetryRequest value) => throw new NotSupportedException();
+    Task<RestoreSourceResponse[]> RestoreSources() => throw new NotSupportedException();
+    Task<CompanyOperationResponse> RestoreCompany(RestoreCompanyRequest value) => throw new NotSupportedException();
 }
 
 public sealed class ApiException(int statusCode, string message) : Exception(message)
@@ -192,6 +194,9 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
     public Task<DeletedCompanyResponse[]> DeletedCompanies() => Get<DeletedCompanyResponse[]>("api/v1/installation/deleted-companies");
     public Task<CompanyOperationResponse> DeleteCompany(DeleteCompanyRequest value) =>
         Post<CompanyOperationResponse>("api/v1/installation/company-operations/delete", value);
+    public Task<RestoreSourceResponse[]> RestoreSources() => Get<RestoreSourceResponse[]>("api/v1/installation/restore-sources");
+    public Task<CompanyOperationResponse> RestoreCompany(RestoreCompanyRequest value) =>
+        Post<CompanyOperationResponse>("api/v1/installation/company-operations/restore", value);
     public Task<CompanyOperationResponse> CancelCompanyOperation(Guid operationId, CompanyOperationRetryRequest value) =>
         Post<CompanyOperationResponse>($"api/v1/installation/company-operations/{operationId}/cancel", value);
     public Task<RegistryConfigurationResponse[]> RegistryConfigurations() => Get<RegistryConfigurationResponse[]>("api/v1/installation/integrations/registries");

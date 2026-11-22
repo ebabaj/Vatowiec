@@ -10,6 +10,13 @@ public sealed record DeleteCompanyRequest(Guid OperationKey, Guid CompanyId, boo
 
 public sealed record InstallationCompanyResponse(Guid CompanyId, string Name, string DatabaseName, bool IsActive);
 
+// ADR-044 krok 3: źródła odtworzenia (Source: Backup, Deleted, Import) i zlecenie.
+public sealed record RestoreSourceResponse(string Source, long? BackupId, Guid CompanyId, string CompanyName, string? FileName,
+    DateTimeOffset CreatedAtUtc, long SizeBytes, string Kind, bool CompanyExists);
+
+public sealed record RestoreCompanyRequest(Guid OperationKey, string Source, long? BackupId, Guid? CompanyId, string? ImportFileName,
+    bool ConfirmReplace, string? ConnectionProfileKey = null);
+
 public sealed record DeletedCompanyResponse(Guid CompanyId, string CompanyName, string? Nip, string? Regon,
     DateTimeOffset DeletedAtUtc, string DeletedByName, bool HasArchive);
 

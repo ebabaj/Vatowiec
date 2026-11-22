@@ -47,6 +47,24 @@ public static class CompanyOperationEndpoints
             catch (CompanyOperationException error) { return Error(error.Status, error.Code, error.Message); }
         });
 
+        group.MapPost("/restore", async (RestoreCompanyRequest value, HttpContext http, IAntiforgery csrf, CompanyOperationRequests requests,
+            IConfiguration configuration) =>
+        {
+            if (!await ValidCsrf(csrf, http)) return Error(400, "csrf_invalid", "Nie udało się potwierdzić żądania.");
+            // Serwer docelowy dla firmy usuniętej lub przenoszonej: wskazany profil albo jedyny skonfigurowany.
+            var profiles = Profiles(configuration);
+            var profile = value.ConnectionProfileKey is { } key ? profiles.SingleOrDefault(x => x.Key == key)
+                : profiles.Length == 1 ? profiles[0] : null;
+            try
+            {
+                var (operation, created) = await requests.RequestRestore(Requester(http), value, profile?.ServerName, profile?.Key, http.RequestAborted,
+                    profile is null ? null : (name, ct) => DatabaseExists(configuration, profile.Key, name, ct));
+                return created ? Results.Json(Response(operation), statusCode: 202) : Results.Ok(Response(operation));
+            }
+            catch (CompanyOperationException error) { return Error(error.Status, error.Code, error.Message); }
+            catch (SqlException) { return Error(503, "server_unavailable", "Nie można sprawdzić serwera baz firm. Nie przyjęto zlecenia; spróbuj ponownie."); }
+        });
+
         // Katalog firm instalacji (tylko nazwy i bazy, bez danych firm) i rejestr usuniętych firm.
         var installation = app.MapGroup("/api/v1/installation").RequireAuthorization(InstallationAdministration.Policy);
         installation.MapGet("/companies", async (SystemDbContext system, CancellationToken ct) => Results.Ok(await (
@@ -54,6 +72,7 @@ public static class CompanyOperationEndpoints
             join database in system.CompanyDatabases.AsNoTracking() on company.Id equals database.CompanyId
             orderby company.Name
             select new InstallationCompanyResponse(company.Id, company.Name, database.DatabaseName, company.IsActive)).ToArrayAsync(ct)));
+        installation.MapGet("/restore-sources", async (CompanyOperationRequests requests, CancellationToken ct) => Results.Ok(await requests.RestoreSources(ct)));
         installation.MapGet("/deleted-companies", async (SystemDbContext system, CancellationToken ct) => Results.Ok(
             (await system.DeletedCompanies.AsNoTracking().OrderByDescending(x => x.DeletedAtUtc).Take(200).ToArrayAsync(ct))
             .Select(x => new DeletedCompanyResponse(x.CompanyId, x.CompanyName, x.Nip, x.Regon, x.DeletedAtUtc, x.DeletedByName, x.ArchiveFileName != null))));

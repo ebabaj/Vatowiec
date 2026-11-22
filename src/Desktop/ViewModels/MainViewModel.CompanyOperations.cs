@@ -59,6 +59,7 @@ public sealed partial class MainViewModel
             await ReadCompanyOperations(0);
             await ReadBackupPolicy();
             await ReadInstallationCompanies();
+            await ReadRestoreSources();
         });
     }
 
@@ -117,13 +118,13 @@ public sealed partial class MainViewModel
     {
         companyOperationsScreen = false; companyOperations = []; serverProfiles = []; selectedServerProfile = null;
         selectedCompanyOperation = null; newCompanyName = ""; companyOperationsOffset = 0; CompanyOperationsHasNext = false;
-        provisionOperationKey = Guid.NewGuid(); backupPolicy = null; policyRetained = ""; ResetCompanyDeletion();
+        provisionOperationKey = Guid.NewGuid(); backupPolicy = null; policyRetained = ""; ResetCompanyDeletion(); ResetCompanyRestore();
     }
 }
 
 public sealed record CompanyOperationRow(CompanyOperationResponse Value)
 {
-    public string Name => Value.Kind switch { "Backup" => "Kopia: ", "Delete" => "Usunięcie: ", _ => "" } + Value.CompanyName;
+    public string Name => Value.Kind switch { "Backup" => "Kopia: ", "Delete" => "Usunięcie: ", "Restore" => "Odtworzenie: ", _ => "" } + Value.CompanyName;
     public bool CanRetry => Value.Status is "Failed" or "NeedsReconciliation";
     public bool CanCancel => Value.Kind == "Delete" && Value.Status is "Pending" or "Failed" or "NeedsReconciliation" && Value.Stage is not ("DatabaseDropped" or "Ready");
     public string Stage => Value.Stage switch
@@ -138,6 +139,10 @@ public sealed record CompanyOperationRow(CompanyOperationResponse Value)
         "ArchiveWritten" => "Archiwum zapisane",
         "ArchiveVerified" => "Archiwum zweryfikowane",
         "DatabaseDropped" => "Baza usunięta",
+        "DatabaseRestored" => "Kopia odtworzona do bazy roboczej",
+        "RestoreVerified" => "Kopia sprawdzona",
+        "SchemaUpgraded" => "Schemat zaktualizowany",
+        "Switched" => "Baza przełączona",
         "Ready" => Value.Kind == "Backup" ? "Kopia gotowa" : "Firma gotowa",
         _ => Value.Stage
     };
@@ -164,6 +169,14 @@ public sealed record CompanyOperationRow(CompanyOperationResponse Value)
         "backup_file_missing" => "Plik kopii zniknął przed zakończeniem operacji. Zleć nową kopię.",
         "company_database_changed" => "Baza firmy zmieniła się od zlecenia. Sprawdź stan przed ponowieniem.",
         "company_missing" => "Firma nie istnieje już w katalogu instalacji.",
+        "backup_checksum_mismatch" => "Suma kontrolna pliku kopii nie zgadza się z manifestem lub rejestrem. Plik mógł zostać uszkodzony.",
+        "restore_manifest_invalid" => "Brak lub nieprawidłowy manifest VATowca obok pliku kopii.",
+        "restore_company_mismatch" => "Manifest wskazuje inną firmę niż zlecenie.",
+        "restore_database_corrupt" => "Kontrola spójności (CHECKDB) odtworzonej bazy wykazała błędy. Firma nie została przełączona.",
+        "restore_schema_unknown" => "Kopia pochodzi z nowszej wersji programu albo ma nieznaną historię schematu.",
+        "previous_database_name_taken" => "Nazwa dla dotychczasowej bazy jest zajęta. Sprawdź serwer SQL przed ponowieniem.",
+        "database_name_taken" => "Docelowa nazwa bazy jest zajęta. Sprawdź serwer SQL przed ponowieniem.",
+        "working_database_not_owned" or "working_database_missing" or "restore_switch_incomplete" => "Stan baz odtworzenia nie zgadza się z planem. Sprawdź serwer SQL przed ponowieniem.",
         "archive_file_missing" => "Plik kopii archiwalnej zniknął. Baza nie została usunięta; sprawdź katalog archiwum.",
         "server_profile_missing" or "server_profile_invalid" or "server_profile_mismatch" or "server_profile_policy" =>
             "Usługa VATowiec Operations nie ma zgodnego profilu połączenia dla wybranego serwera. Popraw konfigurację usługi i ponów.",

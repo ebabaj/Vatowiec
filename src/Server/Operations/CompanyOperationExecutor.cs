@@ -56,6 +56,7 @@ public sealed partial class CompanyOperationExecutor(SystemDbContext system, Ope
                 case CompanyOperationKinds.Provision: await ExecuteProvision(operation, ct); break;
                 case CompanyOperationKinds.Backup: await ExecuteBackup(operation, ct); break;
                 case CompanyOperationKinds.Delete: await ExecuteDelete(operation, ct); break;
+                case CompanyOperationKinds.Restore: await ExecuteRestore(operation, ct); break;
                 default: throw new OperationFailure("operation_kind_unsupported", reconcile: true);
             }
             logger.LogInformation("Company operation {OperationId} ({Kind}) completed for company {CompanyId}", operation.Id, operation.Kind, operation.CompanyId);

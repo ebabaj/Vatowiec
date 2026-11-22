@@ -336,6 +336,17 @@
             <TextBlock Text="{Binding DeleteWithoutArchiveText}" TextWrapping="Wrap" Foreground="#B42318" FontWeight="SemiBold"/>
             <WrapPanel><Button Content="Usuń bez kopii archiwalnej" Click="ConfirmCompanyDeleteClick" AutomationProperties.AutomationId="ConfirmCompanyDeleteWithoutArchive"/><Button Content="Anuluj" Click="CancelCompanyDeleteConfirmationClick"/></WrapPanel>
           </StackPanel>
+          <TextBlock Text="Odtwarzanie z kopii" FontSize="20"/>
+          <TextBlock Text="Kopie firm, archiwa usuniętych firm oraz pliki z manifestem VATowca umieszczone w podkatalogu _import katalogu kopii na serwerze. Kopia jest najpierw odtwarzana do bazy roboczej i sprawdzana; dopiero potem następuje przełączenie." TextWrapping="Wrap" Opacity="0.7"/>
+          <TextBlock Text="Brak kopii do odtworzenia." IsVisible="{Binding !HasRestoreSources}"/>
+          <ComboBox ItemsSource="{Binding RestoreSources}" SelectedItem="{Binding SelectedRestoreSource, Mode=TwoWay}" IsVisible="{Binding HasRestoreSources}" HorizontalAlignment="Stretch" PlaceholderText="Wybierz kopię" AutomationProperties.AutomationId="RestoreSource">
+            <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:RestoreSourceRow"><TextBlock Text="{Binding Text}" TextWrapping="Wrap"/></DataTemplate></ComboBox.ItemTemplate>
+          </ComboBox>
+          <WrapPanel><Button Content="Odtwórz…" Click="RequestRestoreClick" IsEnabled="{Binding CanRequestRestore}" AutomationProperties.AutomationId="RequestRestore"/></WrapPanel>
+          <StackPanel IsVisible="{Binding IsRestoreConfirmVisible}" Spacing="8">
+            <TextBlock Text="{Binding RestoreConfirmText}" TextWrapping="Wrap" FontWeight="SemiBold"/>
+            <WrapPanel><Button Content="Tak, odtwórz" Click="ConfirmRestoreClick" AutomationProperties.AutomationId="ConfirmRestore"/><Button Content="Anuluj" Click="CancelRestoreConfirmationClick"/></WrapPanel>
+          </StackPanel>
           <StackPanel IsVisible="{Binding HasDeletedCompanies}" Spacing="4">
             <TextBlock Text="Usunięte firmy" FontSize="16"/>
             <ItemsControl ItemsSource="{Binding DeletedCompanyLines}" AutomationProperties.AutomationId="DeletedCompanies">

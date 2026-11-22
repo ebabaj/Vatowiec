@@ -6,6 +6,7 @@ public static class CompanyOperationKinds
     public const string Provision = "Provision";
     public const string Backup = "Backup";
     public const string Delete = "Delete";
+    public const string Restore = "Restore";
 }
 
 public static class CompanyOperationStages
@@ -20,17 +21,32 @@ public static class CompanyOperationStages
     public const string ArchiveWritten = "ArchiveWritten";
     public const string ArchiveVerified = "ArchiveVerified";
     public const string DatabaseDropped = "DatabaseDropped";
+    public const string DatabaseRestored = "DatabaseRestored";
+    public const string RestoreVerified = "RestoreVerified";
+    public const string SchemaUpgraded = "SchemaUpgraded";
+    public const string Switched = "Switched";
     public const string Ready = "Ready";
     public static readonly string[] Provisioning = [Requested, DatabaseCreated, SchemaApplied, ProfileInitialized, Ready];
     public static readonly string[] Backup = [Requested, BackupWritten, BackupVerified, Ready];
     public static readonly string[] Delete = [Requested, CompanyDeactivated, ArchiveWritten, ArchiveVerified, DatabaseDropped, Ready];
+    public static readonly string[] Restore = [Requested, DatabaseRestored, RestoreVerified, SchemaUpgraded, Switched, Ready];
     public static string[] For(string kind) => kind switch
     {
         CompanyOperationKinds.Provision => Provisioning,
         CompanyOperationKinds.Backup => Backup,
         CompanyOperationKinds.Delete => Delete,
+        CompanyOperationKinds.Restore => Restore,
         _ => throw new ArgumentException("Nieznany rodzaj operacji.", nameof(kind))
     };
+}
+
+// Existing: zastąpienie danych istniejącej firmy; Deleted: przywrócenie usuniętej; Import: przeniesienie z innej instalacji.
+public static class RestoreModes
+{
+    public const string Existing = "Existing";
+    public const string Deleted = "Deleted";
+    public const string Import = "Import";
+    public static readonly string[] All = [Existing, Deleted, Import];
 }
 
 public static class CompanyOperationStatuses
@@ -115,6 +131,35 @@ public sealed class CompanyOperation : ITrackedEntity
             Status = CompanyOperationStatuses.Pending
         };
 
+    // ADR-044 krok 3: odtworzenie z pliku kopii do bazy roboczej, weryfikacja, migracje, przełączenie.
+    // previousDatabaseName: nazwa, pod którą zostaje dotychczasowa baza (tylko odtworzenie istniejącej firmy).
+    public static CompanyOperation Restore(Guid id, Guid operationKey, Guid companyId, string companyName,
+        Guid requestedById, string requestedByName, Guid actorIssuerId, string requestHash, string serverName,
+        string connectionProfileKey, string databaseName, string sourceFileName, string mode, string workingDatabaseName,
+        string? previousDatabaseName) => new()
+        {
+            Id = EntityText.Id(id, nameof(id)),
+            Kind = CompanyOperationKinds.Restore,
+            OperationKey = EntityText.Id(operationKey, nameof(operationKey)),
+            CompanyId = EntityText.Id(companyId, nameof(companyId)),
+            CompanyName = EntityText.Required(companyName, 256, nameof(companyName)),
+            RequestedById = EntityText.Id(requestedById, nameof(requestedById)),
+            RequestedByName = EntityText.Required(requestedByName, 256, nameof(requestedByName)),
+            ActorIssuerId = EntityText.Id(actorIssuerId, nameof(actorIssuerId)),
+            RequestHash = EntityText.Required(requestHash, 64, nameof(requestHash)),
+            ServerName = EntityText.Required(serverName, 128, nameof(serverName)),
+            ConnectionProfileKey = EntityText.Required(connectionProfileKey, 128, nameof(connectionProfileKey)),
+            DatabaseName = EntityText.Required(databaseName, 128, nameof(databaseName)),
+            BackupFileName = EntityText.Required(sourceFileName, 260, nameof(sourceFileName)),
+            RestoreMode = RestoreModes.All.Contains(mode) ? mode : throw new ArgumentException("Nieznany tryb odtworzenia.", nameof(mode)),
+            WorkingDatabaseName = EntityText.Required(workingDatabaseName, 128, nameof(workingDatabaseName)),
+            PreviousDatabaseName = mode == RestoreModes.Existing
+                ? EntityText.Required(previousDatabaseName ?? "", 128, nameof(previousDatabaseName))
+                : previousDatabaseName is null ? null : throw new ArgumentException("Nazwa poprzedniej bazy dotyczy tylko istniejącej firmy.", nameof(previousDatabaseName)),
+            Stage = CompanyOperationStages.Requested,
+            Status = CompanyOperationStatuses.Pending
+        };
+
     public Guid Id { get; private set; }
     public string Kind { get; private set; } = null!;
     public Guid OperationKey { get; private set; }
@@ -123,6 +168,9 @@ public sealed class CompanyOperation : ITrackedEntity
     public Guid? RequestedById { get; private set; }
     public string? BackupFileName { get; private set; }
     public bool? CreateArchive { get; private set; }
+    public string? RestoreMode { get; private set; }
+    public string? WorkingDatabaseName { get; private set; }
+    public string? PreviousDatabaseName { get; private set; }
     public string RequestedByName { get; private set; } = null!;
     public Guid ActorIssuerId { get; private set; }
     public string RequestHash { get; private set; } = null!;

@@ -59,6 +59,15 @@ public static partial class CompanyDatabaseNames
     public static bool IsCompanyDatabase(string? database) => database is not null &&
         database.Length <= Prefix.Length + MaxNameLength && Pattern().IsMatch(database) && !IsReserved(database);
 
+    // ADR-044 krok 3: baza robocza odtworzenia i nazwa, pod którą zostaje dotychczasowa baza firmy.
+    public static string Working(string target, Guid operationId) => Fit(target, "_odtwarzanie_" + operationId.ToString("N")[..8]);
+    public static string Previous(string target, DateTime localTime) => Fit(target, $"_przed_{localTime:yyyyMMdd_HHmm}");
+    private static string Fit(string target, string suffix) => target[..Math.Min(target.Length, 128 - suffix.Length)].TrimEnd('_') + suffix;
+
+    // Baza projektu (prefiks Vatowiec_, bezpieczny identyfikator, spoza zastrzeżonych) — także robocze i poprzednie.
+    public static bool IsProjectDatabase(string? database) => IsSafeIdentifier(database) &&
+        database!.StartsWith(Prefix, StringComparison.Ordinal) && database.Length > Prefix.Length && !IsReserved(database);
+
     // Dowolna zarejestrowana baza (także demonstracyjna) — bezpieczna jako identyfikator w nawiasach [].
     public static bool IsSafeIdentifier(string? database) => database is not null && SafeIdentifier().IsMatch(database);
 
