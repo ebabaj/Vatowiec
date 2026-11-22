@@ -57,6 +57,7 @@ public sealed partial class MainViewModel
             serverProfiles = await api!.ServerProfiles();
             selectedServerProfile = serverProfiles.Length == 1 ? serverProfiles[0] : null;
             await ReadCompanyOperations(0);
+            await ReadBackupPolicy();
         });
     }
 
@@ -115,13 +116,13 @@ public sealed partial class MainViewModel
     {
         companyOperationsScreen = false; companyOperations = []; serverProfiles = []; selectedServerProfile = null;
         selectedCompanyOperation = null; newCompanyName = ""; companyOperationsOffset = 0; CompanyOperationsHasNext = false;
-        provisionOperationKey = Guid.NewGuid();
+        provisionOperationKey = Guid.NewGuid(); backupPolicy = null; policyRetained = "";
     }
 }
 
 public sealed record CompanyOperationRow(CompanyOperationResponse Value)
 {
-    public string Name => Value.CompanyName;
+    public string Name => Value.Kind == "Backup" ? "Kopia: " + Value.CompanyName : Value.CompanyName;
     public bool CanRetry => Value.Status is "Failed" or "NeedsReconciliation";
     public string Stage => Value.Stage switch
     {
@@ -129,7 +130,9 @@ public sealed record CompanyOperationRow(CompanyOperationResponse Value)
         "DatabaseCreated" => "Baza utworzona",
         "SchemaApplied" => "Schemat bazy utworzony",
         "ProfileInitialized" => "Profil firmy zapisany",
-        "Ready" => "Firma gotowa",
+        "BackupWritten" => "Kopia zapisana",
+        "BackupVerified" => "Kopia zweryfikowana",
+        "Ready" => Value.Kind == "Backup" ? "Kopia gotowa" : "Firma gotowa",
         _ => Value.Stage
     };
     public string Status => Value.Status switch
@@ -149,6 +152,10 @@ public sealed record CompanyOperationRow(CompanyOperationResponse Value)
         "company_identity_mismatch" => "Baza zawiera profil innej firmy. Sprawdź serwer SQL przed ponowieniem.",
         "schema_history_unknown" => "Baza ma nieznaną historię migracji. Sprawdź serwer SQL przed ponowieniem.",
         "catalog_conflict" => "Katalog instalacji zawiera już tę firmę lub bazę. Sprawdź stan przed ponowieniem.",
+        "backup_root_missing" => "Usługa VATowiec Operations nie ma skonfigurowanego katalogu kopii (Operations:BackupRoot).",
+        "backup_storage_failed" => "Nie udało się zapisać, odczytać lub usunąć pliku kopii. Sprawdź uprawnienia katalogu kopii i wolne miejsce.",
+        "backup_file_missing" => "Plik kopii zniknął przed zakończeniem operacji. Zleć nową kopię.",
+        "company_database_changed" => "Baza firmy zmieniła się od zlecenia kopii. Zleć nową kopię.",
         "server_profile_missing" or "server_profile_invalid" or "server_profile_mismatch" or "server_profile_policy" =>
             "Usługa VATowiec Operations nie ma zgodnego profilu połączenia dla wybranego serwera. Popraw konfigurację usługi i ponów.",
         var code when code.StartsWith("sql_", StringComparison.Ordinal) => $"Błąd SQL Server nr {code[4..]}. Sprawdź uprawnienia usługi i dostępność serwera.",

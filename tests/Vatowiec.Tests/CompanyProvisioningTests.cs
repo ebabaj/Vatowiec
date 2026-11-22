@@ -112,7 +112,7 @@ public sealed class CompanyProvisioningTests
         var api = typeof(Vatowiec.Api.Security.CompanyOperationEndpoints).Assembly;
         Assert.DoesNotContain(api.GetReferencedAssemblies(), x => x.Name == "Vatowiec.Operations");
         Assert.DoesNotContain(api.GetTypes(), x => x.Name.Contains("Executor", StringComparison.Ordinal));
-        Assert.Equal("Vatowiec.Operations", typeof(Vatowiec.Operations.CompanyProvisioningExecutor).Assembly.GetName().Name);
+        Assert.Equal("Vatowiec.Operations", typeof(Vatowiec.Operations.CompanyOperationExecutor).Assembly.GetName().Name);
     }
 
     [Theory]

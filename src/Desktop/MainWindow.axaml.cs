@@ -91,6 +91,14 @@ public partial class MainWindow : Window
     private async void CompanyOperationsPreviousClick(object? sender, RoutedEventArgs e) => await model.RefreshCompanyOperations(-1);
     private async void CompanyOperationsNextClick(object? sender, RoutedEventArgs e) => await model.RefreshCompanyOperations(1);
     private async void CloseCompanyOperationsClick(object? sender, RoutedEventArgs e) => await model.CloseCompanyOperations();
+    private async void SaveBackupPolicyClick(object? sender, RoutedEventArgs e) => await model.SaveBackupPolicy();
+    private async void CompanyBackupsClick(object? sender, RoutedEventArgs e) => await model.OpenCompanyBackups();
+    private async void RequestCompanyBackupClick(object? sender, RoutedEventArgs e) => await model.RequestCompanyBackup();
+    private async void RefreshCompanyBackupsClick(object? sender, RoutedEventArgs e) => await model.RefreshCompanyBackups();
+    private async void SaveBackupScheduleClick(object? sender, RoutedEventArgs e) => await model.SaveBackupSchedule();
+    private void CloseCompanyBackupsClick(object? sender, RoutedEventArgs e) => model.CloseCompanyBackups();
+    private async void BackupFromReminderClick(object? sender, RoutedEventArgs e) => await model.BackupFromReminder();
+    private async void SnoozeBackupReminderClick(object? sender, RoutedEventArgs e) => await model.SnoozeBackupReminder();
     private async void PasswordPolicyClick(object? sender, RoutedEventArgs e) => await model.OpenPasswordPolicy();
     private async Task SavePasswordPolicy()
     {

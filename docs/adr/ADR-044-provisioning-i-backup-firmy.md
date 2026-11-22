@@ -258,7 +258,16 @@ transakcji co katalog. Ograniczenie: nadanie dostępu osobnemu loginowi SQL API 
 jest na razie ręczne (docs/company-provisioning.md). Kryterium 6 w części „skrypt ról”
 pozostaje do kroku z osobnym loginem SQL. Instrukcja: [docs/company-provisioning.md](../company-provisioning.md).
 
-Kroki 2 (kopia z rotacją i harmonogramem) i 3 (odtworzenie) — do wykonania.
+**Krok 2 — kopia z rotacją i harmonogramem: wdrożony 2026-11-22.** Migracja System
+`20261122135208_CompanyBackups`, kopie w usłudze Operations (BACKUP COPY_ONLY/CHECKSUM,
+VERIFYONLY, manifest z SHA-256, rotacja tylko plików potwierdzonych manifestem), harmonogram
+automatyczny, przypomnienie w Avalonia, prawo `ManageCompanyBackups = 1024`, polityka
+instalacji. Spełnione kryteria 7, 12–15 (testy `CompanyBackupTests`, `CompanyBackupSqlTests`).
+Rozstrzygnięcia techniczne: brak wiersza harmonogramu = ustawienia domyślne; pliki w
+`{BackupRoot}\{baza}\`; wykonawca obsługuje oba rodzaje operacji jedną kolejką
+(`CompanyOperationExecutor`). Instrukcja: [docs/company-backups.md](../company-backups.md).
+
+Krok 3 (odtworzenie) — do wykonania; przed nim usuwanie firmy wg ADR-045.
 
 ## Pytania do właściciela
 

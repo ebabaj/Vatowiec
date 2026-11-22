@@ -59,6 +59,12 @@ public static partial class CompanyDatabaseNames
     public static bool IsCompanyDatabase(string? database) => database is not null &&
         database.Length <= Prefix.Length + MaxNameLength && Pattern().IsMatch(database) && !IsReserved(database);
 
+    // Dowolna zarejestrowana baza (także demonstracyjna) — bezpieczna jako identyfikator w nawiasach [].
+    public static bool IsSafeIdentifier(string? database) => database is not null && SafeIdentifier().IsMatch(database);
+
+    [GeneratedRegex("^[A-Za-z0-9_]{1,128}$", RegexOptions.CultureInvariant)]
+    private static partial Regex SafeIdentifier();
+
     [GeneratedRegex("_{2,}", RegexOptions.CultureInvariant)]
     private static partial Regex Underscores();
 

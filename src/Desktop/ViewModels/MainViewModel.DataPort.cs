@@ -66,5 +66,5 @@ public sealed partial class MainViewModel
         if (busy) return;
         ResetDataPortSettings(); ChangedAll(); _ = LoadContractors();
     }
-    private void ResetDataPortSettings() { dataPortSettings = false; dataPortConfiguration = null; confirmDataPortDelete = false; }
+    private void ResetDataPortSettings() { dataPortSettings = false; dataPortConfiguration = null; confirmDataPortDelete = false; ResetCompanyBackups(); }
 }

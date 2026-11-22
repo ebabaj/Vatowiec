@@ -27,6 +27,11 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
     public DbSet<RegistryConfigurationChange> RegistryConfigurationChanges => Set<RegistryConfigurationChange>();
     public DbSet<CompanyOperation> CompanyOperations => Set<CompanyOperation>();
     public DbSet<CompanyOperationEvent> CompanyOperationEvents => Set<CompanyOperationEvent>();
+    public DbSet<CompanyBackup> CompanyBackups => Set<CompanyBackup>();
+    public DbSet<BackupPolicy> BackupPolicies => Set<BackupPolicy>();
+    public DbSet<CompanyBackupSchedule> CompanyBackupSchedules => Set<CompanyBackupSchedule>();
+    public DbSet<BackupSettingChange> BackupSettingChanges => Set<BackupSettingChange>();
+    public DbSet<BackupReminderSnooze> BackupReminderSnoozes => Set<BackupReminderSnooze>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -141,6 +146,11 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
         modelBuilder.ApplyConfiguration(new UserSessionConfiguration());
         modelBuilder.ApplyConfiguration(new CompanyOperationConfiguration());
         modelBuilder.ApplyConfiguration(new CompanyOperationEventConfiguration());
+        modelBuilder.ApplyConfiguration(new CompanyBackupConfiguration());
+        modelBuilder.ApplyConfiguration(new BackupPolicyConfiguration());
+        modelBuilder.ApplyConfiguration(new CompanyBackupScheduleConfiguration());
+        modelBuilder.ApplyConfiguration(new BackupSettingChangeConfiguration());
+        modelBuilder.ApplyConfiguration(new BackupReminderSnoozeConfiguration());
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -169,5 +179,7 @@ public sealed class SystemDbContext(DbContextOptions<SystemDbContext> options)
             throw new InvalidOperationException("Audyt konfiguracji rejestrów jest niezmienny.");
         if (ChangeTracker.Entries<CompanyOperationEvent>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("Historia operacji technicznych firm jest niezmienna.");
+        if (ChangeTracker.Entries<BackupSettingChange>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Historia ustawień kopii zapasowych jest niezmienna.");
     }
 }

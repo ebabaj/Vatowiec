@@ -4,6 +4,7 @@ namespace Vatowiec.Core.Domain;
 public static class CompanyOperationKinds
 {
     public const string Provision = "Provision";
+    public const string Backup = "Backup";
 }
 
 public static class CompanyOperationStages
@@ -12,8 +13,17 @@ public static class CompanyOperationStages
     public const string DatabaseCreated = "DatabaseCreated";
     public const string SchemaApplied = "SchemaApplied";
     public const string ProfileInitialized = "ProfileInitialized";
+    public const string BackupWritten = "BackupWritten";
+    public const string BackupVerified = "BackupVerified";
     public const string Ready = "Ready";
     public static readonly string[] Provisioning = [Requested, DatabaseCreated, SchemaApplied, ProfileInitialized, Ready];
+    public static readonly string[] Backup = [Requested, BackupWritten, BackupVerified, Ready];
+    public static string[] For(string kind) => kind switch
+    {
+        CompanyOperationKinds.Provision => Provisioning,
+        CompanyOperationKinds.Backup => Backup,
+        _ => throw new ArgumentException("Nieznany rodzaj operacji.", nameof(kind))
+    };
 }
 
 public static class CompanyOperationStatuses
@@ -51,12 +61,35 @@ public sealed class CompanyOperation : ITrackedEntity
             Status = CompanyOperationStatuses.Pending
         };
 
+    // ADR-044 krok 2: kopia jednej firmy do pliku na serwerze. requestedById == null: harmonogram usługi.
+    public static CompanyOperation Backup(Guid id, Guid operationKey, Guid companyId, string companyName,
+        Guid? requestedById, string requestedByName, Guid actorIssuerId, string requestHash,
+        string serverName, string connectionProfileKey, string databaseName, string backupFileName) => new()
+        {
+            Id = EntityText.Id(id, nameof(id)),
+            Kind = CompanyOperationKinds.Backup,
+            OperationKey = EntityText.Id(operationKey, nameof(operationKey)),
+            CompanyId = EntityText.Id(companyId, nameof(companyId)),
+            CompanyName = EntityText.Required(companyName, 256, nameof(companyName)),
+            RequestedById = requestedById is { } user ? EntityText.Id(user, nameof(requestedById)) : null,
+            RequestedByName = EntityText.Required(requestedByName, 256, nameof(requestedByName)),
+            ActorIssuerId = EntityText.Id(actorIssuerId, nameof(actorIssuerId)),
+            RequestHash = EntityText.Required(requestHash, 64, nameof(requestHash)),
+            ServerName = EntityText.Required(serverName, 128, nameof(serverName)),
+            ConnectionProfileKey = EntityText.Required(connectionProfileKey, 128, nameof(connectionProfileKey)),
+            DatabaseName = EntityText.Required(databaseName, 128, nameof(databaseName)),
+            BackupFileName = EntityText.Required(backupFileName, 260, nameof(backupFileName)),
+            Stage = CompanyOperationStages.Requested,
+            Status = CompanyOperationStatuses.Pending
+        };
+
     public Guid Id { get; private set; }
     public string Kind { get; private set; } = null!;
     public Guid OperationKey { get; private set; }
     public Guid CompanyId { get; private set; }
     public string CompanyName { get; private set; } = null!;
-    public Guid RequestedById { get; private set; }
+    public Guid? RequestedById { get; private set; }
+    public string? BackupFileName { get; private set; }
     public string RequestedByName { get; private set; } = null!;
     public Guid ActorIssuerId { get; private set; }
     public string RequestHash { get; private set; } = null!;
@@ -97,8 +130,9 @@ public sealed class CompanyOperation : ITrackedEntity
     public void Reach(string stage, DateTimeOffset now, TimeSpan lease)
     {
         RequireRunning();
-        var target = Array.IndexOf(CompanyOperationStages.Provisioning, stage);
-        var current = Array.IndexOf(CompanyOperationStages.Provisioning, Stage);
+        var stages = CompanyOperationStages.For(Kind);
+        var target = Array.IndexOf(stages, stage);
+        var current = Array.IndexOf(stages, Stage);
         if (target < 0 || target < current || target > current + 1)
             throw new InvalidOperationException("Nieprawidłowa kolejność etapów operacji.");
         Stage = stage;

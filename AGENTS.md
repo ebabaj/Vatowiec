@@ -92,7 +92,13 @@ znacznikiem własnej operacji (lub puste bazy utworzone przez ten sam test).
   kontrolowany wyjątek od niezmienności historii. Zostaje rejestr usuniętych: CompanyId,
   nazwa, NIP/REGON, data, kto usunął. CompanyId zablokowany poza przywróceniem z archiwum.
 - Kolejność: nazwy baz (wdrożone, baza Tenjin → `Vatowiec_Tenjin`) → kopia z rotacją
-  i harmonogramem → usuwanie → odtwarzanie (istniejącej i usuniętej firmy).
+  i harmonogramem (wdrożone 2026-11-22, [docs/company-backups.md](docs/company-backups.md))
+  → usuwanie → odtwarzanie (istniejącej i usuniętej firmy).
+- Kopie: plik tworzy wyłącznie usługa Operations w `Operations:BackupRoot` (zapis dla konta
+  usługi SQL, odczyt/usuwanie dla usługi). Rotacja usuwa tylko pliki z `ops.CompanyBackups`
+  potwierdzone manifestem; obcych plików nie dotyka. Developerski katalog:
+  `C:\ProgramData\Vatowiec\Backups`. Prawo firmy `ManageCompanyBackups = 1024` (limit
+  `CompanyAccess` 2047) nie jest nadawane automatycznie istniejącym kontom.
 Decyzje właściciela do ADR-044 (2026-11-22): tworzenie firmy i odtworzenie kopii
 wyłącznie przez administratora instalacji; twórca firmy od razu dostaje do niej
 pełne prawa (jawne, audytowane nadanie, nie prawo wynikające z roli). Kopię na

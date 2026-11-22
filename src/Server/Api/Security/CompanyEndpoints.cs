@@ -36,6 +36,7 @@ public static class CompanyEndpoints
         group.MapVerifications();
         group.MapDataPort();
         group.MapCurrencies();
+        group.MapCompanyBackups();
     }
 
     private static Guid UserId(HttpContext context) => Guid.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);

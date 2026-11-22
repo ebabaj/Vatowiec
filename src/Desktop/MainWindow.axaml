@@ -30,6 +30,7 @@
       </MenuItem>
       <MenuItem Header="_FIRMA" IsEnabled="{Binding CanUseCompanyMenu}">
         <MenuItem Header="Ustawienia firmy" Click="DataPortSettingsClick" AutomationProperties.AutomationId="CompanySettings"/>
+        <MenuItem Header="Kopie zapasowe" Click="CompanyBackupsClick" AutomationProperties.AutomationId="CompanyBackups"/>
         <MenuItem Header="Zmień firmę" Click="ChangeCompanyClick" AutomationProperties.AutomationId="ChangeCompany"/>
       </MenuItem>
       <MenuItem Header="K_ONTO" Classes="account" AutomationProperties.AutomationId="AccountMenu">
@@ -94,7 +95,18 @@
       </Grid>
 
       <Grid IsVisible="{Binding IsBrowsingWorkspace}" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="10">
-        <TextBlock Text="Kontrahenci" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+        <StackPanel Spacing="8">
+          <TextBlock Text="Kontrahenci" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <Border IsVisible="{Binding IsBackupReminderVisible}" BorderBrush="#F0B429" BorderThickness="1" CornerRadius="4" Padding="10" AutomationProperties.AutomationId="BackupReminder">
+            <StackPanel Spacing="6">
+              <TextBlock Text="{Binding BackupReminderText}" TextWrapping="Wrap" Foreground="#8A5A00"/>
+              <WrapPanel>
+                <Button Content="Utwórz kopię teraz" Click="BackupFromReminderClick" IsEnabled="{Binding CanRequestBackup}" AutomationProperties.AutomationId="BackupFromReminder"/>
+                <Button Content="Przypomnij później" Click="SnoozeBackupReminderClick" AutomationProperties.AutomationId="SnoozeBackupReminder"/>
+              </WrapPanel>
+            </StackPanel>
+          </Border>
+        </StackPanel>
         <Grid Grid.Row="1" IsVisible="{Binding CanBrowse}" ColumnDefinitions="*,150,Auto" ColumnSpacing="10">
           <StackPanel Spacing="4">
             <TextBlock Text="Szukaj w widocznych kolumnach (Ctrl+F)" />
@@ -297,6 +309,15 @@
             <Button Content="Następne" Click="CompanyOperationsNextClick" IsEnabled="{Binding CompanyOperationsHasNext}"/>
           </WrapPanel>
           <TextBlock Text="Ponowienie operacji wymagającej sprawdzenia ma sens dopiero po wyjaśnieniu stanu serwera SQL. Program nigdy nie usuwa ani nie przejmuje bazy o niepotwierdzonym pochodzeniu." TextWrapping="Wrap" Opacity="0.7"/>
+          <StackPanel Spacing="8" IsVisible="{Binding HasBackupPolicy}">
+            <TextBlock Text="Kopie zapasowe firm" FontSize="20"/>
+            <CheckBox IsChecked="{Binding PolicyUsersMayRequest, Mode=TwoWay}" AutomationProperties.AutomationId="PolicyUsersMayRequest">
+              <TextBlock Text="Użytkownicy firm mogą zlecać kopie na serwerze (administrator instalacji może zawsze)" TextWrapping="Wrap"/>
+            </CheckBox>
+            <TextBlock Text="Liczba zachowywanych kopii każdej firmy (1–365); starsze są usuwane automatycznie"/>
+            <TextBox Text="{Binding PolicyRetained, Mode=TwoWay}" MaxLength="3" Width="80" HorizontalAlignment="Left" AutomationProperties.AutomationId="PolicyRetained"/>
+            <WrapPanel><Button Content="Zapisz ustawienia kopii" Click="SaveBackupPolicyClick" IsEnabled="{Binding CanSaveBackupPolicy}" AutomationProperties.AutomationId="SaveBackupPolicy"/></WrapPanel>
+          </StackPanel>
           <WrapPanel><Button Content="Wróć" Click="CloseCompanyOperationsClick" AutomationProperties.AutomationId="CloseCompanyOperations"/><Button Content="Wyloguj" Click="LogoutClick"/></WrapPanel>
         </StackPanel>
       </ScrollViewer>
@@ -349,6 +370,37 @@
           <TextBlock Text="Powtórz nowe hasło"/><TextBox x:Name="OwnRepeatPassword" PasswordChar="●" MaxLength="1024" KeyDown="OwnPasswordKeyDown" AutomationProperties.AutomationId="RepeatPassword"/>
           <TextBlock Text="Obowiązują aktualne wymagania haseł ustawione dla instalacji. Hasło nie może być puste." TextWrapping="Wrap"/>
           <WrapPanel><Button Content="Zmień hasło" Click="ChangeOwnPasswordClick" AutomationProperties.AutomationId="SaveOwnPassword"/><Button Content="Anuluj" Click="CancelOwnPasswordClick" IsVisible="{Binding CanCancelPasswordChange}"/><Button Content="Wyloguj" Click="LogoutClick"/></WrapPanel>
+        </StackPanel>
+      </ScrollViewer>
+      <ScrollViewer IsVisible="{Binding IsCompanyBackupsScreen}">
+        <StackPanel Spacing="12" MaxWidth="740" HorizontalAlignment="Left">
+          <TextBlock Text="Firma → Kopie zapasowe" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>
+          <TextBlock Text="{Binding CurrentCompany}" TextWrapping="Wrap"/>
+          <TextBlock Text="{Binding LastBackupText}" FontSize="16" TextWrapping="Wrap" AutomationProperties.AutomationId="LastBackup"/>
+          <TextBlock Text="{Binding LatestBackupOperationText}" Foreground="#8A5A00" TextWrapping="Wrap" IsVisible="{Binding LatestBackupOperationText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+          <WrapPanel>
+            <Button Content="Utwórz kopię na serwerze" Click="RequestCompanyBackupClick" IsEnabled="{Binding CanRequestBackup}" AutomationProperties.AutomationId="RequestCompanyBackup"/>
+            <Button Content="Odśwież" Click="RefreshCompanyBackupsClick" AutomationProperties.AutomationId="RefreshCompanyBackups"/>
+          </WrapPanel>
+          <TextBlock Text="{Binding RetentionText}" Opacity="0.7" TextWrapping="Wrap"/>
+          <TextBlock Text="Kopie na serwerze" FontSize="20"/>
+          <TextBlock Text="Brak kopii tej firmy." IsVisible="{Binding HasNoBackups}"/>
+          <ItemsControl ItemsSource="{Binding BackupLines}" AutomationProperties.AutomationId="CompanyBackupsList">
+            <ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,4"/></DataTemplate></ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="Harmonogram kopii tej firmy" FontSize="20"/>
+          <TextBlock Text="{Binding BackupScheduleText}" Opacity="0.7" TextWrapping="Wrap"/>
+          <StackPanel Spacing="6" IsEnabled="{Binding CanEditBackupSchedule}">
+            <TextBlock Text="Częstotliwość"/>
+            <ComboBox ItemsSource="{x:Static vm:MainViewModel.BackupFrequencyNames}" SelectedIndex="{Binding BackupFrequencyIndex, Mode=TwoWay}" AutomationProperties.AutomationId="BackupFrequency"/>
+            <TextBlock Text="Po upływie okresu"/>
+            <ComboBox ItemsSource="{x:Static vm:MainViewModel.BackupModeNames}" SelectedIndex="{Binding BackupModeIndex, Mode=TwoWay}" AutomationProperties.AutomationId="BackupMode"/>
+            <TextBlock Text="Godzina kopii automatycznej (czas serwera)" IsVisible="{Binding IsBackupHourVisible}"/>
+            <ComboBox ItemsSource="{x:Static vm:MainViewModel.BackupHours}" SelectedIndex="{Binding BackupHourIndex, Mode=TwoWay}" IsVisible="{Binding IsBackupHourVisible}" AutomationProperties.AutomationId="BackupHour"/>
+          </StackPanel>
+          <TextBlock Text="Zmiana harmonogramu wymaga prawa „Harmonogram kopii firmy” albo roli administratora instalacji. Program nie pyta o kopię przy zamykaniu; przypomina najwyżej raz po upływie okresu." Opacity="0.7" TextWrapping="Wrap"/>
+          <WrapPanel><Button Content="Zapisz harmonogram" Click="SaveBackupScheduleClick" IsEnabled="{Binding CanSaveBackupSchedule}" AutomationProperties.AutomationId="SaveBackupSchedule"/></WrapPanel>
+          <WrapPanel><Button Content="Wróć" Click="CloseCompanyBackupsClick" AutomationProperties.AutomationId="CloseCompanyBackups"/></WrapPanel>
         </StackPanel>
       </ScrollViewer>
       <ScrollViewer IsVisible="{Binding IsDataPortSettings}">

@@ -104,6 +104,6 @@ public sealed class CompanyOperationRequests(SystemDbContext db, TimeProvider cl
         : throw new CompanyOperationException(409, "operation_payload_mismatch",
             "Ten klucz operacji użyto już z innymi danymi. Odśwież formularz i zleć utworzenie ponownie.");
 
-    internal static string Hash(string kind, string name, string profile) => Convert.ToHexString(SHA256.HashData(
+    public static string Hash(string kind, string name, string profile) => Convert.ToHexString(SHA256.HashData(
         Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { kind, name, profile }))));
 }

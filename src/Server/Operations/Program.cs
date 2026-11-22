@@ -22,7 +22,10 @@ public static class OperationsProgram
         builder.Services.AddDbContext<SystemDbContext>(options => options.UseSqlServer(systemConnection));
         builder.Services.AddSingleton(new OperationsWorkerIdentity($"{Environment.MachineName}/{Environment.ProcessId}"));
         builder.Services.AddSingleton<OperationsConnections>();
-        builder.Services.AddScoped<CompanyProvisioningExecutor>();
+        builder.Services.AddSingleton<BackupStorage>();
+        builder.Services.AddScoped<Vatowiec.Core.Infrastructure.Operations.CompanyBackupService>();
+        builder.Services.AddScoped<BackupScheduler>();
+        builder.Services.AddScoped<CompanyOperationExecutor>();
         builder.Services.AddHostedService<OperationsWorker>();
 
         await builder.Build().RunAsync();

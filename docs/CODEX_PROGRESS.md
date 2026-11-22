@@ -45,6 +45,19 @@ nazwy fizyczne. Weryfikacja: build 0/0; 588 zaliczonych, 0 błędów, 109 pomini
 formatowanie bez uwag. Do zatrzymania przed buildem: API, usługa Operations i klient
 Desktop użytkownika (blokował pliki); API i usługę przywrócono.
 
+Zadanie 2026-11-22 (ADR-044 krok 2 — kopie z rotacją i harmonogramem, bez Commit i Push):
+domena `CompanyBackup`, `BackupPolicy`, `CompanyBackupSchedule`, `BackupSettingChange`,
+`BackupReminderSnooze`, reguły terminów; migracja System `CompanyBackups` (wykonana
+`migrate-system`); wykonawca `CompanyOperationExecutor` (wspólna kolejka, tworzenie firmy
+i kopia), `BackupStorage`, `BackupScheduler`; API kopii firmy i polityki instalacji;
+Avalonia: FIRMA → Kopie zapasowe, przypomnienie po otwarciu firmy, polityka w
+Ustawieniach instalacji → Firmy. Prawo `ManageCompanyBackups = 1024`.
+Środowisko: utworzono `C:\ProgramData\Vatowiec\Backups` z prawem Modify dla
+`NT Service\MSSQL$SQLEXPRESS`. `DatabaseTools verify` dopuszcza teraz firmy utworzone
+z aplikacji obok A/B. Weryfikacja: build 0/0; 604 zaliczonych, 0 błędów, 109 pominiętych;
+formatowanie bez uwag; po testach brak plików i wierszy testowych; usługa uruchomiona
+próbnie. Nie wykonano próby w oknie Avalonia.
+
 ## Archiwum: naprawa zakładki Finansowe
 
 2026-10-23. Ukończone. BEZ Commit i Push.

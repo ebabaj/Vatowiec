@@ -136,6 +136,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         profile = result;
         await ReadTableViews();
         if (CanViewContractors) _ = LoadPage(0);
+        _ = CheckBackupReminder(id);
     }
 
     public Task OpenClickedCompany(CompanyResponse company)
@@ -314,6 +315,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IDisposable
         ClearContractorState();
         ResetDataPortSettings();
         ResetCurrencyState();
+        ClearBackupState();
     }
     private void ResetSession()
     {

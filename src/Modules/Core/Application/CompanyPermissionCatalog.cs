@@ -32,6 +32,7 @@ public static class CompanyPermissionCatalog
         CompanyPermission.ManageCurrencies => ("Zarządzanie walutami", "Zmiana aktywności i ustawień walut; wymaga odczytu kursów."),
         CompanyPermission.ImportExchangeRates => ("Import kursów NBP", "Ręczne pobieranie i import; wymaga odczytu kursów."),
         CompanyPermission.ManageContractorPesel => ("Odczyt i edycja PESEL", "Dane chronione; zapis wymaga także edycji kontrahentów."),
+        CompanyPermission.ManageCompanyBackups => ("Harmonogram kopii firmy", "Częstotliwość i tryb kopii zapasowych tej firmy; zlecić kopię może każdy użytkownik firmy, o ile pozwala na to instalacja."),
         _ => (permission.ToString(), "Uprawnienie firmy z aktualnej wersji serwera.")
     };
 }

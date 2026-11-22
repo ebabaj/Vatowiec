@@ -11,9 +11,13 @@ internal sealed class CompanyOperationConfiguration : IEntityTypeConfiguration<C
     {
         builder.ToTable("CompanyOperations", "ops", table =>
         {
-            table.HasCheckConstraint("CK_CompanyOperations_Kind", "[Kind] IN (N'Provision')");
+            table.HasCheckConstraint("CK_CompanyOperations_Kind", "[Kind] IN (N'Provision', N'Backup')");
             table.HasCheckConstraint("CK_CompanyOperations_Stage",
-                "[Stage] IN (N'Requested', N'DatabaseCreated', N'SchemaApplied', N'ProfileInitialized', N'Ready')");
+                "[Stage] IN (N'Requested', N'DatabaseCreated', N'SchemaApplied', N'ProfileInitialized', N'BackupWritten', N'BackupVerified', N'Ready')");
+            table.HasCheckConstraint("CK_CompanyOperations_Requester",
+                "[Kind] = N'Backup' OR [RequestedById] IS NOT NULL");
+            table.HasCheckConstraint("CK_CompanyOperations_BackupFile",
+                "([Kind] = N'Backup' AND [BackupFileName] IS NOT NULL) OR ([Kind] <> N'Backup' AND [BackupFileName] IS NULL)");
             table.HasCheckConstraint("CK_CompanyOperations_Status",
                 "[Status] IN (N'Pending', N'Running', N'Failed', N'NeedsReconciliation', N'Completed')");
             table.HasCheckConstraint("CK_CompanyOperations_Attempt", "[Attempt] >= 0");
@@ -35,13 +39,17 @@ internal sealed class CompanyOperationConfiguration : IEntityTypeConfiguration<C
         builder.Property(x => x.Status).HasMaxLength(32).IsRequired();
         builder.Property(x => x.LastErrorCode).HasMaxLength(64);
         builder.Property(x => x.LeaseOwner).HasMaxLength(128);
+        builder.Property(x => x.BackupFileName).HasMaxLength(260);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.Ignore(x => x.IsFinished);
         builder.Ignore(x => x.CanRetry);
         // Idempotencja: jeden klucz operacji na zlecającego; jedna operacja tworzenia na firmę i bazę.
-        builder.HasIndex(x => new { x.RequestedById, x.OperationKey }).IsUnique();
+        builder.HasIndex(x => new { x.RequestedById, x.OperationKey }).IsUnique().HasFilter("[RequestedById] IS NOT NULL");
         builder.HasIndex(x => x.CompanyId).IsUnique().HasFilter("[Kind] = N'Provision'");
         builder.HasIndex(x => new { x.ServerName, x.DatabaseName }).IsUnique().HasFilter("[Kind] = N'Provision'");
+        // Najwyżej jedna oczekująca lub wykonywana kopia danej firmy.
+        builder.HasIndex(x => x.CompanyId, "IX_CompanyOperations_ActiveBackup").IsUnique()
+            .HasFilter("[Kind] = N'Backup' AND [Status] IN (N'Pending', N'Running')");
         builder.HasIndex(x => new { x.Status, x.NextAttemptAtUtc });
     }
 }

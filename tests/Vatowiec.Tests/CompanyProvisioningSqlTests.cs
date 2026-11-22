@@ -39,8 +39,8 @@ public sealed class ProvisioningSqlFactAttribute : FactAttribute
 public sealed class CompanyProvisioningSqlTests
 {
     private const string Route = "/api/v1/installation/company-operations";
-    private const string Server = @"localhost\SQLEXPRESS";
-    private const string Local = @"Server=localhost\SQLEXPRESS;Integrated Security=True;Encrypt=True;TrustServerCertificate=True";
+    internal const string Server = @"localhost\SQLEXPRESS";
+    internal const string Local = @"Server=localhost\SQLEXPRESS;Integrated Security=True;Encrypt=True;TrustServerCertificate=True";
 
     [ProvisioningSqlFact]
     public async Task Api_RequiresAdministratorAndCsrf_IsIdempotent_AndNeverTouchesSqlServer()
@@ -136,7 +136,7 @@ public sealed class CompanyProvisioningSqlTests
                 Assert.NotNull(await Executor(db, clock, "crashed-worker").Claim(default));
                 Assert.Null(await Executor(db, clock, "second-worker").Claim(default)); // Aktywna dzierżawa wyklucza drugiego wykonawcę.
             }
-            clock.Advance(CompanyProvisioningExecutor.Lease + TimeSpan.FromSeconds(1));
+            clock.Advance(CompanyOperationExecutor.Lease + TimeSpan.FromSeconds(1));
 
             foreach (var failAfter in new[] { CompanyOperationStages.DatabaseCreated, CompanyOperationStages.SchemaApplied, CompanyOperationStages.ProfileInitialized })
             {
@@ -221,15 +221,20 @@ public sealed class CompanyProvisioningSqlTests
         }
     }
 
-    private static CompanyProvisioningExecutor Executor(SystemDbContext db, TimeProvider clock, string worker, Func<string, Task>? afterCheckpoint = null)
+    internal static CompanyOperationExecutor Executor(SystemDbContext db, TimeProvider clock, string worker, Func<string, Task>? afterCheckpoint = null,
+        string? backupRoot = null)
     {
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["OperationsConnections:LocalWindows"] = Local }).Build();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["OperationsConnections:LocalWindows"] = Local,
+            ["Operations:BackupRoot"] = backupRoot
+        }).Build();
         var environment = new HostingEnvironment { EnvironmentName = Environments.Development };
-        return new(db, new OperationsConnections(configuration, environment), clock, NullLogger<CompanyProvisioningExecutor>.Instance,
-            new OperationsWorkerIdentity(worker), afterCheckpoint);
+        return new(db, new OperationsConnections(configuration, environment), new BackupStorage(configuration), clock,
+            NullLogger<CompanyOperationExecutor>.Instance, new OperationsWorkerIdentity(worker), afterCheckpoint);
     }
 
-    private static async Task DropOwned(CompanyOperation operation)
+    internal static async Task DropOwned(CompanyOperation operation)
     {
         if (!await DatabaseExists(operation.DatabaseName)) return;
         var marker = await Scalar<string>(operation.DatabaseName,
@@ -237,14 +242,14 @@ public sealed class CompanyProvisioningSqlTests
         if (marker == operation.Id.ToString("D")) await Drop(operation.DatabaseName);
     }
 
-    private static async Task Drop(string database)
+    internal static async Task Drop(string database)
     {
         if (!CompanyDatabaseNames.IsCompanyDatabase(database)) throw new InvalidOperationException("Odmowa usunięcia bazy spoza wzorca testu.");
         SqlConnection.ClearAllPools();
         await Execute("master", $"ALTER DATABASE [{database}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{database}];");
     }
 
-    private static async Task<bool> DatabaseExists(string database)
+    internal static async Task<bool> DatabaseExists(string database)
     {
         await using var connection = new SqlConnection(Local + ";Database=master");
         await connection.OpenAsync();
@@ -253,7 +258,7 @@ public sealed class CompanyProvisioningSqlTests
         return (int)(await command.ExecuteScalarAsync())! == 1;
     }
 
-    private static async Task Execute(string database, string sql)
+    internal static async Task Execute(string database, string sql)
     {
         await using var connection = new SqlConnection(Local + ";Database=" + database);
         await connection.OpenAsync();
@@ -261,8 +266,8 @@ public sealed class CompanyProvisioningSqlTests
         await command.ExecuteNonQueryAsync();
     }
 
-    private static async Task<int> Scalar(string database, string sql) => await Scalar<int>(database, sql);
-    private static async Task<T?> Scalar<T>(string database, string sql)
+    internal static async Task<int> Scalar(string database, string sql) => await Scalar<int>(database, sql);
+    internal static async Task<T?> Scalar<T>(string database, string sql)
     {
         await using var connection = new SqlConnection(Local + ";Database=" + database);
         await connection.OpenAsync();
@@ -271,7 +276,7 @@ public sealed class CompanyProvisioningSqlTests
         return value is null or DBNull ? default : (T)value;
     }
 
-    private static WebApplicationFactory<Program> App(PreservedSystemTransaction tx) => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+    internal static WebApplicationFactory<Program> App(PreservedSystemTransaction tx) => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
     {
         builder.UseEnvironment("Development"); builder.ConfigureLogging(x => x.ClearProviders());
         builder.ConfigureServices(services =>
@@ -281,9 +286,9 @@ public sealed class CompanyProvisioningSqlTests
         });
     });
 
-    private static HttpClient Client(WebApplicationFactory<Program> app) => app.CreateClient(new() { BaseAddress = new("https://localhost"), AllowAutoRedirect = false });
+    internal static HttpClient Client(WebApplicationFactory<Program> app) => app.CreateClient(new() { BaseAddress = new("https://localhost"), AllowAutoRedirect = false });
 
-    private static async Task<ApplicationUser> Account(IServiceProvider services, bool admin, string password)
+    internal static async Task<ApplicationUser> Account(IServiceProvider services, bool admin, string password)
     {
         var users = services.GetRequiredService<UserManager<ApplicationUser>>();
         var user = new ApplicationUser { UserName = "fixture-provisioning-" + Guid.NewGuid().ToString("N") };
@@ -297,10 +302,11 @@ public sealed class CompanyProvisioningSqlTests
         return user;
     }
 
-    private sealed class MutableClock(DateTimeOffset start) : TimeProvider
+    internal sealed class MutableClock(DateTimeOffset start, TimeZoneInfo? zone = null) : TimeProvider
     {
         private DateTimeOffset now = start;
         public override DateTimeOffset GetUtcNow() => now;
+        public override TimeZoneInfo LocalTimeZone => zone ?? TimeZoneInfo.Local;
         public void Advance(TimeSpan by) => now += by;
     }
 }

@@ -71,6 +71,12 @@ public interface IVatowiecApiClient : IDisposable
     Task<ServerProfileResponse[]> ServerProfiles() => throw new NotSupportedException();
     Task<CompanyOperationResponse> ProvisionCompany(ProvisionCompanyRequest value) => throw new NotSupportedException();
     Task<CompanyOperationResponse> RetryCompanyOperation(Guid operationId, CompanyOperationRetryRequest value) => throw new NotSupportedException();
+    Task<CompanyBackupStatusResponse> CompanyBackups(Guid companyId) => throw new NotSupportedException();
+    Task<CompanyOperationResponse> RequestCompanyBackup(Guid companyId, CompanyBackupRequest value) => throw new NotSupportedException();
+    Task<CompanyBackupStatusResponse> SaveBackupSchedule(Guid companyId, CompanyBackupScheduleRequest value) => throw new NotSupportedException();
+    Task<CompanyBackupStatusResponse> SnoozeBackupReminder(Guid companyId) => throw new NotSupportedException();
+    Task<BackupPolicyResponse> BackupPolicy() => throw new NotSupportedException();
+    Task<BackupPolicyResponse> SaveBackupPolicy(BackupPolicyRequest value) => throw new NotSupportedException();
 }
 
 public sealed class ApiException(int statusCode, string message) : Exception(message)
@@ -169,6 +175,15 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
     public Task<CompanyOperationResponse> ProvisionCompany(ProvisionCompanyRequest value) => Post<CompanyOperationResponse>("api/v1/installation/company-operations/provision", value);
     public Task<CompanyOperationResponse> RetryCompanyOperation(Guid operationId, CompanyOperationRetryRequest value) =>
         Post<CompanyOperationResponse>($"api/v1/installation/company-operations/{operationId}/retry", value);
+    public Task<CompanyBackupStatusResponse> CompanyBackups(Guid companyId) => Get<CompanyBackupStatusResponse>($"api/v1/companies/{companyId}/backups");
+    public Task<CompanyOperationResponse> RequestCompanyBackup(Guid companyId, CompanyBackupRequest value) =>
+        Post<CompanyOperationResponse>($"api/v1/companies/{companyId}/backups", value);
+    public Task<CompanyBackupStatusResponse> SaveBackupSchedule(Guid companyId, CompanyBackupScheduleRequest value) =>
+        Write<CompanyBackupStatusResponse>($"api/v1/companies/{companyId}/backups/schedule", value, true);
+    public Task<CompanyBackupStatusResponse> SnoozeBackupReminder(Guid companyId) =>
+        Post<CompanyBackupStatusResponse>($"api/v1/companies/{companyId}/backups/reminder/snooze", new { });
+    public Task<BackupPolicyResponse> BackupPolicy() => Get<BackupPolicyResponse>("api/v1/installation/backup-policy");
+    public Task<BackupPolicyResponse> SaveBackupPolicy(BackupPolicyRequest value) => Write<BackupPolicyResponse>("api/v1/installation/backup-policy", value, true);
     public Task<RegistryConfigurationResponse[]> RegistryConfigurations() => Get<RegistryConfigurationResponse[]>("api/v1/installation/integrations/registries");
     public Task<RegistryConfigurationResponse> SaveRegistryConfiguration(string source, RegistryConfigurationRequest value) =>
         Write<RegistryConfigurationResponse>($"api/v1/installation/integrations/registries/{Uri.EscapeDataString(source)}", value, true);
@@ -301,7 +316,9 @@ public sealed class VatowiecApiClient : IVatowiecApiClient
         try { error = await response.Content.ReadFromJsonAsync<ApiError>(); }
         catch (JsonException) { }
         var userAdministration = uri?.AbsolutePath.StartsWith("/api/v1/installation/users", StringComparison.Ordinal) == true;
-        var companyOperations = uri?.AbsolutePath.StartsWith("/api/v1/installation/company-operations", StringComparison.Ordinal) == true;
+        var companyOperations = uri?.AbsolutePath.StartsWith("/api/v1/installation/company-operations", StringComparison.Ordinal) == true ||
+            uri?.AbsolutePath.StartsWith("/api/v1/installation/backup-policy", StringComparison.Ordinal) == true ||
+            uri?.AbsolutePath.Contains("/backups", StringComparison.Ordinal) == true;
         var message = response.StatusCode switch
         {
             _ when companyOperations && error?.Message is { Length: > 0 } => error.Message,

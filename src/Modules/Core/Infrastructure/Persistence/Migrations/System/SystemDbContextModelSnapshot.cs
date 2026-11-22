@@ -157,6 +157,100 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                     b.ToTable("UserTokens", "security");
                 });
 
+            modelBuilder.Entity("Vatowiec.Core.Domain.BackupPolicy", b =>
+                {
+                    b.Property<byte>("SingletonKey")
+                        .HasColumnType("tinyint");
+
+                    b.Property<int>("RetainedBackupsPerCompany")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<bool>("UsersMayRequestBackups")
+                        .HasColumnType("bit");
+
+                    b.HasKey("SingletonKey");
+
+                    b.ToTable("BackupPolicy", "ops", t =>
+                        {
+                            t.HasCheckConstraint("CK_BackupPolicy_Values", "[SingletonKey] = 1 AND [RetainedBackupsPerCompany] BETWEEN 1 AND 365");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            SingletonKey = (byte)1,
+                            RetainedBackupsPerCompany = 7,
+                            UsersMayRequestBackups = true
+                        });
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.BackupReminderSnooze", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UntilUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("UserId", "CompanyId");
+
+                    b.HasIndex("CompanyId");
+
+                    b.ToTable("BackupReminderSnoozes", "ops");
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.BackupSettingChange", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActorName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("AfterJson")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
+
+                    b.Property<DateTimeOffset>("AtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("BeforeJson")
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
+
+                    b.Property<Guid?>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "Id");
+
+                    b.ToTable("BackupSettingChanges", "ops", t =>
+                        {
+                            t.HasTrigger("TR_BackupSettingChanges_Immutable");
+                        });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
+                });
+
             modelBuilder.Entity("Vatowiec.Core.Domain.Company", b =>
                 {
                     b.Property<Guid>("Id")
@@ -223,7 +317,118 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
 
                     b.ToTable("CompanyAccess", "security", t =>
                         {
-                            t.HasCheckConstraint("CK_CompanyAccess_Permissions", "[Permissions] > 0 AND [Permissions] <= 1023");
+                            t.HasCheckConstraint("CK_CompanyAccess_Permissions", "[Permissions] > 0 AND [Permissions] <= 2047");
+                        });
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.CompanyBackup", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.Property<bool>("IsAutomatic")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("RemovedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("RemovedReason")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("RequestedByName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("char(64)")
+                        .IsFixedLength();
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique();
+
+                    b.HasIndex("CompanyId", "RemovedAtUtc", "CreatedAtUtc");
+
+                    b.ToTable("CompanyBackups", "ops", t =>
+                        {
+                            t.HasCheckConstraint("CK_CompanyBackups_Kind", "[Kind] IN (N'Regular')");
+
+                            t.HasCheckConstraint("CK_CompanyBackups_Removed", "([RemovedAtUtc] IS NULL AND [RemovedReason] IS NULL) OR ([RemovedAtUtc] IS NOT NULL AND [RemovedReason] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_CompanyBackups_Size", "[SizeBytes] > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.CompanyBackupSchedule", b =>
+                {
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Frequency")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<int>("PreferredHour")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("CompanyId");
+
+                    b.ToTable("CompanyBackupSchedules", "ops", t =>
+                        {
+                            t.HasCheckConstraint("CK_CompanyBackupSchedules_Frequency", "[Frequency] IN (N'Never', N'Daily', N'Every7Days', N'Every30Days')");
+
+                            t.HasCheckConstraint("CK_CompanyBackupSchedules_Hour", "[PreferredHour] BETWEEN 0 AND 23");
+
+                            t.HasCheckConstraint("CK_CompanyBackupSchedules_Mode", "[Mode] IN (N'Reminder', N'Automatic')");
                         });
                 });
 
@@ -283,6 +488,10 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                     b.Property<int>("Attempt")
                         .HasColumnType("int");
 
+                    b.Property<string>("BackupFileName")
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier");
 
@@ -335,7 +544,7 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                         .IsUnicode(false)
                         .HasColumnType("varchar(64)");
 
-                    b.Property<Guid>("RequestedById")
+                    b.Property<Guid?>("RequestedById")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("RequestedByName")
@@ -374,7 +583,8 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                         .HasFilter("[Kind] = N'Provision'");
 
                     b.HasIndex("RequestedById", "OperationKey")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[RequestedById] IS NOT NULL");
 
                     b.HasIndex("ServerName", "DatabaseName")
                         .IsUnique()
@@ -382,17 +592,25 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
 
                     b.HasIndex("Status", "NextAttemptAtUtc");
 
+                    b.HasIndex(new[] { "CompanyId" }, "IX_CompanyOperations_ActiveBackup")
+                        .IsUnique()
+                        .HasFilter("[Kind] = N'Backup' AND [Status] IN (N'Pending', N'Running')");
+
                     b.ToTable("CompanyOperations", "ops", t =>
                         {
                             t.HasCheckConstraint("CK_CompanyOperations_Attempt", "[Attempt] >= 0");
 
+                            t.HasCheckConstraint("CK_CompanyOperations_BackupFile", "([Kind] = N'Backup' AND [BackupFileName] IS NOT NULL) OR ([Kind] <> N'Backup' AND [BackupFileName] IS NULL)");
+
                             t.HasCheckConstraint("CK_CompanyOperations_Completed", "([Status] = N'Completed' AND [Stage] = N'Ready' AND [CompletedAtUtc] IS NOT NULL) OR ([Status] <> N'Completed' AND [CompletedAtUtc] IS NULL)");
 
-                            t.HasCheckConstraint("CK_CompanyOperations_Kind", "[Kind] IN (N'Provision')");
+                            t.HasCheckConstraint("CK_CompanyOperations_Kind", "[Kind] IN (N'Provision', N'Backup')");
 
                             t.HasCheckConstraint("CK_CompanyOperations_Lease", "([Status] = N'Running' AND [LeaseOwner] IS NOT NULL AND [LeaseExpiresAtUtc] IS NOT NULL) OR ([Status] <> N'Running' AND [LeaseOwner] IS NULL AND [LeaseExpiresAtUtc] IS NULL)");
 
-                            t.HasCheckConstraint("CK_CompanyOperations_Stage", "[Stage] IN (N'Requested', N'DatabaseCreated', N'SchemaApplied', N'ProfileInitialized', N'Ready')");
+                            t.HasCheckConstraint("CK_CompanyOperations_Requester", "[Kind] = N'Backup' OR [RequestedById] IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_CompanyOperations_Stage", "[Stage] IN (N'Requested', N'DatabaseCreated', N'SchemaApplied', N'ProfileInitialized', N'BackupWritten', N'BackupVerified', N'Ready')");
 
                             t.HasCheckConstraint("CK_CompanyOperations_Status", "[Status] IN (N'Pending', N'Running', N'Failed', N'NeedsReconciliation', N'Completed')");
                         });
@@ -1576,6 +1794,21 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Vatowiec.Core.Domain.BackupReminderSnooze", b =>
+                {
+                    b.HasOne("Vatowiec.Core.Domain.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Vatowiec.Core.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Vatowiec.Core.Domain.CompanyAccess", b =>
                 {
                     b.HasOne("Vatowiec.Core.Domain.Company", null)
@@ -1588,6 +1821,24 @@ namespace Vatowiec.Core.Infrastructure.Persistence.Migrations.System
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.CompanyBackup", b =>
+                {
+                    b.HasOne("Vatowiec.Core.Domain.CompanyOperation", null)
+                        .WithMany()
+                        .HasForeignKey("OperationId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Vatowiec.Core.Domain.CompanyBackupSchedule", b =>
+                {
+                    b.HasOne("Vatowiec.Core.Domain.Company", null)
+                        .WithOne()
+                        .HasForeignKey("Vatowiec.Core.Domain.CompanyBackupSchedule", "CompanyId")
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
                 });
 

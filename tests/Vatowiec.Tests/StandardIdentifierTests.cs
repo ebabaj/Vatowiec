@@ -79,7 +79,7 @@ public sealed class StandardIdentifierTests
         Assert.Equal(0, (int)(old.Permissions & CompanyPermission.ManageContractorPesel));
         old.ChangePermissions(old.Permissions | CompanyPermission.ManageContractorPesel);
         Assert.Equal(1023, (int)old.Permissions);
-        Assert.Throws<ArgumentException>(() => old.ChangePermissions((CompanyPermission)1024));
+        Assert.Throws<ArgumentException>(() => old.ChangePermissions((CompanyPermission)2048)); // Pierwsza nieznana flaga (1024 = ManageCompanyBackups, ADR-044).
     }
 }
 

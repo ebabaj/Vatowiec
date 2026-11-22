@@ -13,7 +13,8 @@ public enum CompanyPermission
     ViewExchangeRates = 64,
     ManageCurrencies = 128,
     ImportExchangeRates = 256,
-    ManageContractorPesel = 512
+    ManageContractorPesel = 512,
+    ManageCompanyBackups = 1024
 }
 
 public sealed class CompanyAccess : ITrackedEntity

@@ -25,7 +25,7 @@ public sealed class OperationsConnections(IConfiguration configuration, IHostEnv
 
     public string Company(CompanyOperation operation)
     {
-        if (!CompanyDatabaseNames.IsCompanyDatabase(operation.DatabaseName))
+        if (!CompanyDatabaseNames.IsSafeIdentifier(operation.DatabaseName))
             throw new OperationFailure("database_name_invalid", reconcile: true);
         var connection = Build(operation);
         connection.InitialCatalog = operation.DatabaseName;

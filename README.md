@@ -31,9 +31,10 @@ Nie jest to jeszcze program do prowadzenia księgowości.
 **Aktualny etap: domknięcie M0.** Dodano CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)),
 [CONTRIBUTING.md](CONTRIBUTING.md) i [SECURITY.md](SECURITY.md).
 [Tworzenie firmy z aplikacji](docs/company-provisioning.md) (ADR-044 krok 1) wykonuje
-osobna usługa VATowiec Operations — uruchom ją obok API. Do zamknięcia M0 pozostaje
-kopia z rotacją i harmonogramem oraz odtworzenie jednej firmy
-([ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md), kroki 2–3).
+osobna usługa VATowiec Operations — uruchom ją obok API. Ta sama usługa wykonuje
+[kopie zapasowe firm](docs/company-backups.md) z rotacją i harmonogramem (krok 2).
+Do zamknięcia M0 pozostaje usuwanie firmy ([ADR-045](docs/adr/ADR-045-nazwy-baz-i-usuwanie-firmy.md))
+i odtworzenie jednej firmy ([ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md), krok 3).
 Stan i dowody: [SPECYFIKACJA.md §13](SPECYFIKACJA.md#m0--repozytorium-i-architektura).
 
 Standardowe warunki finansowe kontrahenta (ADR-031):
@@ -320,8 +321,8 @@ kontrakt HTTP: [logowanie](docs/authentication.md).
 
 ## Dalsze kroki
 
-Do zamknięcia M0 pozostaje niezależny backup z rotacją i harmonogramem oraz odtworzenie
-jednej firmy ([ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md), kroki 2–3).
+Do zamknięcia M0 pozostaje usuwanie firmy z kopią archiwalną (ADR-045) i odtworzenie
+jednej firmy ([ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md), krok 3).
 Następnie M1: dokumenty, faktury i audyt księgowy. Narzędzie
 wdrożeniowe `DatabaseTools` działa poza API. Nie przeniesiono danych z usuniętej Vatowiec_Dev.
 

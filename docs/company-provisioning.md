@@ -55,7 +55,8 @@ sc.exe create "VATowiec Operations" binPath= "<katalog-usługi>\Vatowiec.Operati
 sc.exe start "VATowiec Operations"
 ```
 
-Konfigurację (`ConnectionStrings:VatowiecSystem`, `OperationsConnections:*`) podaj w
+Konfigurację (`ConnectionStrings:VatowiecSystem`, `OperationsConnections:*`,
+`Operations:BackupRoot` — patrz [kopie zapasowe](company-backups.md)) podaj w
 `appsettings.json` katalogu usługi albo w zmiennych środowiskowych usługi. Nie zapisuj
 haseł SQL w repozytorium.
 

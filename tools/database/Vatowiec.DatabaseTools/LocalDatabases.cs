@@ -472,11 +472,16 @@ internal static class LocalDatabases
         await using var system = SystemContext(SystemDatabase);
         await ShowSchema(system, SystemDatabase, ["core.Companies", "core.CompanyDatabases", "dbo.__EFMigrationsHistory",
             "security.Users", "security.Roles", "security.UserRoles", "security.UserClaims", "security.UserLogins",
-            "security.UserTokens", "security.RoleClaims", "security.CompanyAccess", "security.UserSessions", "security.Installation", "security.GusConfiguration", "security.RegistryConfigurations", "audit.RegistryConfigurationChanges", "audit.UserAdministrationChanges", "security.PasswordPolicy", "audit.PasswordPolicyChanges", "security.UserPasswordHistory", "ref.TaxIdentifierSchemes", "security.TableViews", "audit.TableViewChanges", "ops.CompanyOperations", "ops.CompanyOperationEvents"], "_CompanyProvisioning");
+            "security.UserTokens", "security.RoleClaims", "security.CompanyAccess", "security.UserSessions", "security.Installation", "security.GusConfiguration", "security.RegistryConfigurations", "audit.RegistryConfigurationChanges", "audit.UserAdministrationChanges", "security.PasswordPolicy", "audit.PasswordPolicyChanges", "security.UserPasswordHistory", "ref.TaxIdentifierSchemes", "security.TableViews", "audit.TableViewChanges", "ops.CompanyOperations", "ops.CompanyOperationEvents", "ops.CompanyBackups", "ops.BackupPolicy", "ops.CompanyBackupSchedules", "ops.BackupSettingChanges", "ops.BackupReminderSnoozes"], "_CompanyBackups");
         if (await system.InstallationIdentities.CountAsync() != 1 || (await system.InstallationIdentities.SingleAsync()).Id == Guid.Empty)
             throw new InvalidOperationException("Brak trwałej identyfikacji instalacji.");
-        if (await system.Companies.CountAsync() != 2 || await system.CompanyDatabases.CountAsync() != 2)
-            throw new InvalidOperationException("Katalog demonstratora powinien zawierać dokładnie dwie firmy i dwa wskazania baz.");
+        // Firmy demonstracyjne A/B muszą istnieć; firmy utworzone z aplikacji (ADR-044) są dozwolone obok nich.
+        var demoIds = DemoCompanies.Select(x => x.Id).ToArray();
+        if (await system.Companies.CountAsync(x => demoIds.Contains(x.Id)) != 2 || await system.CompanyDatabases.CountAsync(x => demoIds.Contains(x.CompanyId)) != 2 ||
+            await system.Companies.CountAsync() != await system.CompanyDatabases.CountAsync())
+            throw new InvalidOperationException("Katalog musi zawierać obie firmy demonstracyjne, a każda firma dokładnie jedno wskazanie bazy.");
+        var provisioned = await system.Companies.CountAsync(x => !demoIds.Contains(x.Id));
+        if (provisioned > 0) Console.WriteLine($"  Firmy utworzone z aplikacji: {provisioned} (bez kontroli danych demonstracyjnych).");
         var now = DateTimeOffset.UtcNow;
         Console.WriteLine($"  Identity: użytkownicy={await system.Users.CountAsync()}, role={await system.Roles.CountAsync()}, przypisania={await system.CompanyAccesses.CountAsync()}, aktywne sesje={await system.UserSessions.CountAsync(x => x.RevokedAtUtc == null && x.ExpiresAtUtc > now)}.");
         foreach (var (id, _, database) in DemoCompanies)
