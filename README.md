@@ -21,16 +21,20 @@ Lokalne wydanie klienta Windows **0.1.0-preview**: [budowanie, instalacja i aktu
 bez API/SQL; [wyniki weryfikacji](docs/releases/0.1.0-preview.md).
 
 Projekt wielostanowiskowej aplikacji dla polskich mikrofirm. Obecny stan to
-**kartoteka kontrahentów M0 database-per-company**: logowanie Avalonia,
-wybór firmy, dodawanie/edycja z audytem i konfliktami oraz wyszukiwanie po stronie serwera.
-Osobne SystemDbContext i CompanyDbContext, trzy bazy SQL
-Server oraz dwie fikcyjne firmy. Działają Identity, sesje API i autoryzowany resolver
-bazy firmy. Finanse kontrahenta ADR-031: **383/383 wykonanych testów**,
-374 bez SQL i 9 niedestrukcyjnych SQL/API. Dawnych 103 SQL/API z resetującym fixture
-nie uruchamiano, aby zachować dane. Kompilacja bez ostrzeżeń i błędów.
+**M0 database-per-company w trakcie domykania**: logowanie Avalonia,
+wybór firmy, pełna kartoteka kontrahentów z audytem, konfliktami i wyszukiwaniem
+po stronie serwera, waluty i kursy NBP, administracja użytkownikami, konfigurowalne
+widoki tabel (ADR-042) i numery telefonów (ADR-043). Osobne SystemDbContext
+i CompanyDbContext, trzy bazy SQL Server oraz dwie fikcyjne firmy.
 Nie jest to jeszcze program do prowadzenia księgowości.
 
-**Aktualny etap: standardowe warunki finansowe kontrahenta (ADR-031).**
+**Aktualny etap: domknięcie M0.** Dodano CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)),
+[CONTRIBUTING.md](CONTRIBUTING.md) i [SECURITY.md](SECURITY.md). Do zamknięcia M0
+pozostaje wznawialne tworzenie firmy oraz backup i odtworzenie jednej firmy —
+propozycja [ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md) czeka na akceptację.
+Stan i dowody: [SPECYFIKACJA.md §13](SPECYFIKACJA.md#m0--repozytorium-i-architektura).
+
+Standardowe warunki finansowe kontrahenta (ADR-031):
 Zakładka Finansowe: niezależne Sprzedaż/Zakup, opcjonalne warunki płatności,
 waluta i rabat oraz wielowalutowe limity. Otwarty słownik sposobów płatności,
 rowversion, idempotencja i atomowy audyt. Zapis finansów zachowuje szkic danych
@@ -215,7 +219,7 @@ Zadanie **test** jest dostępne przez **Terminal → Run Task**.
 src/
   Modules/Core/
     Domain/           # katalog, profil firmy, kontrahenci; bez ORM
-    Application/      # kontrakt kontekstu firmy
+    Application/      # kontrakty aplikacyjne: kontekst firmy, walidatory, uprawnienia
     Infrastructure/   # dwa konteksty EF, rozłączne mapowania i migracje
   Server/Api/         # host, Identity/cookie/CSRF, autoryzowany odczyt firm
   Desktop/            # Avalonia UI
@@ -266,17 +270,19 @@ __EFMigrationsHistory. Dane demonstracyjne nie zawierają autentycznych identyfi
 ## Sprawdzanie zmian
 
 ```powershell
-dotnet build Vatowiec.slnx --no-restore
-$env:VATOWIEC_DATABASE_PER_COMPANY_SQL = '0'
-dotnet test Vatowiec.slnx --no-build
+dotnet build Vatowiec.slnx -c Debug --no-restore
+dotnet test Vatowiec.slnx -c Debug --no-build --filter "FullyQualifiedName!~Personal"
 dotnet format Vatowiec.slnx --verify-no-changes --no-restore
 ```
 
-Testy offline weryfikują rozłączne modele, lokalny profil/FK, historie i SQL
-migracji, zgodność snapshotów, odmowę bez wyboru bazy, izolację scope,
-politykę połączeń, filtry, kontrolę zapisu i host API.
+To ten sam zestaw, który wykonuje [CI](.github/workflows/ci.yml); filtr pomija
+testy wstrzymanej edycji Personal. Testy offline weryfikują rozłączne modele,
+lokalny profil/FK, historie i SQL migracji, zgodność snapshotów, odmowę bez
+wyboru bazy, izolację scope, politykę połączeń, filtry, kontrolę zapisu i host API.
+Testy wymagające SQL, natywnego okna lub LocalDB są pomijane bez jawnych zmiennych
+`VATOWIEC_*` ([lista w CONTRIBUTING.md](CONTRIBUTING.md#testy)).
 
-Powyższy przebieg bez SQL zalicza 104 testy i pomija 76 testów SQL/API. Pełny przebieg:
+Przebieg z 2026-11-22: **541 zaliczonych, 0 błędów, 136 pominiętych**. Pełny przebieg SQL:
 
 ```powershell
 dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- test
@@ -286,8 +292,10 @@ Runner sprawdza instancję, nazwy, znaczniki i fikcyjne dane, po czym czyści fi
 wyłącznie Vatowiec_System i Vatowiec_Company_A_Dev/B_Dev. **Przed testem zatrzymaj
 API i desktop; bieżące fikcyjne dane i sesje zostaną usunięte.** Po pełnym
 przebiegu inicjalizuje konta i dane demonstracyjne z lokalnej konfiguracji.
-Nie odtwarza baz ani tabel, nie tworzy dodatkowych *_Test i nie modyfikuje innych baz. Pełny wynik:
-**180/180**, bez pominięć (76 SQL/API, 104 bez SQL). Raport TRX: TestResults.
+Nie odtwarza baz ani tabel, nie tworzy dodatkowych *_Test i nie modyfikuje innych baz.
+Ostatni udokumentowany pełny wynik runnera: **180/180** (ADR-021, 2026-10-22);
+w późniejszych etapach uruchamiano wybrane niedestrukcyjne klasy SQL, a testów
+z resetującymi fixture nie powtarzano. Raport TRX: TestResults.
 Flagi SQL i dodatkową zgodę na przygotowane fixture ustawia runner;
 [instrukcja testów](docs/database-per-company.md#testy). Pominięcie nie jest zaliczeniem.
 
@@ -309,10 +317,10 @@ kontrakt HTTP: [logowanie](docs/authentication.md).
 
 ## Dalsze kroki
 
-Kolejne etapy obejmą wznawialny provisioning firmy
-z aplikacji, audyt księgowy z trwałą identyfikacją aktorów oraz niezależny backup/restore.
-Narzędzie wdrożeniowe jest dostępne poza API; pełny provisioning z aplikacji
-pozostaje osobnym etapem. Nie przeniesiono danych z usuniętej Vatowiec_Dev.
+Do zamknięcia M0 pozostaje wznawialne tworzenie firmy z aplikacji oraz niezależny
+backup i odtworzenie jednej firmy ([ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md),
+propozycja). Następnie M1: dokumenty, faktury i audyt księgowy. Narzędzie
+wdrożeniowe `DatabaseTools` działa poza API. Nie przeniesiono danych z usuniętej Vatowiec_Dev.
 
 Nie zaimplementowano podatków, KSeF, JPK ani wtyczek. M0 nie jest ukończone;
 nazwa pozostaje robocza.

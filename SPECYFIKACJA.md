@@ -1,7 +1,7 @@
 # Otwarty następca VATowca — specyfikacja produktu i architektury
 
-**Wersja dokumentu:** 0.21 (kolejność i szerokości kolumn, ADR-042)
-**Data:** 2026-10-25
+**Wersja dokumentu:** 0.22 (domknięcie M0: CI, licencja MIT, propozycja ADR-044)
+**Data:** 2026-11-22
 **Status:** projekt założeń; nie jest potwierdzeniem zgodności podatkowej gotowego oprogramowania  
 **Nazwa projektu:** robocza „Otwarty następca VATowca”; docelowa nazwa i użycie nazwy „VATowiec” wymagają odrębnej decyzji i sprawdzenia praw  
 **Główna platforma:** Windows; klient i serwer projektowane także z myślą o Linux  
@@ -542,7 +542,7 @@ Bez faktur, reguł podatkowych i różnic kursowych. [Obsługa i struktura](docs
 | Dostęp do danych | **EF Core** dla CRUD/migracji + jawne SQL, gdy potrzebne [PROPOZYCJA] | Zachowujemy pełną kontrolę nad zapytaniami i wydajnością |
 | Testy | **xUnit**, testy integracyjne na prawdziwym SQL Server [PROPOZYCJA] | Powtarzalna kontrola obliczeń i transakcji |
 | API | OpenAPI, wersjonowane endpointy + zdarzenia integracyjne | Możliwość rozbudowy programu bez modyfikacji rdzenia |
-| Licencja źródeł | **MPL-2.0 do zatwierdzenia** [PROPOZYCJA] | Open source z możliwością łączenia z odrębnymi komponentami własnościowymi |
+| Licencja źródeł | **MIT** [USTALONE 2026-11-22, ADR-002] | Open source bez ograniczeń łączenia z odrębnymi komponentami; zależności zachowują własne licencje |
 
 **SQL Server Express:** Microsoft dokumentuje limit 50 GB dla SQL Server 2025 Express w głównej tabeli edycji, natomiast osobna dokumentacja *SQL Server 2025 on Linux* podawała w dniu sporządzania specyfikacji 10 GB. Nie uzależniamy projektu od jednego z tych limitów bez weryfikacji konkretnej platformy, wydania i aktualnej licencji. SQL Server Express nie ma usługi SQL Server Agent — automatyzacja kopii zapasowych musi działać przez własny serwis / harmonogram OS. Rozmiar plików PDF w bazie ograniczamy poprzez przechowywanie załączników poza tabelami transakcyjnymi.
 
@@ -952,7 +952,7 @@ Ważne jest odróżnienie **daty zmiany przepisów** od **daty wydania aktualiza
 - KSeF 2.0: [MF — wsparcie dla integratorów](https://ksef.podatki.gov.pl/ksef-na-okres-obligatoryjny/wsparcie-dla-integratorow/) — OpenAPI oraz środowiska integracyjne/demo/produkcyjne.
 - e-Deklaracje, XML i UPO: [MF — informacje podstawowe](https://www.podatki.gov.pl/e-deklaracje/informacje-podstawowe) — system FK może w odpowiednim trybie generować i wysyłać XML.
 - SQL Server 2025 Express: [Microsoft — edycje i limity](https://learn.microsoft.com/en-us/sql/sql-server/editions-and-components-of-sql-server-2025?view=sql-server-ver17) i [wariant Linux](https://learn.microsoft.com/en-us/sql/linux/sql-server-linux-editions-and-components-2025?view=sql-server-ver17).
-- MPL-2.0: [Open Source Initiative — pełny tekst](https://opensource.org/license/mpl-2-0).
+- MIT: [Open Source Initiative — pełny tekst](https://opensource.org/license/mit); tekst projektu w [LICENSE](LICENSE).
 
 **Nie określamy** w tej specyfikacji pełnej listy stawek, ustawowych terminów i zakresu zwolnień — są to zmienne wymagania domenowe, które należy zebrać w katalogu reguł z podstawą prawną i testami.
 
@@ -1003,7 +1003,7 @@ Zakres tej sekcji opisuje docelową ochronę używanego systemu. Obecne fikcyjne
 - Aktualizacja aplikacji nie może automatycznie nadpisać jedynej działającej kopii danych.
 - Restore najpierw odtwarza do nowej bazy roboczej, weryfikuje integralność, `CompanyId`, schemat i załączniki; przełączenie jest kontrolowane i poprzedzone kopią dotychczasowej bazy oraz zatrzymaniem zapisów danej firmy. Inne firmy mogą pracować dalej. Nie odtwarzamy centralnych kont/uprawnień z pakietu firmy.
 - Przeniesienie na inną instancję zachowuje `CompanyId`, przygotowuje tożsamość techniczną i sekrety docelowego serwera, aktualizuje centralne przypisanie i unieważnia stare wybory połączenia. Klon jako nowa firma wymaga osobnej procedury; nie jest zwykłym restore.
-- W tym etapie backup/restore to wymagania i plan, nie działające funkcje. ADR-011 pozostaje otwarty w zakresie RPO/RTO, harmonogramów i retencji.
+- W tym etapie backup/restore to wymagania i plan, nie działające funkcje. Zakres dla M0 (ręczny backup i odtworzenie jednej firmy przez osobny proces techniczny) proponuje [ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md), oczekujący na akceptację. ADR-011 pozostaje otwarty w zakresie RPO/RTO, harmonogramów i retencji.
 
 ### 11.4. Monitoring
 
@@ -1062,7 +1062,9 @@ Health check API/SQL/magazynu plików, diagnostyka błędów integracji, kolejka
 
 ### M0 — Repozytorium i architektura
 
-**Bieżący etap implementacyjny (2026-10-22, ADR-021):** edycja identyfikatorów, wersjonowane reguły, świadome odstępstwa i duplikaty, ręczne rejestry TEST i niezmienna historia w firmie. Pełny przebieg **180/180** (76 SQL/API, 104 bez SQL), bez pominięć; kompilacja bez błędów/ostrzeżeń i poprawne formatowanie. Przeprowadzono próbę w rzeczywistym oknie Avalonia i rzeczywiste testowe wywołania MF/WL2, GUS oraz VIES. Bazy zaktualizowano jawnie po backupach, bez odtwarzania. Wyniki, algorytmy i granice: §3.10 i docs/identifiers-and-registries.md. M0 pozostaje nieukończone.
+**Stan M0 (2026-11-22) — w trakcie domykania.** Wykonane: solution .NET 10, API, klient Avalonia i moduły; database-per-company z osobnymi migracjami System/firma i dwiema fikcyjnymi firmami; Identity, sesje, role, CompanyAccess i administracja użytkownikami (ADR-015, ADR-033–035); atomowy audyt z trwałą identyfikacją aktorów; kartoteka kontrahentów z konfliktami rowversion i testami izolacji firm; LICENSE (MIT, ADR-002), README, AGENTS.md, CONTRIBUTING.md, SECURITY.md; CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)): build Debug, testy bez SQL, formatowanie i skan podatnych zależności. Lokalny przebieg odpowiadający CI 2026-11-22: build 0 ostrzeżeń/0 błędów, **541 zaliczonych, 0 błędów, 136 pominiętych** (SQL/API, natywne UI, LocalDB; wstrzymane testy Personal wyłączone filtrem), formatowanie i skan zależności bez uwag. Pominięte testy nie są zaliczone; pełnego runnera SQL w tym kroku nie uruchamiano. **Pozostaje:** wznawialny provisioning firmy i niezależny backup/restore z udokumentowanym odtworzeniem — propozycja [ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md) czeka na akceptację właściciela; po wdrożeniu pełny przebieg SQL i próba dwóch operatorów na dwóch stanowiskach jako dowód warunku ukończenia.
+
+**Etap (2026-10-22, ADR-021):** edycja identyfikatorów, wersjonowane reguły, świadome odstępstwa i duplikaty, ręczne rejestry TEST i niezmienna historia w firmie. Pełny przebieg **180/180** (76 SQL/API, 104 bez SQL), bez pominięć; kompilacja bez błędów/ostrzeżeń i poprawne formatowanie. Przeprowadzono próbę w rzeczywistym oknie Avalonia i rzeczywiste testowe wywołania MF/WL2, GUS oraz VIES. Bazy zaktualizowano jawnie po backupach, bez odtwarzania. Wyniki, algorytmy i granice: §3.10 i docs/identifiers-and-registries.md. M0 pozostaje nieukończone.
 
 **Poprzedni etap (2026-10-22, ADR-020):** pełna kartoteka z czterema zakładkami, wybór grupy, API szczegółów, typowany audyt i trwała idempotencja, atomowa zmiana preferencji i świadoma akceptacja ostrzeżenia rachunku. Pełny przebieg **142/142** (67 SQL/API i 75 bez SQL), bez pominięć; kompilacja bez błędów/ostrzeżeń i poprawne formatowanie. Przeprowadzono pełną próbę w prawdziwym oknie Avalonia. Bazy zaktualizowano jawnymi migracjami technicznymi bez odtwarzania tabel biznesowych. Wyniki tego etapu: §3.9 i docs/contractors.md.
 
@@ -1175,7 +1177,7 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | ID | Kwestia | Propozycja / termin rozstrzygnięcia |
 |---|---|---|
 | ADR-001 | Nazwa i identyfikacja projektu | Przed publicznym ogłoszeniem; roboczo „Otwarty następca VATowca” |
-| ADR-002 | MPL-2.0 vs inna licencja | Przed pierwszym publicznym commitem z `LICENSE`; sprawdzić użyte zależności |
+| ADR-002 | Licencja kodu źródłowego | **Rozstrzygnięte 2026-11-22: MIT** ([LICENSE](LICENSE)); zależności zachowują własne licencje (`licenses/THIRD-PARTY-NOTICES.md`) |
 | ADR-003 | SQLite/PostgreSQL jako opcja | Dopiero po stabilizacji SQL Server i kontraktów repozytorium |
 | ADR-004 | SQL Server na Linux / limit Express | Przed publikacją instrukcji instalacji linuksowej; rozbieżność dokumentacji |
 | [ADR-005](docs/adr/ADR-005-izolacja-firm-i-pierwszy-model.md) | Historyczna wspólna baza | Zastąpiony przez ADR-014; pozostaje zapisem zastosowanej migracji Vatowiec_Dev |
@@ -1200,13 +1202,15 @@ Każde zadanie ma mieć: opis domenowy, kryteria akceptacji, testy, uwagi o bezp
 | [ADR-018](docs/adr/ADR-018-docelowy-model-kontrahentow.md) | Docelowy model kontrahentów i niezależne weryfikacje | Uzupełniony o ParentId bez dziedziczenia, nazwy tabel, reguły identyfikatorów i domyślność walutową; ślad rozstrzygnięć K-01–K-09, pozostałe doprecyzowania w §4; podstawa implementacji ADR-019, bez migracji danych demonstracyjnych |
 | [ADR-030](docs/adr/ADR-030-standardowe-identyfikatory-kontrahenta.md) | REGON, KRS, BDO i PESEL | Opcjonalne teksty, kontrola sum/formatu, osobne firmowe prawo PESEL, bezpieczne wyszukiwanie POST, addytywne migracje i audyt wersji 3 |
 | [ADR-031](docs/adr/ADR-031-warunki-finansowe-kontrahenta.md) | Warunki finansowe kontrahenta | Sale/Purchase, opcjonalne warunki, słownik sposobów, limity per waluta, osobne szkice i atomowy audyt bez dokumentów/sald |
+| [ADR-042](docs/adr/ADR-042-interfejs-i-widoki-tabel.md) | Interfejs i wspólne widoki tabel | Menu, podgląd bez blokowania, stronicowanie, katalog kolumn, kolejność i szerokości, hierarchia widoków użytkownik → instalacja → fabryczny z audytem |
 | [ADR-043](docs/adr/ADR-043-numery-telefoniczne.md) | Numery telefoniczne | libphonenumber-csharp, E.164 w nowych zapisach API, uproszczone PL w Avalonia, ścisła walidacja i zachowanie niezmienionej historii bez migracji |
+| [ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md) | Tworzenie firmy oraz backup/odtworzenie jednej firmy (M0) | **Propozycja, czeka na akceptację:** osobny Worker z tożsamością DDL/BACKUP, operacje `ops` w System z etapami, lease i audytem, odtworzenie do nowej bazy i kontrolowane przełączenie |
 | ADR-006 | Podpisywanie XML i przechowywanie certyfikatów | Przed implementacją wysyłek MF; nie przechowywać sekretów w zwykłej bazie |
 | ADR-007 | API pluginów: manifest, sandbox, granice dostępu | Przed pierwszą wykonywalną wtyczką |
 | ADR-008 | Pełny wykaz typów VAT i deklaracji na 1.0 | Przed M3; uzgodnić precyzyjne scenariusze |
 | ADR-009 | PIT-28/36/36L, załączniki, roczne deklaracje | Przed M3; granice zastosowania i właściwe podpisy |
 | ADR-010 | Migracja starych danych z oryginalnego VATowca | Opcjonalny importer; po uzyskaniu legalnych danych testowych i dokumentacji |
-| ADR-011 | Backup/restore per firma: harmonogramy, retencja, RPO/RTO | Niezależność baz ustala ADR-014; szczegóły operacyjne przed wdrożeniem |
+| ADR-011 | Backup/restore per firma: harmonogramy, retencja, RPO/RTO | Niezależność baz ustala ADR-014; ręczny backup/odtworzenie M0 proponuje ADR-044; harmonogramy, retencja i RPO/RTO przed wdrożeniem produkcyjnym |
 | ADR-012 | Wtyczki zamknięte i dystrybucja bibliotek | Weryfikacja prawna każdej zależności przed dołączeniem |
 
 ### 15.1. Główne ryzyka
@@ -1256,6 +1260,6 @@ Zmiana może zostać zaakceptowana, jeśli:
 5. Ministerstwo Finansów: [e-Deklaracje — informacje podstawowe](https://www.podatki.gov.pl/e-deklaracje/informacje-podstawowe).
 6. Microsoft Learn: [SQL Server 2025 — edycje i funkcje](https://learn.microsoft.com/en-us/sql/sql-server/editions-and-components-of-sql-server-2025?view=sql-server-ver17).
 7. Microsoft Learn: [SQL Server 2025 on Linux — edycje i limity](https://learn.microsoft.com/en-us/sql/linux/sql-server-linux-editions-and-components-2025?view=sql-server-ver17).
-8. Open Source Initiative: [MPL-2.0](https://opensource.org/license/mpl-2-0).
+8. Open Source Initiative: [MIT License](https://opensource.org/license/mit).
 
 **Dokument podlega przeglądowi przed każdą większą iteracją.** Opis funkcji nie jest obietnicą ich zgodności prawnej bez implementacji, weryfikacji i aktualnych testów.

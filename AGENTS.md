@@ -1,7 +1,14 @@
-# AGENTS.md — instrukcje dla Codexa i współautorów
+# AGENTS.md — instrukcje dla agentów (Codex, Claude) i współautorów
 
 Projekt: **Otwarty następca VATowca** (nazwa robocza).  
 Główne źródło wymagań: [`SPECYFIKACJA.md`](./SPECYFIKACJA.md).  
+
+**Zapis ustaleń (2026-11-22):** ten plik jest jedynym miejscem zapisu zasad
+pracy i ustaleń właściciela dla wszystkich agentów i współautorów.
+[`CLAUDE.md`](./CLAUDE.md) wyłącznie importuje AGENTS.md dla Claude Code i nie
+zawiera własnych reguł. Nowe ustalenia z rozmów dopisuj tutaj; decyzje
+architektoniczne dodatkowo jako ADR w `docs/adr/`, a ustalenia produktowe
+w `SPECYFIKACJA.md`.
 
 ## Nadrzędne zasady środowiska developerskiego — 2026-10-25
 
@@ -57,9 +64,20 @@ Nie odinstalowuj go ani składników Visual Studio w ramach usuwania Personal.
 
 ## Historyczne etapy i zasady architektury
 
-Aktualne prace Network: interfejs i widoki tabel, zlecone jako „ADR-041”, zapisane
-w [ADR-042](docs/adr/ADR-042-interfejs-i-widoki-tabel.md), ponieważ ADR-041
-opisuje wcześniejsze ustawienia Personal. Stosuj powyższe zasady developerskie.
+**Aktualne prace Network (2026-11-22): domknięcie M0.** Właściciel zlecił
+zamknięcie M0 według `SPECYFIKACJA.md` §13. Brakujące elementy: CI, CONTRIBUTING,
+SECURITY, wznawialny provisioning firmy i niezależny backup/restore jednej firmy.
+Provisioning i backup/restore najpierw opisuje propozycja
+[ADR-044](docs/adr/ADR-044-provisioning-i-backup-firmy.md) z kryteriami akceptacji;
+**implementacja dopiero po jej akceptacji przez właściciela**. Do tego czasu nie
+dodawaj tabel, migracji ani endpointów provisioningu/backupu.
+
+Wdrożone wcześniej: interfejs i widoki tabel
+[ADR-042](docs/adr/ADR-042-interfejs-i-widoki-tabel.md) (zlecone jako „ADR-041”,
+który opisuje ustawienia Personal) oraz wspólna obsługa numerów telefonów
+[ADR-043](docs/adr/ADR-043-numery-telefoniczne.md): `PhoneNumberService`
+w SharedContracts (libphonenumber-csharp) jest jedynym miejscem reguł telefonu,
+nowe zapisy API w E.164, bez migracji historii. Stosuj powyższe zasady developerskie.
 
 Eksperyment Personal (ADR-037): [docs/personal-localdb.md](docs/personal-localdb.md).
 Nowa prywatna instancja `VatowiecPersonal_Prototype` i trzy bazy
@@ -339,7 +357,8 @@ Po kodowaniu:
 5. Opisy mają być konkretne, zwięzłe i informować, co faktycznie zmieniono.
 6. W treści commita można umieścić krótkie polskie podsumowanie najważniejszych zmian.
 7. Nie stosuj ogólnych angielskich tytułów typu „Refactor table layout and view management features”.
-8. Codex proponuje opis commita, ale nie wykonuje samodzielnie commit ani push. Te czynności wykonuje osobiście użytkownik.
+8. Agent (Codex, Claude) proponuje opis commita, ale nie wykonuje samodzielnie commit ani push. Te czynności wykonuje osobiście użytkownik po przejrzeniu zmian.
+9. Numer ADR w tytule zapisuj trzycyfrowo (`ADR-043`, nie `ADR-43`).
 
 ### Stała zasada: uruchomienie API po zakończeniu zadania
 
@@ -428,4 +447,4 @@ Zwykły start API nadal nie wykonuje migracji ani resetu.
 
 ## 9. Licencje i cudze materiały
 
-Oprogramowanie źródłowe planujemy publikować na licencji **MPL-2.0**, decyzja pozostaje do zatwierdzenia. Dopuszcza się opcjonalne bezpłatne komponenty zamknięte tylko wtedy, gdy ich licencje zezwalają na przyjęty sposób użycia/dystrybucji. **Nie kopiuj** kodu, ikon, tekstów ani innych chronionych zasobów oryginalnego VATowca. Historyczna instrukcja jest wyłącznie materiałem do opisu funkcji i potrzeb użytkownika.
+Oprogramowanie źródłowe jest publikowane na licencji **MIT** ([LICENSE](LICENSE)); decyzję właściciela potwierdzono 2026-11-22 i zamyka ona ADR-002 (wcześniej proponowano MPL-2.0). Biblioteki zewnętrzne zachowują własne licencje, wymienione w `licenses/THIRD-PARTY-NOTICES.md`. Dopuszcza się opcjonalne bezpłatne komponenty zamknięte tylko wtedy, gdy ich licencje zezwalają na przyjęty sposób użycia/dystrybucji. **Nie kopiuj** kodu, ikon, tekstów ani innych chronionych zasobów oryginalnego VATowca. Historyczna instrukcja jest wyłącznie materiałem do opisu funkcji i potrzeb użytkownika.

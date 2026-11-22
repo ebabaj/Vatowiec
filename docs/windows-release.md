@@ -107,9 +107,9 @@ Instalator nie kopiuje preferencji ani poświadczeń między kontami Windows.
 ## Licencje
 
 Projekt używa nazwy wydawcy **Otwarty następca VATowca**, zgodnej z README.
-Nie dodano fikcyjnej firmy ani cudzej grafiki. Licencja własnego kodu pozostaje
-otwartą decyzją ADR-002; ten lokalny preview nie rozstrzyga jej ani nie jest
-publicznym wydaniem kodu na MPL-2.0.
+Nie dodano fikcyjnej firmy ani cudzej grafiki. Własny kod jest udostępniany na
+licencji MIT ([LICENSE](../LICENSE), ADR-002 rozstrzygnięte 2026-11-22);
+zależności zachowują własne licencje opisane poniżej.
 
 W instalacji `licenses/CLIENT-DEPENDENCIES.md` podaje rzeczywiste wersje,
 autorów, licencje i repozytoria pakietów. Pełne teksty SkiaSharp/HarfBuzzSharp,

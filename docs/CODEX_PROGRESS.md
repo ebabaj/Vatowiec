@@ -1,4 +1,26 @@
-﻿# Stan prac — naprawa zakładki Finansowe
+﻿# Stan prac
+
+## Bieżący stan (2026-11-22)
+
+Ten plik jest dziennikiem pojedynczych zadań agentów. Aktualny stan projektu
+i etapu M0 opisuje [SPECYFIKACJA.md §13](../SPECYFIKACJA.md#m0--repozytorium-i-architektura),
+zasady pracy i ustalenia — [AGENTS.md](../AGENTS.md).
+
+Po ADR-031 wdrożono ADR-032–043 (m.in. użytkownicy i hasła, Personal, widoki
+tabel, numery telefonów); ich wyniki są w odpowiednich ADR i dokumentach w `docs/`.
+
+Zadanie 2026-11-22 (domknięcie M0, bez Commit i Push): CLAUDE.md importujący
+AGENTS.md, poprawki niespójności dokumentacji (licencja MIT/ADR-002, stan M0,
+liczby testów), CI w `.github/workflows/ci.yml`, CONTRIBUTING.md, SECURITY.md,
+`.gitattributes` (LF), formatowanie istniejącego kodu (`dotnet format`, wyłącznie
+białe znaki i usunięcie BOM z trzech migracji System) oraz propozycja
+[ADR-044](adr/ADR-044-provisioning-i-backup-firmy.md) czekająca na akceptację.
+Weryfikacja: build Debug 0 ostrzeżeń/0 błędów; testy bez SQL i bez Personal
+541 zaliczonych, 0 błędów, 136 pominiętych; `dotnet format --verify-no-changes`
+i skan podatnych pakietów bez uwag. Pełnego runnera SQL nie uruchamiano.
+Logi lokalne: `TestResults/m0-docs/`.
+
+## Archiwum: naprawa zakładki Finansowe
 
 2026-10-23. Ukończone. BEZ Commit i Push.
 Na początku tego zadania repozytorium zawierało niezacommitowane, ukończone
