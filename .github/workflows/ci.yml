@@ -1,0 +1,75 @@
+# CI dla M0 (SPECYFIKACJA §13): build, testy bez SQL, formatowanie, skan zależności.
+# Testy SQL/API, natywne UI Avalonia i LocalDB same się pomijają bez jawnych zmiennych
+# VATOWIEC_* (patrz CONTRIBUTING.md). Testy Personal są wyłączone filtrem, bo prace nad
+# Personal są wstrzymane (AGENTS.md). Budujemy wyłącznie standardowy Debug.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+
+jobs:
+  build-test:
+    name: Build, testy, formatowanie, zależności
+    # Windows: testy Credential Manager/DPAPI i klient Avalonia są przeznaczone dla Windows.
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: .NET SDK z global.json
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore Vatowiec.slnx
+
+      - name: Build (Debug)
+        run: dotnet build Vatowiec.slnx -c Debug --no-restore
+
+      - name: Testy bez SQL
+        run: >
+          dotnet test Vatowiec.slnx -c Debug --no-build
+          --filter "FullyQualifiedName!~Personal"
+          --logger "trx;LogFileName=ci.trx"
+          --results-directory TestResults/ci
+
+      - name: Formatowanie
+        run: dotnet format Vatowiec.slnx --verify-no-changes --no-restore
+
+      - name: Skan podatnych zależności
+        shell: pwsh
+        run: |
+          $report = dotnet list Vatowiec.slnx package --vulnerable --include-transitive --format json | Out-String | ConvertFrom-Json
+          $found = @($report.projects | ForEach-Object { $_.frameworks } | Where-Object { $_ } |
+            ForEach-Object { @($_.topLevelPackages) + @($_.transitivePackages) } |
+            Where-Object { $_ -and $_.vulnerabilities })
+          if ($found.Count -gt 0) {
+            $found | ForEach-Object { "::error::Podatny pakiet $($_.id) $($_.resolvedVersion)" }
+            exit 1
+          }
+          "Brak znanych podatnych pakietów w $(@($report.projects).Count) projektach."
+
+      - name: Wyniki testów
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/ci
+          if-no-files-found: ignore
