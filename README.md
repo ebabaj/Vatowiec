@@ -35,8 +35,8 @@ osobna usługa VATowiec Operations — uruchom ją obok API. Ta sama usługa wyk
 [kopie zapasowe firm](docs/company-backups.md) z rotacją i harmonogramem (krok 2).
 [Usuwanie firmy](docs/company-deletion.md) z kopią archiwalną (ADR-045) i
 [odtwarzanie firmy z kopii](docs/company-restore.md) (ADR-044 krok 3) również wykonuje usługa.
-Wszystkie funkcje M0 są wdrożone; do formalnego zamknięcia pozostaje pełny przebieg SQL
-i próba dwóch operatorów na dwóch stanowiskach.
+Wszystkie funkcje M0 są wdrożone, pełny przebieg SQL: 141/141. Do formalnego zamknięcia
+pozostaje próba dwóch operatorów na dwóch stanowiskach.
 Stan i dowody: [SPECYFIKACJA.md §13](SPECYFIKACJA.md#m0--repozytorium-i-architektura).
 
 Standardowe warunki finansowe kontrahenta (ADR-031):
@@ -288,22 +288,19 @@ wyboru bazy, izolację scope, politykę połączeń, filtry, kontrolę zapisu i 
 Testy wymagające SQL, natywnego okna lub LocalDB są pomijane bez jawnych zmiennych
 `VATOWIEC_*` ([lista w CONTRIBUTING.md](CONTRIBUTING.md#testy)).
 
-Przebieg z 2026-11-22: **541 zaliczonych, 0 błędów, 136 pominiętych**. Pełny przebieg SQL:
+Przebieg z 2026-11-22: **578 zaliczonych, 0 błędów** (pominięte są testy SQL, które
+uruchamia runner). Pełny przebieg SQL:
 
 ```powershell
-dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- test
+dotnet run --project tools/database/Vatowiec.DatabaseTools -c Debug --no-build -- test
 ```
 
-Runner sprawdza instancję, nazwy, znaczniki i fikcyjne dane, po czym czyści fixture przez DML w
-wyłącznie Vatowiec_System i Vatowiec_Company_A_Dev/B_Dev. **Przed testem zatrzymaj
-API i desktop; bieżące fikcyjne dane i sesje zostaną usunięte.** Po pełnym
-przebiegu inicjalizuje konta i dane demonstracyjne z lokalnej konfiguracji.
-Nie odtwarza baz ani tabel, nie tworzy dodatkowych *_Test i nie modyfikuje innych baz.
-Ostatni udokumentowany pełny wynik runnera: **180/180** (ADR-021, 2026-10-22);
-w późniejszych etapach uruchamiano wybrane niedestrukcyjne klasy SQL, a testów
-z resetującymi fixture nie powtarzano. Raport TRX: TestResults.
-Flagi SQL i dodatkową zgodę na przygotowane fixture ustawia runner;
-[instrukcja testów](docs/database-per-company.md#testy). Pominięcie nie jest zaliczeniem.
+Runner tworzy tymczasowe puste bazy `Vatowiec_System_Test` i `Vatowiec_Company_A_Test/B_Test`
+dla testów niszczących, uruchamia wszystkie testy SQL bez pominięć, sprawdza sprzątanie
+i usuwa bazy testowe. **Prawdziwe bazy developerskie (konta, firmy, dane demonstracyjne)
+nie są czyszczone.** Wynik 2026-11-22: **141/141 testów SQL, 0 pominiętych**.
+Raport TRX: TestResults. [Instrukcja testów](docs/database-per-company.md#testy).
+Pominięcie nie jest zaliczeniem.
 
 ## Logowanie demonstracyjne
 
@@ -323,8 +320,7 @@ kontrakt HTTP: [logowanie](docs/authentication.md).
 
 ## Dalsze kroki
 
-Do formalnego zamknięcia M0 pozostaje pełny przebieg SQL (aktualizacja runnera
-`DatabaseTools test`) i próba dwóch operatorów na dwóch stanowiskach.
+Do formalnego zamknięcia M0 pozostaje próba dwóch operatorów na dwóch stanowiskach.
 Następnie M1: dokumenty, faktury i audyt księgowy. Narzędzie
 wdrożeniowe `DatabaseTools` działa poza API. Nie przeniesiono danych z usuniętej Vatowiec_Dev.
 

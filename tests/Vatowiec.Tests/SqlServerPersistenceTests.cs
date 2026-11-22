@@ -14,10 +14,9 @@ public sealed class SqlServerPersistenceTests
     [SqlServerFact]
     public async Task SystemSchema_ContainsOnlyCatalogAndItsOwnMigrationHistory()
     {
-        await using var session = await Session.Open("Vatowiec_System", "ConnectionStrings__VatowiecSystemTest");
+        await using var session = await Session.Open(SqlFixtureDatabases.System, "ConnectionStrings__VatowiecSystemTest");
         await using var context = session.System();
-        Assert.Equal(11, (await context.Database.GetAppliedMigrationsAsync()).Count());
-        Assert.EndsWith("_ContractorPeselPermission", (await context.Database.GetAppliedMigrationsAsync()).Last());
+        Assert.Equal(context.Database.GetMigrations(), await context.Database.GetAppliedMigrationsAsync());
         Assert.Empty(await context.Database.GetPendingMigrationsAsync());
         using var command = new SqlCommand("SELECT COUNT(*) FROM sys.tables WHERE schema_id = SCHEMA_ID('core')", session.Connection, session.Transaction);
         Assert.Equal(2, (int)(await command.ExecuteScalarAsync())!);
@@ -50,18 +49,17 @@ public sealed class SqlServerPersistenceTests
     {
         await using var a = await Session.CompanyA();
         await using var b = await Session.CompanyB();
-        await using var s = await Session.Open("Vatowiec_System", "ConnectionStrings__VatowiecSystemTest");
+        await using var s = await Session.Open(SqlFixtureDatabases.System, "ConnectionStrings__VatowiecSystemTest");
         await using var first = a.Company(null);
         await using var second = b.Company(null);
         await using var system = s.System();
         using var command = new SqlCommand("DELETE FROM dbo.__EFMigrationsHistory;", a.Connection, a.Transaction);
-        Assert.Equal(9, await command.ExecuteNonQueryAsync());
+        Assert.Equal(first.Database.GetMigrations().Count(), await command.ExecuteNonQueryAsync());
         Assert.Empty(await first.Database.GetAppliedMigrationsAsync());
-        Assert.Equal(9, (await first.Database.GetPendingMigrationsAsync()).Count());
-        Assert.EndsWith("_ContractorFinance", (await second.Database.GetAppliedMigrationsAsync()).Last());
+        Assert.Equal(first.Database.GetMigrations(), await first.Database.GetPendingMigrationsAsync());
+        Assert.Equal(second.Database.GetMigrations(), await second.Database.GetAppliedMigrationsAsync());
         Assert.Empty(await second.Database.GetPendingMigrationsAsync());
-        Assert.Equal(11, (await system.Database.GetAppliedMigrationsAsync()).Count());
-        Assert.EndsWith("_ContractorPeselPermission", (await system.Database.GetAppliedMigrationsAsync()).Last());
+        Assert.Equal(system.Database.GetMigrations(), await system.Database.GetAppliedMigrationsAsync());
         Assert.Empty(await system.Database.GetPendingMigrationsAsync());
         // Usunięcie wpisu historii w A jest wycofywane przez Session.DisposeAsync.
     }
@@ -84,7 +82,7 @@ public sealed class SqlServerPersistenceTests
     [SqlServerFact]
     public async Task SystemCatalog_EnforcesCompanyForeignKeyAndUniqueDatabaseLocation()
     {
-        await using var session = await Session.Open("Vatowiec_System", "ConnectionStrings__VatowiecSystemTest");
+        await using var session = await Session.Open(SqlFixtureDatabases.System, "ConnectionStrings__VatowiecSystemTest");
         await using var context = session.System();
         var a = Guid.NewGuid();
         var b = Guid.NewGuid();
@@ -208,7 +206,7 @@ public sealed class SqlServerPersistenceTests
             await session.Seed(id);
             await using var context = session.Company(id);
             var contractor = await context.Contractors.SingleAsync();
-            Assert.Equal(9, contractor.RowVersion.Length);
+            Assert.Equal(8, contractor.RowVersion.Length); // rowversion SQL Server ma zawsze 8 bajtów.
             Assert.NotEqual(default, contractor.CreatedAtUtc);
             Assert.Equal(contractor.CreatedAtUtc, contractor.UpdatedAtUtc);
         }
@@ -223,8 +221,8 @@ public sealed class SqlServerPersistenceTests
         public SqlConnection Connection { get; } = connection;
         public SqlTransaction Transaction { get; } = transaction;
 
-        public static Task<Session> CompanyA() => Open("Vatowiec_Company_A_Dev", "ConnectionStrings__VatowiecCompanyATest");
-        public static Task<Session> CompanyB() => Open("Vatowiec_Company_B_Dev", "ConnectionStrings__VatowiecCompanyBTest");
+        public static Task<Session> CompanyA() => Open(SqlFixtureDatabases.CompanyA, "ConnectionStrings__VatowiecCompanyATest");
+        public static Task<Session> CompanyB() => Open(SqlFixtureDatabases.CompanyB, "ConnectionStrings__VatowiecCompanyBTest");
 
         public static async Task<Session> Open(string database, string variable)
         {
@@ -234,7 +232,7 @@ public sealed class SqlServerPersistenceTests
             Assert.Equal(@"localhost\SQLEXPRESS", builder.DataSource, ignoreCase: true);
             Assert.Equal(database, builder.InitialCatalog);
             Assert.True(builder.IntegratedSecurity);
-            if (database == "Vatowiec_System") DatabaseConnectionPolicy.ValidateSystem(value, true);
+            if (database == SqlFixtureDatabases.System) DatabaseConnectionPolicy.ValidateSystem(value, true);
             else DatabaseConnectionPolicy.ValidateCompany(value!, true);
             var connection = new SqlConnection(value);
             try

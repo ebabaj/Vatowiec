@@ -107,33 +107,40 @@ wyłącznie dla jawnie dozwolonych baz demonstracyjnych, nigdy produkcyjnych.
 
 ## Testy
 
-Zatrzymaj API i desktop. Polecenie test **usuwa bieżące fikcyjne dane i sesje**
-w trzech wskazanych istniejących bazach, uruchamia pełny zestaw,
-a następnie inicjalizuje ponownie demonstrator i konta:
+Pełny przebieg testów SQL (wszystkie testy kategorii `SqlIntegration`, bez wstrzymanych
+testów Personal):
 
 ```powershell
-dotnet run --project tools/database/Vatowiec.DatabaseTools --no-build -- test
+dotnet run --project tools/database/Vatowiec.DatabaseTools -c Debug --no-build -- test
 ```
 
-Nie wykonuje DROP/CREATE ani migracji przy starcie API. Wymaga wcześniej jawnie wykonanych migracji migrate-contractors. Nie tworzy dodatkowych *_Test i nie modyfikuje baz innych aplikacji. Kontrola
-wszystkich celów poprzedza wyczyszczenie fikcyjnych danych fixture przez DML. Niepowodzenie kontroli przerywa operację.
-Testy persystencji używają rollbacku, testy API sprzątają własne fixture.
-Runner sprawdza sprzątanie i niezależne historie. Jeżeli test nie posprząta
-fixture, nie należy ręcznie usuwać niezweryfikowanych danych; trzeba zbadać błąd.
+Zmiana 2026-11-22: testy niszczące (`[SqlServerFact]`, wymagające pustych danych) korzystają
+z **osobnych, tymczasowych baz** `Vatowiec_System_Test`, `Vatowiec_Company_A_Test` i
+`Vatowiec_Company_B_Test`. Runner:
 
-Runner ustawia VATOWIEC_DATABASE_PER_COMPANY_SQL=1 i dodatkową flagę
-VATOWIEC_DEMO_RESET_AUTHORIZED=1 dopiero po przygotowaniu pustych fixture w istniejących bazach. Zmienne
-ConnectionStrings__VatowiecSystemTest oraz VatowiecCompanyATest/BTest
-wskazują odpowiednio trzy bazy demonstracyjne; nazwy zmiennych zachowano
-technicznie, nie oznaczają tworzenia baz o sufiksie _Test. Nie ustawiaj tych
-flag na używanym demonstratorze bez jawnego przygotowania pustych fixture.
-Bez runnera testy SQL są pomijane, nie zaliczane.
+1. sprawdza, że `Vatowiec_System` nie ma oczekujących migracji (testy z rollbackiem i testy
+   tworzące własne bazy firm używają istniejącej bazy System bez trwałych zmian),
+2. tworzy trzy puste bazy testowe ze znacznikiem `Vatowiec.LocalTestPurpose =
+   "VATowiec SQL test fixture v2"` (zastaną bazę o tej nazwie usuwa wyłącznie przy zgodnym
+   znaczniku) i wykonuje w nich migracje System i firm,
+3. uruchamia `dotnet test` z filtrem `Category=SqlIntegration&FullyQualifiedName!~Personal`
+   i flagami `VATOWIEC_DATABASE_PER_COMPANY_SQL`, `VATOWIEC_DEMO_RESET_AUTHORIZED`,
+   `VATOWIEC_PRESERVED_VAT_SQL`, `VATOWIEC_PROVISIONING_SQL`; zmienne
+   `ConnectionStrings__VatowiecSystemTest` / `VatowiecCompanyATest` / `VatowiecCompanyBTest`
+   wskazują bazy testowe,
+4. wymaga wszystkich testów zaliczonych, bez pominięć, i sprawdza, że testy nie zostawiły
+   danych ani nie zmieniły historii migracji baz testowych,
+5. zawsze usuwa bazy testowe (także po błędzie).
 
-Wynik wcześniejszego etapu ADR-021: **180/180**, bez pominięć (76 SQL/API, 104 bez SQL). Testy sprawdzają
-również wszystkie kolumny/typy adresów i rachunków, klucze i zaufane FK,
-trigger hierarchii, domyślność PLN/EUR/NULL, niezależne historie migracji,
-odmowę obcego profilu, rowversion, atomowy audyt oraz trwałe ponowienia.
-Raporty TRX znajdują się w TestResults, poza repozytorium.
+**Prawdziwe bazy developerskie nie są czyszczone:** konta (w tym własne konta właściciela),
+firmy utworzone z aplikacji, dane demonstracyjne A/B i klucze DataPort pozostają bez zmian.
+API i usługę Operations należy zatrzymać tylko na czas budowania. Bazy testowe można też
+przygotować i usunąć osobno: `-- prepare-tests`, `-- cleanup-tests`.
+
+Wynik 2026-11-22: **141/141 testów SQL zaliczonych, 0 pominiętych** (w tym 35 testów
+niszczących na bazach testowych, testy z rollbackiem na `Vatowiec_System`, testy tworzenia,
+kopii, usuwania i odtwarzania firm). Wcześniejszy wynik ADR-021: 180/180 (76 SQL/API).
+Raporty TRX: `TestResults/sql-integration-*.trx`, poza repozytorium.
 
 ## Korekta klucza waluty ADR-024
 

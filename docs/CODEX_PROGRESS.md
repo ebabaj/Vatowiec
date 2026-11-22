@@ -78,6 +78,19 @@ Weryfikacja: build 0/0; 616 zaliczonych, 0 błędów, 109 pominiętych; formatow
 po testach brak baz, plików i wierszy testowych. Do formalnego zamknięcia M0: pełny runner
 SQL (preflight `DatabaseTools` do aktualizacji) i próba dwóch operatorów z właścicielem.
 
+Zadanie 2026-11-22 (pełny runner SQL, bez Commit i Push): runner `DatabaseTools test`
+przebudowany — testy niszczące na tymczasowych bazach `Vatowiec_System_Test`,
+`Vatowiec_Company_A_Test/B_Test` (tworzone, migrowane, sprawdzane i zawsze usuwane);
+usunięto przestarzały preflight danych demonstracyjnych, który oczekiwał 13–14 tabel
+System i czyścił z `Vatowiec_System` wszystkie konta i firmy (w tym konta właściciela
+i firmy z aplikacji). Testy wskazują bazy przez `SqlFixtureDatabases`. Poprawiono
+nieaktualne asercje: liczby migracji (porównanie z listą programu), `RowVersion` = 8
+bajtów (błędna zmiana na 9 w 3b52486), limit strony 201 (ADR-042), oczekiwanie na
+odświeżenie listy po zamknięciu edytora i jawny podgląd `ShowContractor` w firmie
+tylko do odczytu. Wynik: **141/141 testów SQL, 0 pominiętych**; bez SQL 578 zaliczonych,
+0 błędów; formatowanie bez uwag. Bazy developerskie nietknięte (konta, A/B, Tenjin, kopia).
+Logi: `TestResults/m0-sql/`.
+
 ## Archiwum: naprawa zakładki Finansowe
 
 2026-10-23. Ukończone. BEZ Commit i Push.

@@ -261,6 +261,7 @@ public sealed partial class AuthenticationIntegrationTests
         Assert.Equal("TEST-VAT", model.Editor.VatEuId);
         Assert.Equal("TEST-IDWEW", model.Editor.KsefIdWew);
         model.CancelEditor();
+        await model.LoadContractors(); // ADR-042: zamknięcie edytora odświeża listę w tle.
         model.SelectedContractor = model.Contractors.Single(x => x.Id == contractorId);
         await model.EditContractor();
         model.ParentSearch = "GROUP";
@@ -291,7 +292,7 @@ public sealed partial class AuthenticationIntegrationTests
         await model.OpenCompany();
         await model.LoadContractors();
         model.SelectedContractor = Assert.Single(model.Contractors);
-        await model.EditContractor();
+        await model.ShowContractor(); // ADR-042: firma tylko do odczytu — jawny podgląd zamiast edycji.
         Assert.True(model.IsEditing);
         Assert.False(model.CanEditDetails);
         model.SelectedTab = 2;

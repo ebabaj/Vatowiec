@@ -270,10 +270,14 @@ Odtwarzamy tylko trzy demonstracyjne tabele modułu walutowego; nie migrujemy
 danych ani CurrencyId. Sama migracja nie dotyka innych kartotek ani DataPort.
 Użytkownik następnie jawnie odwołał ograniczenie czyszczenia danych demonstratora
 i zatwierdził pełny reset fikcyjnych danych na potrzeby wszystkich testów.
-Istniejący runner `test` ma własną allowlistę trzech baz demonstracyjnych.
-Nie jest ona ograniczeniem zgody właściciela na pozostałe zweryfikowane bazy
-VATowca. Nowe cele izolowane twórz tylko wtedy, gdy wymaga ich konkretny test.
-Runner nadal zachowuje zastany szyfrogram DataPort po zweryfikowanych kopiach.
+Runner `DatabaseTools test` (od 2026-11-22) tworzy na czas przebiegu tymczasowe
+puste bazy `Vatowiec_System_Test` i `Vatowiec_Company_A_Test/B_Test` dla testów
+niszczących, uruchamia wszystkie testy SQL bez pominięć i zawsze je usuwa (tylko
+przy znaczniku `VATowiec SQL test fixture v2`). Nie czyści prawdziwych baz
+developerskich — wcześniejszy runner usuwał z `Vatowiec_System` wszystkie konta
+i firmy, w tym konta właściciela i firmy utworzone z aplikacji; nie przywracaj tego.
+Zgoda właściciela na reset baz developerskich nadal obowiązuje, ale testy jej nie
+potrzebują. Nowe cele izolowane twórz tylko wtedy, gdy wymaga ich konkretny test.
 Nie rozszerza to zgody na inne aplikacje, bazy SQL systemowe ani zdalne serwery.
 Pozostałe zasady ADR-023 obowiązują.
 Domyślnie EUR/USD/GBP/CHF z A; PLN bez pobierania. ViewExchangeRates=64,

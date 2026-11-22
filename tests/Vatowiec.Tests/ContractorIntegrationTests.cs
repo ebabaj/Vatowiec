@@ -261,7 +261,7 @@ public sealed partial class AuthenticationIntegrationTests
         Assert.NotEmpty(filtered);
         Assert.All(filtered, x => { Assert.False(x.IsActive); Assert.Equal("DE", x.CountryCode); });
         Assert.Empty((await op.GetFromJsonAsync<ContractorResponse[]>(ContractorsPath() + "?q=%25"))!);
-        Assert.Equal(HttpStatusCode.BadRequest, (await op.GetAsync(ContractorsPath() + "?limit=101")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await op.GetAsync(ContractorsPath() + "?limit=202")).StatusCode); // ADR-042: strony do 200 (+1).
         Assert.Equal(HttpStatusCode.BadRequest, (await op.GetAsync(ContractorsPath() + "?offset=-1")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await op.GetAsync(ContractorsPath() + "?country=P1")).StatusCode);
         Assert.Single((await op.GetFromJsonAsync<ContractorResponse[]>(ContractorsPath(companyB)))!);
@@ -276,7 +276,7 @@ public sealed partial class AuthenticationIntegrationTests
         {
             var system = scope.ServiceProvider.GetRequiredService<SystemDbContext>();
             await system.CompanyDatabases.Where(x => x.CompanyId == companyB).ExecuteDeleteAsync();
-            await system.CompanyDatabases.Where(x => x.CompanyId == companyA).ExecuteUpdateAsync(x => x.SetProperty(a => a.DatabaseName, "Vatowiec_Company_B_Dev"));
+            await system.CompanyDatabases.Where(x => x.CompanyId == companyA).ExecuteUpdateAsync(x => x.SetProperty(a => a.DatabaseName, SqlFixtureDatabases.CompanyB));
         }
         Assert.Equal(HttpStatusCode.ServiceUnavailable, (await op.PostAsJsonAsync(ContractorsPath(), NewContractor())).StatusCode);
         await using var b = Company(true, companyB);

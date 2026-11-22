@@ -41,14 +41,14 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
         if (Environment.GetEnvironmentVariable("VATOWIEC_DATABASE_PER_COMPANY_SQL") != "1" ||
             Environment.GetEnvironmentVariable("VATOWIEC_DEMO_RESET_AUTHORIZED") != "1") return;
         // Bez dowolnych adresów: te same dokładne fixture co w testach persystencji.
-        foreach (var (connection, catalog) in new[] { (SystemConnection, "Vatowiec_System"),
-                     (CompanyConnection(false), "Vatowiec_Company_A_Dev"), (CompanyConnection(true), "Vatowiec_Company_B_Dev") })
+        foreach (var (connection, catalog) in new[] { (SystemConnection, SqlFixtureDatabases.System),
+                     (CompanyConnection(false), SqlFixtureDatabases.CompanyA), (CompanyConnection(true), SqlFixtureDatabases.CompanyB) })
         {
             var target = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(connection);
             Assert.Equal(@"localhost\SQLEXPRESS", target.DataSource, ignoreCase: true);
             Assert.Equal(catalog, target.InitialCatalog);
             Assert.True(target.IntegratedSecurity);
-            if (catalog == "Vatowiec_System") DatabaseConnectionPolicy.ValidateSystem(connection, true);
+            if (catalog == SqlFixtureDatabases.System) DatabaseConnectionPolicy.ValidateSystem(connection, true);
             else DatabaseConnectionPolicy.ValidateCompany(connection, true);
         }
         application = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
@@ -96,7 +96,7 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
         {
             system.Companies.Add(new Company(id, name));
             system.CompanyDatabases.Add(new CompanyDatabaseRegistration(id, @"localhost\SQLEXPRESS",
-                second ? "Vatowiec_Company_B_Dev" : "Vatowiec_Company_A_Dev", "LocalWindows"));
+                second ? SqlFixtureDatabases.CompanyB : SqlFixtureDatabases.CompanyA, "LocalWindows"));
             system.CompanyAccesses.Add(new CompanyAccess(operatorId, id, (CompanyPermission)7));
             await using var company = Company(second, id);
             company.CompanyProfiles.Add(new CompanyProfile(id, name));
@@ -295,7 +295,7 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
             var system = scope.ServiceProvider.GetRequiredService<SystemDbContext>();
             await system.CompanyDatabases.Where(x => x.CompanyId == companyB).ExecuteDeleteAsync();
             await system.CompanyDatabases.Where(x => x.CompanyId == companyA)
-                .ExecuteUpdateAsync(x => x.SetProperty(p => p.DatabaseName, "Vatowiec_Company_B_Dev"));
+                .ExecuteUpdateAsync(x => x.SetProperty(p => p.DatabaseName, SqlFixtureDatabases.CompanyB));
         }
         using var response = await op.GetAsync($"/api/v1/companies/{companyA}/contractors");
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
@@ -419,7 +419,7 @@ public sealed partial class AuthenticationIntegrationTests : IAsyncLifetime
         using var scope = application!.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<SystemDbContext>().CompanyDatabases
             .Where(x => x.CompanyId == companyA).ExecuteUpdateAsync(update =>
-                update.SetProperty(x => x.DatabaseName, "Vatowiec_System"));
+                update.SetProperty(x => x.DatabaseName, SqlFixtureDatabases.System));
         using var response = await op.GetAsync($"/api/v1/companies/{companyA}/profile");
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("{\"code\":\"company_unavailable\"}", await response.Content.ReadAsStringAsync());

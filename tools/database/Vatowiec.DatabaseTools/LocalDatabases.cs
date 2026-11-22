@@ -18,7 +18,7 @@ internal static class LocalDatabases
     private const string Marker = "Vatowiec.LocalTestPurpose";
     private const string SystemDatabase = "Vatowiec_System";
     private static readonly string[] TestDatabases =
-        ["Vatowiec_System", "Vatowiec_Company_A_Dev", "Vatowiec_Company_B_Dev"];
+        ["Vatowiec_System_Test", "Vatowiec_Company_A_Test", "Vatowiec_Company_B_Test"];
     private static readonly (Guid Id, string Name, string Database)[] DemoCompanies =
     [
         (Guid.Parse("aaaaaaaa-0000-4000-8000-000000000001"), "Firma demonstracyjna A — dane fikcyjne", "Vatowiec_Company_A_Dev"),
@@ -37,7 +37,8 @@ internal static class LocalDatabases
         Pooling = false
     }.ConnectionString;
 
-    private static string Purpose(string database) => "VATowiec M0 fictional company demonstration v1";
+    private static string Purpose(string database) => TestDatabases.Contains(database, StringComparer.Ordinal)
+        ? "VATowiec SQL test fixture v2" : "VATowiec M0 fictional company demonstration v1";
 
     private static void CheckName(string database)
     {
@@ -109,90 +110,7 @@ internal static class LocalDatabases
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync()) Console.WriteLine($"{reader.GetString(0)} | {reader.GetString(1)}");
         foreach (var database in TestDatabases)
-            if (await Exists(database)) await CheckDemoData(database);
-    }
-
-    private static async Task CheckDemoData(string database)
-    {
-        await EnsureLocalServer();
-        await CheckOwnership(database);
-        // Odczyt bez EF: obsługuje zatwierdzony stary demonstrator oraz nowy model.
-        // Nie wystarcza nazwa bazy. Nieznany schemat lub nieoznaczone dane blokują DROP.
-        var company = database != SystemDatabase;
-        // Explicit, process-local confirmation by the owner of the demo data.
-        // This never bypasses server/name/ownership/schema/migration checks.
-        var confirmedDemo = Environment.GetEnvironmentVariable("VATOWIEC_CONFIRMED_DEMO_DATA") == "1";
-        var expectedOld = company ? 4 : 13;
-        var expectedNew = company ? 9 : 13;
-        var tableCount = Convert.ToInt32(await Scalar(database, "SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0;"));
-        if (tableCount != expectedOld && tableCount != expectedNew && tableCount != (company ? 10 : 14) && tableCount != (company ? 11 : 14) && tableCount != 14)
-            throw new InvalidOperationException($"Nieznany schemat {database}; odmowa odtworzenia.");
-        var unknownTables = await Scalar(database, """
-            SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id
-            WHERE t.is_ms_shipped=0 AND s.name+'.'+t.name NOT IN (
-                'core.Companies','core.CompanyDatabases','core.CompanyProfile','core.Contractors',
-                'core.ContractorAddresses','core.ContractorContacts','core.ContractorBankAccounts',
-                'core.ContractorCreateOperations','ref.AddressTypes','audit.ContractorChanges','ref.TaxIdentifierSchemes','audit.ExternalVerifications','security.DataPortConfiguration','ref.Currencies','core.ExchangeRates','audit.CurrencyOperations',
-                'dbo.__EFMigrationsHistory','security.Users','security.Roles','security.UserRoles',
-                'security.UserClaims','security.UserLogins','security.UserTokens','security.RoleClaims',
-                'security.CompanyAccess','security.UserSessions','security.Installation');
-            """);
-        if (Convert.ToInt32(unknownTables) != 0) throw new InvalidOperationException($"Obce tabele w {database}.");
-        var unknownHistory = await Scalar(database, """
-            SELECT COUNT(*) FROM dbo.__EFMigrationsHistory WHERE MigrationId NOT IN (
-                '20261021102912_InitialCompany','20261022060000_ContractorAudit','20261022143310_CompanyModelV2','20261022161050_ContractorDetailAudit','20261022175433_ExternalVerifications','20261022194946_DataPortConfiguration','20261022205922_CurrenciesAndNbpRates','20261022211121_OptionalNbpTradingDate','20261023041721_CurrencyIsoCodePrimaryKey','20261023173705_StandardContractorIdentifiers','20261023182240_ContractorFinance',
-                '20261021102909_InitialSystem','20261021114324_IdentityAndCompanyAccess','20261022055958_InstallationIdentity');
-            """);
-        // Rzeczywiste identyfikatory migracji systemowych weryfikuje niżej kontekst.
-        if (company && Convert.ToInt32(unknownHistory) != 0) throw new InvalidOperationException($"Obca historia migracji w {database}.");
-        if (!company) await using (var system = SystemContext(database)) await CheckKnownHistory(system);
-        if (company)
-        {
-            var profileOk = await Scalar(database, """
-                SELECT COUNT(*) FROM core.CompanyProfile WHERE Nip IS NOT NULL OR Regon IS NOT NULL
-                    OR (Name NOT LIKE N'%fikcyjn%' AND Name NOT LIKE N'%demonstracyjn%' AND Name NOT LIKE N'Testowa firma%');
-                """);
-            if (Convert.ToInt32(profileOk) != 0) throw new InvalidOperationException($"Niepotwierdzone fikcyjne dane profilu w {database}.");
-            var taxColumn = Equals(await Scalar(database, "SELECT COUNT(*) FROM sys.columns WHERE object_id=OBJECT_ID('core.Contractors') AND name='TaxIdentifier';"), 1)
-                ? "TaxIdentifier" : "TaxId";
-            var unknownTax = await Scalar(database, $"""
-                SELECT COUNT(*) FROM core.Contractors WHERE [{taxColumn}] IS NOT NULL
-                    AND [{taxColumn}] NOT LIKE N'DEMO%' AND [{taxColumn}] NOT LIKE N'TEST%'
-                    AND [{taxColumn}] NOT LIKE N'FIKCYJN%' AND [{taxColumn}] NOT IN (N'3245174504',N'5261040828');
-                """);
-            if (Convert.ToInt32(unknownTax) != 0 && !confirmedDemo) throw new InvalidOperationException($"Niepotwierdzone identyfikatory podatkowe w {database}.");
-            var unknownNames = await Scalar(database, """
-                SELECT COUNT(*) FROM core.Contractors WHERE Name NOT LIKE N'%fikcyjn%'
-                    AND Name NOT LIKE N'%demonstracyjn%' AND Name NOT LIKE N'Kontrahent [AB]'
-                    AND Name NOT LIKE N'%UIAUTO%' AND Name NOT LIKE N'%UI-AUTO%'
-                    AND Name NOT LIKE N'%test%' AND Name NOT LIKE N'%automatyzac%';
-                """);
-            if (Convert.ToInt32(unknownNames) != 0 && !confirmedDemo) throw new InvalidOperationException($"Niepotwierdzone nazwy demonstracyjne w {database}; odmowa odtworzenia.");
-            if (tableCount >= expectedNew)
-            {
-                var unknownAccounts = await Scalar(database, """
-                    SELECT COUNT(*) FROM core.ContractorBankAccounts WHERE AccountNumber NOT LIKE N'DEMO%'
-                        AND AccountNumber NOT LIKE N'TEST%' AND AccountNumber NOT LIKE N'FIKCYJN%'
-                        AND AccountNumber NOT IN (N'00000000000000000000000000',N'00000000000000000000000001',
-                            N'00000000000000000000000002',N'00000000000000000000000003',N'00000000000000000000000004',
-                            N'70506405335016096312945164',N'PL70506405335016096312945164');
-                    """);
-                if (Convert.ToInt32(unknownAccounts) != 0 && !confirmedDemo) throw new InvalidOperationException($"Niepotwierdzone numery rachunków w {database}.");
-            }
-        }
-        else
-        {
-            var unknownCompanies = await Scalar(database, """
-                SELECT COUNT(*) FROM core.Companies WHERE Name NOT LIKE N'%demonstracyjn%' AND Name NOT LIKE N'%test%' AND Name NOT LIKE N'%fikcyjn%';
-                """);
-            var unknownUsers = await Scalar(database, """
-                SELECT COUNT(*) FROM security.Users WHERE UserName NOT IN (N'operator.m0',N'czytelnik.m0',N'operator.test',N'reader.test');
-                """);
-            if (Convert.ToInt32(unknownCompanies) != 0 || Convert.ToInt32(unknownUsers) != 0)
-                throw new InvalidOperationException($"Niepotwierdzone dane demonstracyjne w {database}.");
-        }
-        Console.WriteLine($"Preflight {database}: dokładna nazwa, znacznik demonstratora, {tableCount} znanych tabel; " +
-            (confirmedDemo ? "właściciel jawnie potwierdził demonstracyjne przeznaczenie danych w tym przebiegu." : "brak nieoznaczonych danych w kontrolowanych kartotekach."));
+            if (await Exists(database)) { await CheckOwnership(database); Console.WriteLine($"Baza testowa runnera: {database}."); }
     }
 
     private static async Task CreateOrCheck(string database)
@@ -209,15 +127,6 @@ internal static class LocalDatabases
             "EXEC sys.sp_addextendedproperty @name = @marker, @value = @purpose;",
             new SqlParameter("@marker", Marker), new SqlParameter("@purpose", Purpose(database)));
         Console.WriteLine($"Utworzono: {database} ({Purpose(database)}).");
-    }
-
-    private static async Task Drop(string database)
-    {
-        CheckName(database);
-        if (!await Exists(database)) return;
-        await CheckDemoData(database);
-        Console.WriteLine($"Usuwanie potwierdzonej bazy testowej: {database}.");
-        await Execute("master", $"ALTER DATABASE {Identifier(database)} SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE {Identifier(database)};");
     }
 
     private static SystemDbContext SystemContext(string database)
@@ -284,67 +193,40 @@ internal static class LocalDatabases
         await Verify();
     }
 
+    // Bazy testów niszczących: osobne, tymczasowe i puste. Prawdziwe bazy developerskie (konta, firmy z aplikacji,
+    // dane demonstracyjne A/B) pozostają nietknięte. Testy z wycofywanymi transakcjami i tworzące własne bazy firm
+    // korzystają z baz developerskich bez trwałych zmian.
     public static async Task PrepareTests()
     {
         foreach (var database in TestDatabases)
-            await CheckDemoData(database);
-        // Fixture wymagają pustych kartotek, ale nie wymagają DROP/CREATE baz ani tabel.
-        await using (var system = SystemContext(SystemDatabase))
         {
-            if ((await system.Database.GetPendingMigrationsAsync()).Any()) throw new InvalidOperationException("Najpierw wykonaj migrate-contractors.");
+            if (await Exists(database)) await DropTestDatabase(database);
+            await Execute("master", $"CREATE DATABASE {Identifier(database)};");
+            await Execute(database, "EXEC sys.sp_addextendedproperty @name = @marker, @value = @purpose;",
+                new SqlParameter("@marker", Marker), new SqlParameter("@purpose", Purpose(database)));
         }
-        foreach (var (id, _, database) in DemoCompanies)
+        await using (var system = SystemContext(TestDatabases[0])) await system.Database.MigrateAsync();
+        foreach (var database in TestDatabases.Skip(1))
         {
-            await using var company = CompanyContext(database, id);
-            if ((await company.Database.GetPendingMigrationsAsync()).Any()) throw new InvalidOperationException("Najpierw wykonaj migrate-contractors.");
-            if (await company.DataPortConfigurations.AnyAsync(x => x.ProtectedApiKey != null))
-                throw new InvalidOperationException("Zapisano klucz DataPort. Przed czyszczeniem fixture usuń go świadomie w ustawieniach firmy; runner nie usuwa zastanych sekretów.");
+            await using var company = CompanyContext(database, null);
+            await company.Database.MigrateAsync();
         }
-        foreach (var (_, _, database) in DemoCompanies)
-            await Execute(database, """
-                BEGIN TRANSACTION;
-                BEGIN TRY
-                    DISABLE TRIGGER audit.TR_ExternalVerifications_Immutable ON audit.ExternalVerifications;
-                    DELETE FROM audit.ExternalVerifications;
-                    DISABLE TRIGGER audit.TR_CurrencyOperations_Immutable ON audit.CurrencyOperations;
-                    DELETE FROM audit.CurrencyOperations;
-                    ENABLE TRIGGER audit.TR_CurrencyOperations_Immutable ON audit.CurrencyOperations;
-                    DELETE FROM core.ExchangeRates;
-                    UPDATE ref.Currencies SET IsActive=1, DownloadA=CASE WHEN Code IN ('EUR','USD','GBP','CHF') THEN 1 ELSE 0 END, DownloadB=0, DownloadC=0;
-                    ENABLE TRIGGER audit.TR_ExternalVerifications_Immutable ON audit.ExternalVerifications;
-                    COMMIT;
-                END TRY
-                BEGIN CATCH
-                    IF @@TRANCOUNT>0 ROLLBACK;
-                    THROW;
-                END CATCH;
-                DELETE FROM security.DataPortConfiguration;
-                DELETE FROM core.ContractorCreateOperations;
-                DELETE FROM audit.ContractorChanges;
-                DELETE FROM core.ContractorAddresses;
-                DELETE FROM core.ContractorContacts;
-                DELETE FROM core.ContractorBankAccounts;
-                UPDATE core.Contractors SET ParentId=NULL;
-                DELETE FROM core.Contractors;
-                DELETE FROM core.CompanyProfile;
-                DELETE FROM ref.AddressTypes WHERE Id NOT IN (1,2);
-                """);
-        await Execute(SystemDatabase, """
-            DELETE FROM security.UserSessions;
-            DELETE FROM security.CompanyAccess;
-            DELETE FROM security.Users;
-            DELETE FROM security.Roles;
-            DELETE FROM core.CompanyDatabases;
-            DELETE FROM core.Companies;
-            """);
-        Console.WriteLine("Wyczyszczono fikcyjne fixture w istniejących bazach; bez DROP/CREATE. Po testach nastąpi inicjalizacja demonstratora.");
+        Console.WriteLine($"Utworzono puste bazy testowe: {string.Join(", ", TestDatabases)} (migracje System i firm).");
     }
 
     public static async Task CleanupTests()
     {
         foreach (var database in TestDatabases)
-            if (await Exists(database)) await CheckOwnership(database);
-        foreach (var database in TestDatabases) await Drop(database);
+            if (await Exists(database)) await DropTestDatabase(database);
+        Console.WriteLine("Usunięto bazy testowe.");
+    }
+
+    private static async Task DropTestDatabase(string database)
+    {
+        if (!TestDatabases.Contains(database, StringComparer.Ordinal)) throw new InvalidOperationException("Usuwać wolno wyłącznie bazy testowe runnera.");
+        await CheckOwnership(database); // Znacznik przeznaczenia testowego; obcej bazy o tej nazwie nie usuwamy.
+        SqlConnection.ClearAllPools();
+        await Execute("master", $"ALTER DATABASE {Identifier(database)} SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE {Identifier(database)};");
     }
 
     public static async Task Test()
@@ -352,26 +234,13 @@ internal static class LocalDatabases
         var root = new DirectoryInfo(AppContext.BaseDirectory);
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "Vatowiec.slnx"))) root = root.Parent;
         if (root is null) throw new InvalidOperationException("Nie znaleziono Vatowiec.slnx.");
-        // Existing integration secrets are not demo fixtures. Keep only their already encrypted
-        // payload in memory, make verified durable SQL copies, and restore after the fixture run.
-        var protectedKeys = new Dictionary<string, string>();
-        foreach (var (id, _, database) in DemoCompanies)
-        {
-            await CheckDemoData(database);
-            await using var company = CompanyContext(database, id);
-            if ((await company.CompanyProfiles.IgnoreQueryFilters().SingleAsync()).CompanyId != id)
-                throw new InvalidOperationException("Nieznany profil przed testami; odmowa przeniesienia konfiguracji.");
-            var key = await company.DataPortConfigurations.Select(x => x.ProtectedApiKey).SingleOrDefaultAsync();
-            if (key != null) protectedKeys.Add(database, key);
-        }
-        await CheckDemoData(SystemDatabase);
-        if (protectedKeys.Count > 0)
-            foreach (var database in TestDatabases) await Backup(database);
+        // Testy z wycofaniem (rollback) i tworzące bazy firm korzystają z istniejącej, zmigrowanej bazy System.
+        await using (var system = SystemContext(SystemDatabase))
+            if ((await system.Database.GetPendingMigrationsAsync()).Any()) throw new InvalidOperationException("Najpierw wykonaj migrate-system.");
+        await PrepareTests();
         try
         {
-            foreach (var database in protectedKeys.Keys) await Execute(database, "DELETE FROM security.DataPortConfiguration;");
-            await PrepareTests();
-            var reportName = $"database-per-company-{Guid.NewGuid():N}.trx";
+            var reportName = $"sql-integration-{Guid.NewGuid():N}.trx";
             var reportDirectory = Path.Combine(root.FullName, "TestResults");
             var start = new ProcessStartInfo("dotnet")
             {
@@ -381,43 +250,35 @@ internal static class LocalDatabases
                 RedirectStandardOutput = true,
                 RedirectStandardError = true
             };
-            foreach (var argument in new[] { "test", "Vatowiec.slnx", "--no-build", "--logger", "console;verbosity=normal",
+            // Wszystkie testy SQL (kategoria SqlIntegration); Personal jest wstrzymany (AGENTS.md).
+            foreach (var argument in new[] { "test", "Vatowiec.slnx", "-c", "Debug", "--no-build",
+                         "--filter", "Category=SqlIntegration&FullyQualifiedName!~Personal", "--logger", "console;verbosity=minimal",
                          "--logger", $"trx;LogFileName={reportName}", "--results-directory", reportDirectory })
                 start.ArgumentList.Add(argument);
             start.Environment["DOTNET_ENVIRONMENT"] = "Development";
             start.Environment["VATOWIEC_DATABASE_PER_COMPANY_SQL"] = "1";
             start.Environment["VATOWIEC_DEMO_RESET_AUTHORIZED"] = "1";
+            start.Environment["VATOWIEC_PRESERVED_VAT_SQL"] = "1";
+            start.Environment["VATOWIEC_PROVISIONING_SQL"] = "1";
             start.Environment["ConnectionStrings__VatowiecSystemTest"] = Connection(TestDatabases[0]);
             start.Environment["ConnectionStrings__VatowiecCompanyATest"] = Connection(TestDatabases[1]);
             start.Environment["ConnectionStrings__VatowiecCompanyBTest"] = Connection(TestDatabases[2]);
             using var process = Process.Start(start) ?? throw new InvalidOperationException("Nie uruchomiono testów.");
             await Task.WhenAll(process.StandardOutput.BaseStream.CopyToAsync(Console.OpenStandardOutput()),
                 process.StandardError.BaseStream.CopyToAsync(Console.OpenStandardError()), process.WaitForExitAsync());
-            if (process.ExitCode != 0) throw new InvalidOperationException($"Testy zakończyły się kodem {process.ExitCode}.");
             var report = XDocument.Load(Path.Combine(reportDirectory, reportName));
             var counters = report.Descendants().Single(x => x.Name.LocalName == "Counters");
             var passed = (int?)counters.Attribute("passed") ?? 0;
             var total = (int?)counters.Attribute("total") ?? 0;
-            if (passed == 0 || total != passed)
-                throw new InvalidOperationException("Pełny przebieg musi mieć wszystkie testy zaliczone, bez pominięć; sprawdź TRX.");
-            Console.WriteLine($"TRX: {total} testów, {passed} zaliczonych, bez pominięć. {Path.Combine(reportDirectory, reportName)}");
+            var failed = (int?)counters.Attribute("failed") ?? 0;
+            Console.WriteLine($"TRX: {total} testów SQL, {passed} zaliczonych, {failed} niezaliczonych, {total - passed - failed} pominiętych. {Path.Combine(reportDirectory, reportName)}");
+            if (process.ExitCode != 0 || passed == 0 || total != passed)
+                throw new InvalidOperationException("Pełny przebieg SQL musi mieć wszystkie testy zaliczone, bez pominięć; sprawdź TRX.");
             await CheckEmptyFixtures();
         }
         finally
         {
-            await Initialize();
-            await SeedUsers();
-            foreach (var (id, _, database) in DemoCompanies.Where(x => protectedKeys.ContainsKey(x.Database)))
-            {
-                await using var company = CompanyContext(database, id);
-                if ((await company.CompanyProfiles.IgnoreQueryFilters().SingleAsync()).CompanyId != id)
-                    throw new InvalidOperationException("Nie przywrócono konfiguracji: profil bazy nie pasuje. Użyj zweryfikowanej kopii sprzed testów.");
-                var row = await company.DataPortConfigurations.SingleOrDefaultAsync();
-                if (row == null) { row = new DataPortConfiguration(); company.DataPortConfigurations.Add(row); }
-                row.SetKey(protectedKeys[database]);
-                await company.SaveChangesAsync();
-                Console.WriteLine($"Przywrócono zaszyfrowaną konfigurację integracji w {database}, bez odczytu sekretu.");
-            }
+            await CleanupTests();
         }
     }
 
@@ -425,11 +286,10 @@ internal static class LocalDatabases
     {
         await using var system = SystemContext(TestDatabases[0]);
         if (await system.Companies.AnyAsync() || await system.CompanyDatabases.AnyAsync() ||
-            await system.Users.AnyAsync() || await system.Roles.AnyAsync() || await system.CompanyAccesses.AnyAsync() ||
-            await system.UserSessions.AnyAsync())
-            throw new InvalidOperationException("Testy pozostawiły rekordy w katalogu demonstracyjnym.");
+            await system.CompanyAccesses.AnyAsync() || await system.UserSessions.AnyAsync())
+            throw new InvalidOperationException("Testy pozostawiły firmy lub sesje w testowej bazie systemowej.");
         if (!(await system.Database.GetAppliedMigrationsAsync()).SequenceEqual(system.Database.GetMigrations()))
-            throw new InvalidOperationException("Testy zmieniły historię bazy systemowej.");
+            throw new InvalidOperationException("Testy zmieniły historię testowej bazy systemowej.");
         foreach (var database in TestDatabases.Skip(1))
         {
             await using var company = CompanyContext(database, null);
@@ -443,7 +303,7 @@ internal static class LocalDatabases
                 !(await company.Database.GetAppliedMigrationsAsync()).SequenceEqual(company.Database.GetMigrations()))
                 throw new InvalidOperationException($"Testy nie wycofały danych lub historii w {database}.");
         }
-        Console.WriteLine("Potwierdzono sprzątanie fixture w trzech bazach demonstracyjnych; historie migracji zachowane.");
+        Console.WriteLine("Potwierdzono sprzątanie danych testowych w bazach testowych; historie migracji zachowane.");
     }
 
     private static async Task ShowSchema(DbContext context, string database, string[] expectedTables, string migrationSuffix)
@@ -587,7 +447,7 @@ internal static class LocalDatabases
     {
         // Wyłącznie trzy konkretne lokalne bazy demonstracyjne. Nigdy API startup.
         foreach (var database in new[] { SystemDatabase }.Concat(DemoCompanies.Select(x => x.Database)))
-            await CheckDemoData(database);
+            await CheckOwnership(database);
         await using (var system = SystemContext(SystemDatabase)) await CheckKnownHistory(system);
         foreach (var (id, _, database) in DemoCompanies)
         {
